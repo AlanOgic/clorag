@@ -24,8 +24,8 @@ EXTRACTION_PROMPT = """Analyze this Cyanview documentation or support content an
 Cyanview makes camera control equipment (RCP, RIO, CI0, VP4). The documentation contains info about which cameras can be controlled and how.
 
 For each camera model mentioned with control/compatibility info, extract:
-- Camera name (exact model, e.g., "Sony HDC-5500", "Canon C500 Mark II")
-- Manufacturer (e.g., "Sony", "Canon", "Panasonic", "Blackmagic", "ARRI")
+- model: The camera model name ONLY, without manufacturer prefix (e.g., "HDC-5500", "C500 Mark II", "URSA Mini Pro 12K")
+- manufacturer: The camera manufacturer name ONLY (e.g., "Sony", "Canon", "Panasonic", "Blackmagic", "ARRI", "RED", "Grass Valley", "Ikegami", "Hitachi", "JVC")
 - Control ports (RS-422, RS-232, Ethernet, GPIO, LANC, etc.)
 - Protocols (VISCA, Sony RCP, Panasonic, LANC, IP, Blackmagic SDI, etc.)
 - Supported controls (Iris, Gain, Shutter, White Balance, ND, Focus, Zoom, Color, Gamma, etc.)
@@ -33,7 +33,9 @@ For each camera model mentioned with control/compatibility info, extract:
 
 Return ONLY a JSON array of cameras found. If no cameras mentioned, return [].
 
-Rules:
+CRITICAL RULES:
+- "model" field must NOT include the manufacturer name - WRONG: "Sony HDC-5500", RIGHT: "HDC-5500"
+- "manufacturer" field must be the brand name ONLY - WRONG: "Sony HDC-5500", RIGHT: "Sony"
 - Only extract cameras with actual compatibility information (ports, protocols, or controls)
 - Do NOT include generic mentions like "any camera" or "most cameras"
 - Use exact model names when available
@@ -43,7 +45,7 @@ Rules:
 Example output:
 [
   {{
-    "name": "Sony HDC-5500",
+    "model": "HDC-5500",
     "manufacturer": "Sony",
     "ports": ["RS-422", "Ethernet"],
     "protocols": ["Sony RCP", "IP"],
@@ -51,12 +53,20 @@ Example output:
     "notes": ["Requires RIO for serial connection", "IP control available with firmware 2.0+"]
   }},
   {{
-    "name": "Canon C500 Mark II",
+    "model": "C500 Mark II",
     "manufacturer": "Canon",
     "ports": ["Ethernet"],
     "protocols": ["IP"],
     "supported_controls": ["Iris", "ISO", "Shutter", "White Balance"],
     "notes": ["Use Cinema RAW Light for best results"]
+  }},
+  {{
+    "model": "URSA Mini Pro 12K",
+    "manufacturer": "Blackmagic",
+    "ports": ["SDI", "Ethernet"],
+    "protocols": ["Blackmagic SDI", "IP"],
+    "supported_controls": ["Iris", "ISO", "Shutter", "White Balance", "ND"],
+    "notes": []
   }}
 ]
 
@@ -80,6 +90,78 @@ Return JSON:
 
 Content:
 {content}"""
+
+
+KNOWN_MANUFACTURERS = [
+    "Sony", "Canon", "Panasonic", "Blackmagic", "ARRI", "RED", "Grass Valley",
+    "Ikegami", "Hitachi", "JVC", "Fujifilm", "Nikon", "Z CAM", "Kinefinity",
+    "Ross", "AJA", "BMD", "GoPro", "DJI", "Atomos", "Marshall", "PTZOptics",
+]
+
+
+def clean_model_name(model: str, manufacturer: str | None) -> str:
+    """Remove manufacturer prefix from model name if present.
+
+    Examples:
+        clean_model_name("Sony HDC-5500", "Sony") -> "HDC-5500"
+        clean_model_name("HDC-5500", "Sony") -> "HDC-5500"
+        clean_model_name("Blackmagic URSA Mini", "Blackmagic") -> "URSA Mini"
+    """
+    if not model:
+        return model
+
+    model = model.strip()
+
+    # Remove known manufacturer prefixes
+    for mfr in KNOWN_MANUFACTURERS:
+        if model.lower().startswith(mfr.lower() + " "):
+            model = model[len(mfr):].strip()
+            break
+        # Also check with "Design" suffix (Blackmagic Design)
+        if model.lower().startswith(mfr.lower() + " design "):
+            model = model[len(mfr) + 8:].strip()
+            break
+
+    # Also check the specific manufacturer if provided
+    if manufacturer:
+        if model.lower().startswith(manufacturer.lower() + " "):
+            model = model[len(manufacturer):].strip()
+
+    return model
+
+
+def normalize_manufacturer(manufacturer: str | None) -> str | None:
+    """Normalize manufacturer name to canonical form.
+
+    Examples:
+        normalize_manufacturer("SONY") -> "Sony"
+        normalize_manufacturer("blackmagic design") -> "Blackmagic"
+        normalize_manufacturer("grass valley") -> "Grass Valley"
+    """
+    if not manufacturer:
+        return None
+
+    manufacturer = manufacturer.strip()
+
+    # Handle common variations
+    lower = manufacturer.lower()
+
+    if "blackmagic" in lower:
+        return "Blackmagic"
+    if "grass" in lower and "valley" in lower:
+        return "Grass Valley"
+    if lower == "bmd":
+        return "Blackmagic"
+    if lower == "gv":
+        return "Grass Valley"
+
+    # Find matching known manufacturer (case-insensitive)
+    for mfr in KNOWN_MANUFACTURERS:
+        if lower == mfr.lower():
+            return mfr
+
+    # Return with first letter capitalized for each word
+    return " ".join(word.capitalize() for word in manufacturer.split())
 
 
 class CameraExtractor:
@@ -151,12 +233,24 @@ class CameraExtractor:
 
             cameras = []
             for cam_data in cameras_data:
-                if not cam_data.get("name"):
+                # Support both "model" (new format) and "name" (old format)
+                raw_model = cam_data.get("model") or cam_data.get("name")
+                if not raw_model:
+                    continue
+
+                # Normalize manufacturer
+                raw_manufacturer = cam_data.get("manufacturer")
+                manufacturer = normalize_manufacturer(raw_manufacturer)
+
+                # Clean model name (remove manufacturer prefix if present)
+                model = clean_model_name(raw_model, manufacturer)
+
+                if not model:
                     continue
 
                 camera = CameraCreate(
-                    name=cam_data["name"],
-                    manufacturer=cam_data.get("manufacturer"),
+                    name=model,
+                    manufacturer=manufacturer,
                     ports=cam_data.get("ports", []),
                     protocols=cam_data.get("protocols", []),
                     supported_controls=cam_data.get("supported_controls", []),
@@ -206,13 +300,17 @@ class CameraExtractor:
                 logger.warning("Extraction task failed", error=str(result))
                 continue
             for camera in result:
-                # Deduplicate by name, merging info
-                key = camera.name.lower()
+                # Create deduplication key: manufacturer + normalized model name
+                # This handles cases like "HDC-5500" vs "hdc-5500" vs "HDC 5500"
+                model_normalized = camera.name.lower().replace("-", "").replace(" ", "").replace("_", "")
+                mfr_normalized = (camera.manufacturer or "unknown").lower()
+                key = f"{mfr_normalized}:{model_normalized}"
+
                 if key in all_cameras:
                     existing = all_cameras[key]
-                    # Merge arrays
+                    # Merge arrays, keeping first non-empty values
                     all_cameras[key] = CameraCreate(
-                        name=camera.name,
+                        name=camera.name if len(camera.name) > len(existing.name) else existing.name,
                         manufacturer=camera.manufacturer or existing.manufacturer,
                         ports=list(set(existing.ports + camera.ports)),
                         protocols=list(set(existing.protocols + camera.protocols)),
