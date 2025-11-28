@@ -1,0 +1,21 @@
+services:
+  clorag-web:
+    build: .
+    container_name: clorag-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8085:8080"
+    environment:
+      - QDRANT_URL=${QDRANT_URL}
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - QDRANT_DOCS_COLLECTION=${QDRANT_DOCS_COLLECTION:-docusaurus_docs}
+      - QDRANT_CASES_COLLECTION=${QDRANT_CASES_COLLECTION:-gmail_cases}
+      - VOYAGE_DIMENSIONS=${VOYAGE_DIMENSIONS:-1024}
+    networks:
+      - clorag-network
+
+networks:
+  clorag-network:
+    driver: bridge

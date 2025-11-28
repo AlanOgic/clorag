@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyanview AI Search</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <!-- Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --ifm-color-primary: #2e8555;
+            --ifm-color-primary-dark: #29784c;
+            --ifm-color-primary-darker: #277148;
+            --ifm-color-primary-darkest: #205d3b;
+            --ifm-color-primary-light: #33925d;
+            --ifm-color-primary-lighter: #359962;
+            --ifm-color-primary-lightest: #3cad6e;
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #fff;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover {
+            color: var(--cyan-blue);
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--hero-bg);
+            padding: 4rem 2rem;
+            text-align: center;
+            color: white;
+        }
+
+        .hero__title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .hero__subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+
+        /* Search Container */
+        .search-container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .search-box {
+            display: flex;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 1rem 1.5rem;
+            border: none;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .search-input::placeholder {
+            color: #999;
+        }
+
+        .search-button {
+            padding: 1rem 2rem;
+            background: var(--cyan-dark);
+            color: white;
+            border: none;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-button:hover {
+            background: var(--cyan-blue);
+        }
+
+        .search-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Source Selector Toggle */
+        .source-selector {
+            display: inline-flex;
+            justify-content: center;
+            margin-top: 1.5rem;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 4px;
+        }
+
+        .source-option {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0.5rem 1.25rem;
+            background: transparent;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .source-option:hover:not(.selected) {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .source-option input {
+            display: none;
+        }
+
+        .source-option.selected {
+            background: white;
+            color: var(--cyanview-navy);
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Quick Links Section */
+        .quick-links {
+            background: #f8f9fa;
+            padding: 2.5rem 1rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .quick-links__container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2rem;
+        }
+
+        .quick-links__column h3 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .quick-links__column ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .quick-links__column li {
+            margin-bottom: 0.5rem;
+        }
+
+        .quick-links__column a {
+            color: #495057;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .quick-links__column a:hover {
+            color: var(--cyan-blue);
+        }
+
+        @media (max-width: 768px) {
+            .quick-links__container {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .quick-links__container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Results Section */
+        .results-section {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        /* AI Answer Card */
+        .answer-card {
+            background: linear-gradient(135deg, #f8f9ff 0%, #f0f7ff 100%);
+            border: 1px solid #d0e3ff;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 12px rgba(0, 119, 182, 0.08);
+        }
+
+        .answer-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #d0e3ff;
+        }
+
+        .answer-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--cyan-dark);
+        }
+
+        .answer-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--cyan-dark);
+        }
+
+        .answer-content {
+            color: #333;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        .answer-content h1, .answer-content h2, .answer-content h3 {
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            color: #1c1e21;
+        }
+
+        .answer-content h2 {
+            font-size: 1.1rem;
+        }
+
+        .answer-content h3 {
+            font-size: 1rem;
+        }
+
+        .answer-content p {
+            margin-bottom: 0.75rem;
+        }
+
+        .answer-content ul, .answer-content ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .answer-content li {
+            margin-bottom: 0.25rem;
+        }
+
+        .answer-content code {
+            background: #e8f4fc;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #0077b6;
+        }
+
+        .answer-content pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0.75rem 0;
+        }
+
+        .answer-content pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        /* Source Links */
+        .source-links {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #d0e3ff;
+        }
+
+        .source-links-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .source-links-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .source-link-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .source-link-item a {
+            color: var(--cyan-dark);
+            text-decoration: none;
+        }
+
+        .source-link-item a:hover {
+            text-decoration: underline;
+        }
+
+        .source-link-badge {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .source-link-badge.docs {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .source-link-badge.case {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .results-count {
+            color: #606770;
+            font-size: 0.9rem;
+        }
+
+        .results-toggle {
+            font-size: 0.85rem;
+            color: var(--cyan-dark);
+            cursor: pointer;
+            background: none;
+            border: none;
+            text-decoration: underline;
+        }
+
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .results-list.collapsed {
+            display: none;
+        }
+
+        /* Result Card */
+        .result-card {
+            background: white;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: box-shadow 0.2s;
+        }
+
+        .result-card:hover {
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--cyan-dark);
+            text-decoration: none;
+            margin: 0;
+        }
+
+        .result-title:hover {
+            text-decoration: underline;
+        }
+
+        .result-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .badge-docs {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-gmail {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        .result-score {
+            font-size: 0.8rem;
+            color: #999;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-url {
+            font-size: 0.85rem;
+            color: #0d7e3f;
+            margin-bottom: 0.5rem;
+            word-break: break-all;
+        }
+
+        .result-snippet {
+            color: #444;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--cyan-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #666;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            background: #f6f6f6;
+            color: #606770;
+            font-size: 0.9rem;
+            margin-top: 3rem;
+        }
+
+        .footer a {
+            color: var(--cyan-dark);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Help Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #eee;
+            background: var(--hero-bg);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            opacity: 0.8;
+        }
+
+        .modal-close:hover {
+            opacity: 1;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-body h3 {
+            font-size: 1.1rem;
+            color: var(--cyan-dark);
+            margin: 1.25rem 0 0.5rem;
+        }
+
+        .modal-body h3:first-child {
+            margin-top: 0;
+        }
+
+        .modal-body p {
+            color: #444;
+            line-height: 1.6;
+            margin-bottom: 0.75rem;
+        }
+
+        .modal-body ul {
+            margin-left: 1.25rem;
+            color: #444;
+        }
+
+        .modal-body li {
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .tech-badge {
+            background: #f0f7ff;
+            color: var(--cyan-dark);
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        /* Case note styling */
+        .case-note {
+            font-style: italic;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .hero__title {
+                font-size: 1.8rem;
+            }
+
+            .source-selector {
+                flex-direction: row;
+                width: auto;
+            }
+
+            .source-option {
+                padding: 0.4rem 0.75rem;
+                font-size: 0.8rem;
+            }
+
+            .search-box {
+                flex-direction: column;
+            }
+
+            .search-button {
+                width: 100%;
+            }
+
+            .answer-card {
+                padding: 1rem 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="#" class="navbar__link" id="help-link">Help</a>
+            <a href="https://support.cyanview.com/docs/" class="navbar__link" target="_blank">Docs & Manuals</a>
+            <a href="https://cyanview.com" class="navbar__link" target="_blank">Cyanview.com</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1 class="hero__title">Cyanview AI Search</h1>
+        <p class="hero__subtitle">
+            Ask questions about Cyanview products and get AI-powered answers.
+        </p>
+
+        <div class="search-container">
+            <form class="search-box" id="search-form">
+                <input
+                    type="text"
+                    class="search-input"
+                    id="search-input"
+                    placeholder="How do I configure tally with TSL 5.0?"
+                    autocomplete="off"
+                >
+                <button type="submit" class="search-button" id="search-button">
+                    Ask
+                </button>
+            </form>
+
+            <div style="text-align: center;">
+                <div class="source-selector">
+                    <label class="source-option selected" data-value="both">
+                        <input type="radio" name="source" value="both" checked>
+                        <span>All</span>
+                    </label>
+                    <label class="source-option" data-value="docs">
+                        <input type="radio" name="source" value="docs">
+                        <span>Documentation</span>
+                    </label>
+                    <label class="source-option" data-value="gmail">
+                        <input type="radio" name="source" value="gmail">
+                        <span>Support Cases</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Links Section -->
+    <section class="quick-links" id="quick-links">
+        <div class="quick-links__container">
+            <div class="quick-links__column">
+                <h3>Manuals</h3>
+                <ul>
+                    <li><a href="https://support.cyanview.com/docs/Manuals/RCP/RCPInstallation" target="_blank">RCP Installation</a></li>
+                    <li><a href="https://support.cyanview.com/docs/Manuals/RCP/RCPUI/RCPUILens" target="_blank">RCP Lens Control</a></li>
+                    <li><a href="https://support.cyanview.com/docs/Manuals/VP4Manual" target="_blank">VP4 Manual</a></li>
+                    <li><a href="https://support.cyanview.com/docs/Accessories/CableCatalog" target="_blank">Cable Catalog</a></li>
+                </ul>
+            </div>
+            <div class="quick-links__column">
+                <h3>Getting Started</h3>
+                <ul>
+                    <li><a href="https://support.cyanview.com/docs/quickstart" target="_blank">Quick Start Guide</a></li>
+                    <li><a href="https://support.cyanview.com/docs/Configuration/ConfIP" target="_blank">IP Configuration</a></li>
+                    <li><a href="https://support.cyanview.com/docs/Configuration/Tally/" target="_blank">Tally Setup</a></li>
+                    <li><a href="https://support.cyanview.com/docs/Manuals/RCP/ProductUpdate" target="_blank">Firmware Update</a></li>
+                </ul>
+            </div>
+            <div class="quick-links__column">
+                <h3>Integrations</h3>
+                <ul>
+                    <li><a href="https://support.cyanview.com/docs/Integrations/Generic/SerialCamera" target="_blank">Serial Cameras</a></li>
+                    <li><a href="https://support.cyanview.com/docs/Integrations/Generic/IPCamera" target="_blank">IP Cameras</a></li>
+                    <li><a href="https://support.cyanview.com/docs/Workflows/BlackmagicHaivision" target="_blank">Workflows</a></li>
+                    <li><a href="https://support.cyanview.com/docs/Troubleshooting/" target="_blank">Troubleshooting</a></li>
+                </ul>
+            </div>
+            <div class="quick-links__column">
+                <h3>Resources</h3>
+                <ul>
+                    <li><a href="/cameras">Camera Compatibility</a></li>
+                    <li><a href="https://support.cyanview.com/docs/" target="_blank">Full Documentation</a></li>
+                    <li><a href="https://support.cyanview.com/download" target="_blank">Downloads</a></li>
+                    <li><a href="https://cyanview.com" target="_blank">Cyanview.com</a></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results-section" id="results-section" style="display: none;">
+        <!-- AI Answer -->
+        <div class="answer-card" id="answer-card">
+            <div class="answer-header">
+                <svg class="answer-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <span class="answer-title">AI Answer</span>
+            </div>
+            <div class="answer-content" id="answer-content"></div>
+            <div class="source-links" id="source-links">
+                <div class="source-links-title">Sources</div>
+                <div class="source-links-list" id="source-links-list"></div>
+            </div>
+        </div>
+
+        <!-- Raw Results (collapsible) - hidden for streaming mode -->
+        <div class="results-header" id="results-header" style="display: none;">
+            <span class="results-count" id="results-count"></span>
+            <button class="results-toggle" id="results-toggle">Show retrieved chunks</button>
+        </div>
+        <div class="results-list collapsed" id="results-list"></div>
+    </section>
+
+    <!-- Loading State -->
+    <div class="loading" id="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Searching documentation and support cases...</p>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="empty-state" style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <p>No results found. Try a different question.</p>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="help-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>How AI Search Works</h2>
+                <button class="modal-close" id="help-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>What is AI Search?</h3>
+                <p>
+                    AI Search uses advanced AI to help you find answers about Cyanview products.
+                    Instead of keyword matching, it understands your question and synthesizes
+                    a comprehensive answer from multiple sources.
+                </p>
+
+                <h3>How It Works</h3>
+                <ul>
+                    <li><strong>Understanding:</strong> Your question is converted into a semantic representation that captures its meaning.</li>
+                    <li><strong>Retrieval:</strong> The most relevant documentation pages and support experiences are found using vector similarity search.</li>
+                    <li><strong>Synthesis:</strong> An AI model reads the retrieved content and generates a clear, comprehensive answer.</li>
+                </ul>
+
+                <h3>Data Sources</h3>
+                <ul>
+                    <li><strong>Documentation:</strong> Official Cyanview documentation from support.cyanview.com</li>
+                    <li><strong>Support Experience:</strong> Knowledge derived from anonymized support interactions</li>
+                </ul>
+
+                <h3>Technologies</h3>
+                <div class="tech-badges">
+                    <span class="tech-badge">Claude AI</span>
+                    <span class="tech-badge">Voyage AI</span>
+                    <span class="tech-badge">Qdrant</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>
+            Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
+            AI Search with Claude AI, Voyage AI & Qdrant
+        </p>
+    </footer>
+
+    <script>
+        const searchForm = document.getElementById('search-form');
+        const searchInput = document.getElementById('search-input');
+        const searchButton = document.getElementById('search-button');
+        const resultsSection = document.getElementById('results-section');
+        const answerContent = document.getElementById('answer-content');
+        const sourceLinksList = document.getElementById('source-links-list');
+        const resultsList = document.getElementById('results-list');
+        const resultsCount = document.getElementById('results-count');
+        const resultsToggle = document.getElementById('results-toggle');
+        const loadingEl = document.getElementById('loading');
+        const emptyState = document.getElementById('empty-state');
+        const sourceOptions = document.querySelectorAll('.source-option');
+
+        // Help modal
+        const helpLink = document.getElementById('help-link');
+        const helpModal = document.getElementById('help-modal');
+        const helpClose = document.getElementById('help-close');
+
+        helpLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            helpModal.classList.add('active');
+        });
+
+        helpClose.addEventListener('click', () => {
+            helpModal.classList.remove('active');
+        });
+
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) {
+                helpModal.classList.remove('active');
+            }
+        });
+
+        // Source selector styling
+        sourceOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                sourceOptions.forEach(o => o.classList.remove('selected'));
+                option.classList.add('selected');
+            });
+        });
+
+        // Toggle raw results
+        resultsToggle.addEventListener('click', () => {
+            const isCollapsed = resultsList.classList.contains('collapsed');
+            resultsList.classList.toggle('collapsed');
+            resultsToggle.textContent = isCollapsed ? 'Hide retrieved chunks' : 'Show retrieved chunks';
+        });
+
+        // Get selected source
+        function getSelectedSource() {
+            return document.querySelector('input[name="source"]:checked').value;
+        }
+
+        // Perform search with streaming
+        async function performSearch(query) {
+            const source = getSelectedSource();
+
+            // Show loading then transition to results
+            loadingEl.style.display = 'block';
+            resultsSection.style.display = 'none';
+            emptyState.style.display = 'none';
+            searchButton.disabled = true;
+
+            try {
+                const response = await fetch('/api/search/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        source: source,
+                        limit: 10
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Search failed');
+                }
+
+                // Prepare UI for streaming
+                loadingEl.style.display = 'none';
+                resultsSection.style.display = 'block';
+                answerContent.innerHTML = '';
+                sourceLinksList.innerHTML = '';
+                resultsList.innerHTML = '';
+                resultsCount.textContent = '';
+
+                let fullText = '';
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+
+                                if (data.type === 'text') {
+                                    fullText += data.text;
+                                    // Render markdown incrementally
+                                    answerContent.innerHTML = marked.parse(fullText);
+                                    // Auto-scroll to show new content
+                                    answerContent.scrollTop = answerContent.scrollHeight;
+                                } else if (data.type === 'sources') {
+                                    // Sources arrive after the answer
+                                    displaySources(data.sources);
+                                } else if (data.type === 'done') {
+                                    // Final render
+                                    answerContent.innerHTML = marked.parse(fullText);
+                                }
+                            } catch (e) {
+                                // Ignore parse errors for incomplete chunks
+                            }
+                        }
+                    }
+                }
+
+                if (!fullText) {
+                    emptyState.style.display = 'block';
+                    resultsSection.style.display = 'none';
+                }
+
+            } catch (error) {
+                console.error('Search error:', error);
+                loadingEl.style.display = 'none';
+                alert('Search failed. Please try again.');
+            } finally {
+                searchButton.disabled = false;
+            }
+        }
+
+        // Display source links
+        function displaySources(sources) {
+            const docLinks = sources.filter(link => link.source_type === 'documentation');
+            const hasCases = sources.some(link => link.source_type !== 'documentation');
+
+            let sourceHtml = docLinks.map(link => {
+                return `
+                    <div class="source-link-item">
+                        <span class="source-link-badge docs">Doc</span>
+                        <a href="${escapeHtml(link.url)}" target="_blank">${escapeHtml(link.title)}</a>
+                    </div>
+                `;
+            }).join('');
+
+            if (hasCases) {
+                sourceHtml += `
+                    <div class="source-link-item case-note">
+                        This answer also draws from internal support cases.
+                    </div>
+                `;
+            }
+
+            sourceLinksList.innerHTML = sourceHtml;
+        }
+
+        // Display results
+        function displayResults(data) {
+            if (data.results.length === 0) {
+                emptyState.style.display = 'block';
+                resultsSection.style.display = 'none';
+                return;
+            }
+
+            resultsSection.style.display = 'block';
+            emptyState.style.display = 'none';
+
+            // Display AI answer (render markdown)
+            answerContent.innerHTML = marked.parse(data.answer || 'No answer generated.');
+
+            // Display source links - only show documentation URLs, add note for cases
+            const docLinks = data.source_links.filter(link => link.source_type === 'documentation');
+            const hasCases = data.source_links.some(link => link.source_type !== 'documentation');
+
+            let sourceHtml = docLinks.map(link => {
+                return `
+                    <div class="source-link-item">
+                        <span class="source-link-badge docs">Doc</span>
+                        <a href="${escapeHtml(link.url)}" target="_blank">${escapeHtml(link.title)}</a>
+                    </div>
+                `;
+            }).join('');
+
+            if (hasCases) {
+                sourceHtml += `
+                    <div class="source-link-item case-note">
+                        This answer also draws from internal support cases.
+                    </div>
+                `;
+            }
+
+            sourceLinksList.innerHTML = sourceHtml;
+
+            // Display raw results count
+            resultsCount.textContent = `${data.total} chunks retrieved`;
+
+            // Keep results collapsed by default
+            resultsList.classList.add('collapsed');
+            resultsToggle.textContent = 'Show retrieved chunks';
+
+            // Display raw results
+            resultsList.innerHTML = data.results.map(result => {
+                const isDoc = result.source === 'documentation';
+                const badgeClass = isDoc ? 'badge-docs' : 'badge-gmail';
+                const badgeText = isDoc ? 'Docs' : 'Case';
+                const title = result.title || 'Untitled';
+                const url = result.url;
+
+                return `
+                    <div class="result-card">
+                        <div class="result-header">
+                            ${url ?
+                                `<a href="${url}" class="result-title" target="_blank">${escapeHtml(title)}</a>` :
+                                `<span class="result-title">${escapeHtml(title)}</span>`
+                            }
+                            <span class="result-badge ${badgeClass}">${badgeText}</span>
+                        </div>
+                        <div class="result-score">Relevance: ${(result.score * 100).toFixed(1)}%</div>
+                        ${url ? `<div class="result-url">${escapeHtml(url)}</div>` : ''}
+                        <p class="result-snippet">${escapeHtml(result.snippet)}</p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Form submit handler
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = searchInput.value.trim();
+            if (query) {
+                performSearch(query);
+            }
+        });
+
+        // Focus search input on load
+        searchInput.focus();
+    </script>
+</body>
+</html>

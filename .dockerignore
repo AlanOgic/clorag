@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Tests
+tests/
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Env files (handled separately)
+.env
+.env.*
+!.env.example
+
+# Misc
+*.md
+!README.md
+*.log
+.DS_Store
+Thumbs.db
+
+# Google credentials (sensitive)
+credentials.json
+token.json

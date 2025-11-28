@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Admin - Cyanview</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --danger: #dc3545;
+            --success: #28a745;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: var(--cyanview-navy);
+            color: white;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+            filter: brightness(0) invert(1);
+        }
+
+        .navbar__badge {
+            background: var(--danger);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .navbar__link {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .navbar__link:hover {
+            color: white;
+        }
+
+        /* Main */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            color: var(--cyanview-navy);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--cyan-dark);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--cyan-blue);
+        }
+
+        /* Stats */
+        .stats-bar {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat__number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--cyanview-navy);
+        }
+
+        .stat__label {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-bar__search {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .filter-bar__search:focus {
+            outline: none;
+            border-color: var(--cyan-blue);
+        }
+
+        .filter-bar__select {
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        /* Table */
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .cameras-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .cameras-table th,
+        .cameras-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cameras-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #606770;
+        }
+
+        .cameras-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .cameras-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .camera-name {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .camera-manufacturer {
+            color: #606770;
+            font-size: 0.9rem;
+        }
+
+        /* Tags */
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            background: #e8f4fd;
+            color: var(--cyan-dark);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .tag--source {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .tag--source-support {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .tag--source-manual {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        /* Actions */
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-sm {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .btn-edit {
+            background: #f8f9fa;
+            color: var(--cyan-dark);
+            border: 1px solid #ddd;
+        }
+
+        .btn-edit:hover {
+            background: #e8f4fd;
+        }
+
+        .btn-delete {
+            background: #f8f9fa;
+            color: var(--danger);
+            border: 1px solid #ddd;
+        }
+
+        .btn-delete:hover {
+            background: #fee;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #666;
+        }
+
+        .empty-state__title {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .cameras-table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin/cameras" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/logo.svg" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/cameras" class="navbar__link">Public View</a>
+            <a href="/" class="navbar__link">AI Search</a>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">Camera Management</h1>
+            <a href="/admin/cameras/new" class="btn btn-primary">+ Add Camera</a>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-bar">
+            <div class="stat">
+                <div class="stat__number">{{ stats.total_cameras }}</div>
+                <div class="stat__label">Total Cameras</div>
+            </div>
+            <div class="stat">
+                <div class="stat__number">{{ stats.manufacturers }}</div>
+                <div class="stat__label">Manufacturers</div>
+            </div>
+            {% for source, count in stats.by_source.items() %}
+            <div class="stat">
+                <div class="stat__number">{{ count }}</div>
+                <div class="stat__label">{{ source | capitalize }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <input type="text" class="filter-bar__search" id="searchInput" placeholder="Search cameras..." oninput="filterTable()">
+            <select class="filter-bar__select" id="manufacturerFilter" onchange="filterByManufacturer()">
+                <option value="">All Manufacturers</option>
+                {% for mfr in manufacturers %}
+                <option value="{{ mfr }}" {% if selected_manufacturer == mfr %}selected{% endif %}>{{ mfr }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% if cameras %}
+        <!-- Table -->
+        <div class="table-container">
+            <table class="cameras-table" id="camerasTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Camera</th>
+                        <th>Ports</th>
+                        <th>Protocols</th>
+                        <th>Source</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for camera in cameras %}
+                    <tr data-id="{{ camera.id }}" data-name="{{ camera.name | lower }}" data-manufacturer="{{ camera.manufacturer | lower if camera.manufacturer else '' }}">
+                        <td>{{ camera.id }}</td>
+                        <td>
+                            <div class="camera-name">{{ camera.name }}</div>
+                            <div class="camera-manufacturer">{{ camera.manufacturer or 'Unknown' }}</div>
+                        </td>
+                        <td>
+                            <div class="tags">
+                                {% for port in camera.ports %}
+                                <span class="tag">{{ port }}</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="tags">
+                                {% for protocol in camera.protocols %}
+                                <span class="tag">{{ protocol }}</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if camera.source.value == 'documentation' %}
+                            <span class="tag tag--source">Documentation</span>
+                            {% elif camera.source.value == 'support_case' %}
+                            <span class="tag tag--source-support">Support</span>
+                            {% else %}
+                            <span class="tag tag--source-manual">Manual</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="actions">
+                                <a href="/admin/cameras/{{ camera.id }}/edit" class="btn btn-sm btn-edit">Edit</a>
+                                <button class="btn btn-sm btn-delete" onclick="deleteCamera({{ camera.id }}, '{{ camera.name }}')">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="empty-state">
+            <h2 class="empty-state__title">No cameras yet</h2>
+            <p>Add your first camera or run ingestion to populate the database.</p>
+        </div>
+        {% endif %}
+    </main>
+
+    <script>
+        const adminPassword = localStorage.getItem('adminPassword') || prompt('Enter admin password:');
+
+        if (adminPassword) {
+            localStorage.setItem('adminPassword', adminPassword);
+        }
+
+        function filterTable() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#camerasTable tbody tr');
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        }
+
+        function filterByManufacturer() {
+            const manufacturer = document.getElementById('manufacturerFilter').value;
+            if (manufacturer) {
+                window.location.href = '/admin/cameras?manufacturer=' + encodeURIComponent(manufacturer);
+            } else {
+                window.location.href = '/admin/cameras';
+            }
+        }
+
+        async function deleteCamera(id, name) {
+            if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/cameras/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Admin-Password': adminPassword,
+                    },
+                });
+
+                if (response.ok) {
+                    const row = document.querySelector(`tr[data-id="${id}"]`);
+                    if (row) row.remove();
+                } else {
+                    const err = await response.json();
+                    alert(err.detail || 'Failed to delete camera');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

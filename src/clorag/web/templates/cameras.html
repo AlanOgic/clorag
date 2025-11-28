@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Compatibility - Cyanview</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover {
+            color: var(--cyan-blue);
+        }
+
+        .navbar__link--active {
+            color: var(--cyan-blue);
+            font-weight: 600;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--hero-bg);
+            padding: 3rem 2rem;
+            text-align: center;
+            color: white;
+        }
+
+        .hero__title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .hero__subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Stats */
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat__number {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .stat__label {
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-bar__search {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .filter-bar__search:focus {
+            outline: none;
+            border-color: var(--cyan-blue);
+        }
+
+        .filter-bar__select {
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        /* Table */
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .cameras-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .cameras-table th,
+        .cameras-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cameras-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #606770;
+        }
+
+        .cameras-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .cameras-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .camera-name {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .camera-manufacturer {
+            color: #606770;
+            font-size: 0.9rem;
+        }
+
+        /* Tags */
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            background: #e8f4fd;
+            color: var(--cyan-dark);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .tag--protocol {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .tag--control {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        /* Notes */
+        .notes-list {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .notes-list li {
+            margin-bottom: 0.25rem;
+        }
+
+        /* Links */
+        .doc-link {
+            color: var(--cyan-blue);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .doc-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #666;
+        }
+
+        .empty-state__title {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #606770;
+            font-size: 0.85rem;
+        }
+
+        .footer a {
+            color: var(--cyan-blue);
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .cameras-table {
+                display: block;
+                overflow-x: auto;
+            }
+
+            .hero__title {
+                font-size: 1.5rem;
+            }
+
+            .stats {
+                gap: 1rem;
+            }
+
+            .stat__number {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/logo.svg" alt="Cyanview" class="navbar__logo">
+            <span>Support</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/cameras" class="navbar__link navbar__link--active">Cameras</a>
+            <a href="https://support.cyanview.com/docs/quickstart" class="navbar__link">Quick Start</a>
+            <a href="https://support.cyanview.com" class="navbar__link">Documentation</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero__title">Camera Compatibility</h1>
+        <p class="hero__subtitle">Find compatible cameras for your Cyanview setup</p>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat__number">{{ stats.total_cameras }}</div>
+                <div class="stat__label">Cameras</div>
+            </div>
+            <div class="stat">
+                <div class="stat__number">{{ stats.manufacturers }}</div>
+                <div class="stat__label">Manufacturers</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <input type="text" class="filter-bar__search" id="searchInput" placeholder="Search cameras..." oninput="filterTable()">
+            <select class="filter-bar__select" id="manufacturerFilter" onchange="filterByManufacturer()">
+                <option value="">All Manufacturers</option>
+                {% for mfr in manufacturers %}
+                <option value="{{ mfr }}" {% if selected_manufacturer == mfr %}selected{% endif %}>{{ mfr }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% if cameras %}
+        <!-- Table -->
+        <div class="table-container">
+            <table class="cameras-table" id="camerasTable">
+                <thead>
+                    <tr>
+                        <th>Camera</th>
+                        <th>Ports</th>
+                        <th>Protocols</th>
+                        <th>Controls</th>
+                        <th>Notes</th>
+                        <th>Docs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for camera in cameras %}
+                    <tr data-name="{{ camera.name | lower }}" data-manufacturer="{{ camera.manufacturer | lower if camera.manufacturer else '' }}">
+                        <td>
+                            <div class="camera-name">{{ camera.name }}</div>
+                            <div class="camera-manufacturer">{{ camera.manufacturer or 'Unknown' }}</div>
+                        </td>
+                        <td>
+                            <div class="tags">
+                                {% for port in camera.ports %}
+                                <span class="tag">{{ port }}</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="tags">
+                                {% for protocol in camera.protocols %}
+                                <span class="tag tag--protocol">{{ protocol }}</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="tags">
+                                {% for control in camera.supported_controls[:5] %}
+                                <span class="tag tag--control">{{ control }}</span>
+                                {% endfor %}
+                                {% if camera.supported_controls | length > 5 %}
+                                <span class="tag tag--control">+{{ camera.supported_controls | length - 5 }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if camera.notes %}
+                            <ul class="notes-list">
+                                {% for note in camera.notes[:2] %}
+                                <li>{{ note }}</li>
+                                {% endfor %}
+                                {% if camera.notes | length > 2 %}
+                                <li>+{{ camera.notes | length - 2 }} more</li>
+                                {% endif %}
+                            </ul>
+                            {% else %}
+                            <span style="color: #999;">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if camera.doc_url %}
+                            <a href="{{ camera.doc_url }}" class="doc-link" target="_blank">View</a>
+                            {% else %}
+                            <span style="color: #999;">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="empty-state">
+            <h2 class="empty-state__title">No cameras yet</h2>
+            <p>Camera compatibility data will be populated as documentation is ingested.</p>
+        </div>
+        {% endif %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Data extracted from <a href="https://support.cyanview.com">Cyanview documentation</a> and support cases.</p>
+    </footer>
+
+    <script>
+        function filterTable() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#camerasTable tbody tr');
+
+            rows.forEach(row => {
+                const name = row.dataset.name || '';
+                const manufacturer = row.dataset.manufacturer || '';
+                const text = row.textContent.toLowerCase();
+
+                if (text.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function filterByManufacturer() {
+            const manufacturer = document.getElementById('manufacturerFilter').value;
+            if (manufacturer) {
+                window.location.href = '/cameras?manufacturer=' + encodeURIComponent(manufacturer);
+            } else {
+                window.location.href = '/cameras';
+            }
+        }
+    </script>
+</body>
+</html>

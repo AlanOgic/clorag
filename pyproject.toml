@@ -1,0 +1,83 @@
+[project]
+name = "clorag"
+version = "0.1.0"
+description = "Multi-RAG Agent with Claude Agent SDK - Docusaurus docs + Gmail support threads"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    # Claude Agent SDK
+    "claude-agent-sdk>=0.1.9",
+
+    # Anthropic SDK (for Haiku/Sonnet analysis)
+    "anthropic>=0.52.0",
+
+    # Vector Database
+    "qdrant-client>=1.16.1",
+
+    # Embeddings
+    "voyageai>=0.3.5",
+    "fastembed>=0.7.3",  # BM25 sparse vectors for hybrid search
+
+    # Gmail API
+    "google-api-python-client>=2.187.0",
+    "google-auth-oauthlib>=1.2.0",
+    "google-auth-httplib2>=0.2.0",
+
+    # Web Scraping
+    "crawl4ai>=0.4.0",
+
+    # Async support
+    "anyio>=4.0.0",
+    "httpx>=0.27.0",
+
+    # Configuration
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+
+    # Utilities
+    "structlog>=24.0.0",
+    "tenacity>=9.0.0",
+
+    # Web Server
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "jinja2>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+]
+
+[project.scripts]
+clorag = "clorag.main:main"
+ingest-docs = "clorag.scripts.ingest_docs:main"
+ingest-gmail = "clorag.scripts.ingest_gmail:main"
+ingest-curated = "clorag.scripts.ingest_curated:main"
+rag-web = "clorag.scripts.run_web:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/clorag"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

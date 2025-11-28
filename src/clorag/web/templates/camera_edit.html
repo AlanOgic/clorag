@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if camera %}Edit Camera{% else %}New Camera{% endif %} - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --danger: #dc3545;
+            --success: #28a745;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: var(--cyanview-navy);
+            color: white;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+            filter: brightness(0) invert(1);
+        }
+
+        .navbar__badge {
+            background: var(--danger);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Main */
+        .main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            color: var(--cyanview-navy);
+        }
+
+        .back-link {
+            color: var(--cyan-blue);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Form */
+        .form-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--cyan-blue);
+        }
+
+        .form-hint {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        /* Array inputs */
+        .array-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .array-input-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .array-input-row input {
+            flex: 1;
+        }
+
+        .btn-remove {
+            padding: 0.5rem 0.75rem;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--danger);
+        }
+
+        .btn-remove:hover {
+            background: #fee;
+        }
+
+        .btn-add {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.5rem 1rem;
+            background: #f8f9fa;
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .btn-add:hover {
+            border-color: var(--cyan-blue);
+            color: var(--cyan-blue);
+        }
+
+        /* Buttons */
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #eee;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--cyan-dark);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--cyan-blue);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #eee;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+            margin-left: auto;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        /* Messages */
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin/cameras" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/logo.svg" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">{% if camera %}Edit Camera{% else %}New Camera{% endif %}</h1>
+            <a href="/admin/cameras" class="back-link">&larr; Back to list</a>
+        </div>
+
+        <div id="alert" class="alert hidden"></div>
+
+        <div class="form-card">
+            <form id="cameraForm">
+                <div class="form-group">
+                    <label class="form-label">Camera Name *</label>
+                    <input type="text" class="form-input" name="name" id="name"
+                           value="{{ camera.name if camera else '' }}" required
+                           placeholder="e.g., Sony HDC-5500">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Manufacturer</label>
+                    <input type="text" class="form-input" name="manufacturer" id="manufacturer"
+                           value="{{ camera.manufacturer if camera else '' }}"
+                           placeholder="e.g., Sony">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Control Ports</label>
+                    <div class="array-inputs" id="ports-container">
+                        {% if camera and camera.ports %}
+                            {% for port in camera.ports %}
+                            <div class="array-input-row">
+                                <input type="text" class="form-input" name="ports[]" value="{{ port }}" placeholder="e.g., RS-422">
+                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="array-input-row">
+                                <input type="text" class="form-input" name="ports[]" placeholder="e.g., RS-422">
+                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn-add" onclick="addRow('ports-container', 'ports[]', 'e.g., RS-422')">+ Add Port</button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Protocols</label>
+                    <div class="array-inputs" id="protocols-container">
+                        {% if camera and camera.protocols %}
+                            {% for protocol in camera.protocols %}
+                            <div class="array-input-row">
+                                <input type="text" class="form-input" name="protocols[]" value="{{ protocol }}" placeholder="e.g., VISCA">
+                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="array-input-row">
+                                <input type="text" class="form-input" name="protocols[]" placeholder="e.g., VISCA">
+                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn-add" onclick="addRow('protocols-container', 'protocols[]', 'e.g., VISCA')">+ Add Protocol</button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Supported Controls</label>
+                    <div class="array-inputs" id="controls-container">
+                        {% if camera and camera.supported_controls %}
+                            {% for control in camera.supported_controls %}
+                            <div class="array-input-row">
+                                <input type="text" class="form-input" name="supported_controls[]" value="{{ control }}" placeholder="e.g., Iris">
+                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="array-input-row">
+                                <input type="text" class="form-input" name="supported_controls[]" placeholder="e.g., Iris">
+                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn-add" onclick="addRow('controls-container', 'supported_controls[]', 'e.g., Iris')">+ Add Control</button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <div class="array-inputs" id="notes-container">
+                        {% if camera and camera.notes %}
+                            {% for note in camera.notes %}
+                            <div class="array-input-row">
+                                <input type="text" class="form-input" name="notes[]" value="{{ note }}" placeholder="e.g., Requires firmware 2.0+">
+                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="array-input-row">
+                                <input type="text" class="form-input" name="notes[]" placeholder="e.g., Requires firmware 2.0+">
+                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn-add" onclick="addRow('notes-container', 'notes[]', 'e.g., Requires firmware 2.0+')">+ Add Note</button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Documentation URL</label>
+                    <input type="url" class="form-input" name="doc_url" id="doc_url"
+                           value="{{ camera.doc_url if camera else '' }}"
+                           placeholder="https://support.cyanview.com/docs/...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Manufacturer URL</label>
+                    <input type="url" class="form-input" name="manufacturer_url" id="manufacturer_url"
+                           value="{{ camera.manufacturer_url if camera else '' }}"
+                           placeholder="https://pro.sony/...">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        {% if camera %}Save Changes{% else %}Create Camera{% endif %}
+                    </button>
+                    <a href="/admin/cameras" class="btn btn-secondary">Cancel</a>
+                    {% if camera %}
+                    <button type="button" class="btn btn-danger" onclick="deleteCamera()">Delete</button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        const cameraId = {{ camera.id if camera else 'null' }};
+        const adminPassword = localStorage.getItem('adminPassword') || prompt('Enter admin password:');
+
+        if (adminPassword) {
+            localStorage.setItem('adminPassword', adminPassword);
+        }
+
+        function addRow(containerId, name, placeholder) {
+            const container = document.getElementById(containerId);
+            const row = document.createElement('div');
+            row.className = 'array-input-row';
+            row.innerHTML = `
+                <input type="text" class="form-input" name="${name}" placeholder="${placeholder}">
+                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeRow(button) {
+            const container = button.parentElement.parentElement;
+            if (container.children.length > 1) {
+                button.parentElement.remove();
+            } else {
+                button.parentElement.querySelector('input').value = '';
+            }
+        }
+
+        function collectArrayValues(name) {
+            const inputs = document.querySelectorAll(`input[name="${name}"]`);
+            return Array.from(inputs)
+                .map(input => input.value.trim())
+                .filter(val => val !== '');
+        }
+
+        function showAlert(message, type) {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.className = `alert alert-${type}`;
+        }
+
+        document.getElementById('cameraForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const data = {
+                name: document.getElementById('name').value,
+                manufacturer: document.getElementById('manufacturer').value || null,
+                ports: collectArrayValues('ports[]'),
+                protocols: collectArrayValues('protocols[]'),
+                supported_controls: collectArrayValues('supported_controls[]'),
+                notes: collectArrayValues('notes[]'),
+                doc_url: document.getElementById('doc_url').value || null,
+                manufacturer_url: document.getElementById('manufacturer_url').value || null,
+            };
+
+            try {
+                const url = cameraId
+                    ? `/api/admin/cameras/${cameraId}`
+                    : '/api/admin/cameras';
+                const method = cameraId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': adminPassword,
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                if (response.ok) {
+                    showAlert('Camera saved successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/admin/cameras';
+                    }, 1000);
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to save camera', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        });
+
+        async function deleteCamera() {
+            if (!confirm('Are you sure you want to delete this camera?')) return;
+
+            try {
+                const response = await fetch(`/api/admin/cameras/${cameraId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Admin-Password': adminPassword,
+                    },
+                });
+
+                if (response.ok) {
+                    showAlert('Camera deleted!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/admin/cameras';
+                    }, 1000);
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to delete camera', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
