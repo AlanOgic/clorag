@@ -79,7 +79,7 @@ class ThreadAnalyzer:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-3-5-haiku-20241022",
+        model: str = "claude-haiku-4-5-20251001",
         max_concurrent: int = 10,
     ) -> None:
         """Initialize the thread analyzer.

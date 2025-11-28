@@ -211,7 +211,7 @@ class CameraExtractor:
 
         try:
             response = await self._client.messages.create(
-                model="claude-3-5-haiku-20241022",
+                model="claude-haiku-4-5-20251001",
                 max_tokens=2048,
                 messages=[
                     {
@@ -357,7 +357,7 @@ class CameraExtractor:
 
             # Use LLM to extract specs
             llm_response = await self._client.messages.create(
-                model="claude-3-5-haiku-20241022",
+                model="claude-haiku-4-5-20251001",
                 max_tokens=1024,
                 messages=[
                     {
