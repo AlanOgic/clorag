@@ -36,6 +36,7 @@ class CuratedGmailPipeline:
     def __init__(
         self,
         max_threads: int | None = None,
+        offset: int = 0,
         min_confidence: float = 0.7,
         haiku_concurrent: int = 10,
         sonnet_concurrent: int = 5,
@@ -45,6 +46,7 @@ class CuratedGmailPipeline:
 
         Args:
             max_threads: Maximum threads to fetch from Gmail.
+            offset: Number of threads to skip (for incremental ingestion).
             min_confidence: Minimum confidence for resolved classification.
             haiku_concurrent: Concurrent Haiku requests.
             sonnet_concurrent: Concurrent Sonnet requests.
@@ -52,10 +54,11 @@ class CuratedGmailPipeline:
         """
         self._settings = get_settings()
         self._max_threads = max_threads
+        self._offset = offset
         self._min_confidence = min_confidence
 
         # Initialize components
-        self._gmail = GmailIngestionPipeline(max_threads=max_threads)
+        self._gmail = GmailIngestionPipeline(max_threads=max_threads, offset=offset)
         self._analyzer = ThreadAnalyzer(max_concurrent=haiku_concurrent)
         self._qc = QualityController()
         self._embeddings = EmbeddingsClient()
@@ -334,12 +337,14 @@ class CuratedGmailPipeline:
 
 async def run_curated_ingestion(
     max_threads: int | None = None,
+    offset: int = 0,
     min_confidence: float = 0.7,
 ) -> int:
     """Run curated Gmail ingestion.
 
     Args:
         max_threads: Maximum threads to fetch.
+        offset: Number of threads to skip (for incremental ingestion).
         min_confidence: Minimum confidence for resolved cases.
 
     Returns:
@@ -347,6 +352,7 @@ async def run_curated_ingestion(
     """
     pipeline = CuratedGmailPipeline(
         max_threads=max_threads,
+        offset=offset,
         min_confidence=min_confidence,
     )
     return await pipeline.run()

@@ -57,6 +57,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
         chunk_size: int = 1500,
         chunk_overlap: int = 150,
         max_threads: int | None = None,
+        offset: int = 0,
     ) -> None:
         """Initialize the pipeline.
 
@@ -69,6 +70,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
             chunk_size: Size of text chunks.
             chunk_overlap: Overlap between chunks.
             max_threads: Maximum number of threads to fetch (most recent first).
+            offset: Number of threads to skip (for incremental ingestion).
         """
         settings = get_settings()
         self._label = label or settings.gmail_label
@@ -78,6 +80,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
         self._vectorstore = vector_store or VectorStore()
         self._chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         self._max_threads = max_threads
+        self._offset = offset
         self._service = None
 
     def _get_credentials(self) -> Credentials:
@@ -159,10 +162,19 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
             if not page_token:
                 break
 
-        # Limit to max_threads if specified (Gmail returns most recent first)
-        if self._max_threads and len(threads) > self._max_threads:
-            threads = threads[: self._max_threads]
-            logger.info("Limited to max threads", original=len(threads), max=self._max_threads)
+        # Apply offset and limit (Gmail returns most recent first)
+        total_available = len(threads)
+        if self._offset or self._max_threads:
+            start_idx = self._offset
+            end_idx = (self._offset + self._max_threads) if self._max_threads else len(threads)
+            threads = threads[start_idx:end_idx]
+            logger.info(
+                "Applied offset/limit",
+                total_available=total_available,
+                offset=self._offset,
+                max_threads=self._max_threads,
+                selected=len(threads),
+            )
 
         logger.info("Found threads", count=len(threads))
 
