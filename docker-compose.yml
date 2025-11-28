@@ -13,6 +13,10 @@ services:
       - QDRANT_DOCS_COLLECTION=${QDRANT_DOCS_COLLECTION:-docusaurus_docs}
       - QDRANT_CASES_COLLECTION=${QDRANT_CASES_COLLECTION:-gmail_cases}
       - VOYAGE_DIMENSIONS=${VOYAGE_DIMENSIONS:-1024}
+      - DATABASE_PATH=${DATABASE_PATH:-data/clorag.db}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    volumes:
+      - ./data:/app/data
     networks:
       - clorag-network
 
