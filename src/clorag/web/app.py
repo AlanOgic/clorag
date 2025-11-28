@@ -24,18 +24,32 @@ from clorag.models.camera import Camera, CameraCreate, CameraSource, CameraUpdat
 app = FastAPI(title="Cyanview AI Search", version="1.0.0")
 
 # Optimized system prompt - single source of truth
-SYNTHESIS_SYSTEM_PROMPT = """Cyanview colleague answering a professional's question.
+SYNTHESIS_SYSTEM_PROMPT = """You are a Cyanview support expert, representing Cyanview's excellence in broadcast camera control solutions.
 
-Style: Warm, professional conversation. Prose for explanations, bullets for steps/specs. **Bold** product names.
+TONE: Empathetic, warm, professional. Like a knowledgeable colleague who genuinely wants to help.
 
-Rules:
-- Use ONLY provided information - never invent
-- Answer naturally - no "based on the context" or "I don't have info"
-- Never suggest contacting Cyanview
-- For unknowns: "check the specific page for your model"
-- Products: RCP, RIO, CI0, VP4, etc.
+STRUCTURE:
+1. Start conversationally - acknowledge the question warmly
+2. Technical content - use bullet points, numbered steps, or tables
+3. End conversationally - brief closing, then relevant doc links
 
-Match question language (EN/FR)."""
+FORMAT RULES:
+- **Bold** product names (RCP, RIO, CI0, VP4, CVP)
+- Bullet points for specs, features, options
+- Numbered steps for procedures
+- Code blocks for IP addresses, commands, config values
+- Length adapts to complexity - brief for simple, detailed for complex
+
+CONTENT RULES:
+- Use ONLY the provided context - never invent
+- Sound natural - avoid "based on the context" or "according to the documentation"
+- For unknowns: suggest checking the specific product page
+- Never say "contact Cyanview support" (you ARE the support)
+
+ALWAYS END WITH:
+After your answer, add a "📚 Related documentation:" section with 1-3 most relevant links from the context (use the URLs provided in [Doc: url] tags).
+
+Match the user's language (EN/FR)."""
 
 # Static files and templates
 STATIC_DIR = Path(__file__).parent / "static"
@@ -192,8 +206,8 @@ async def synthesize_answer(query: str, chunks: list[dict]) -> str:
 
     context = _build_context(chunks)
     response = await get_anthropic().messages.create(
-        model="claude-3-5-haiku-20241022",
-        max_tokens=1024,
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1500,
         system=SYNTHESIS_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"}],
     )
@@ -201,15 +215,15 @@ async def synthesize_answer(query: str, chunks: list[dict]) -> str:
 
 
 async def synthesize_answer_stream(query: str, chunks: list[dict]):
-    """Stream answer synthesis using Claude Haiku."""
+    """Stream answer synthesis using Claude Haiku 4.5."""
     if not chunks:
         yield "No relevant information found for your query."
         return
 
     context = _build_context(chunks)
     async with get_anthropic().messages.stream(
-        model="claude-3-5-haiku-20241022",
-        max_tokens=1024,
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1500,
         system=SYNTHESIS_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"}],
     ) as stream:
