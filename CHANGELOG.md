@@ -2,9 +2,18 @@
 
 All notable changes to CLORAG will be documented in this file.
 
-## [Unreleased]
+## [0.2.0] - 2025-11-28
+
+### Changed
+- **Upgraded to Claude Haiku 4.5** (`claude-haiku-4-5-20251001`)
+  - Thread analyzer now uses Haiku 4.5 for faster, more accurate analysis
+  - Camera extractor uses Haiku 4.5 for improved extraction quality
 
 ### Added
+- **Incremental Gmail Ingestion** (`--offset` parameter)
+  - `uv run ingest-curated --offset 300 --max-threads 300` to process threads 301-600
+  - Enables batch processing without re-analyzing already ingested threads
+  - Gmail API returns threads sorted by most recent first
 
 #### Camera Compatibility Database System
 - **Camera Models** (`src/clorag/models/camera.py`)
@@ -20,7 +29,7 @@ All notable changes to CLORAG will be documented in this file.
   - Search by name, manufacturer filtering, statistics queries
 
 - **Camera Extractor** (`src/clorag/analysis/camera_extractor.py`)
-  - LLM-based extraction using Claude Haiku (claude-3-5-haiku-20241022)
+  - LLM-based extraction using Claude Haiku 4.5 (claude-haiku-4-5-20251001)
   - `extract_cameras()` - Parse documentation/support cases for camera info
   - `extract_from_batch()` - Batch extraction with concurrency control
   - `enrich_from_manufacturer()` - Scrape manufacturer websites for additional specs

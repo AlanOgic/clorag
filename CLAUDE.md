@@ -29,6 +29,9 @@ uv run ingest-docs
 # Ingest Gmail threads (curated with LLM analysis)
 uv run ingest-curated --max-threads 300
 
+# Incremental ingestion (skip first N threads)
+uv run ingest-curated --offset 300 --max-threads 300
+
 # Linting and type checking
 uv run ruff check src/
 uv run mypy src/clorag --strict

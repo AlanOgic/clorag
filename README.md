@@ -106,8 +106,11 @@ uv run ingest-docs https://docs.example.com
 # Ingerer les threads Gmail (label: supports)
 uv run ingest-gmail
 
-# Ingestion curatedee avec analyse LLM (recommande)
+# Ingestion curatee avec analyse LLM (recommande)
 uv run ingest-curated --max-threads 300
+
+# Ingestion incrementale (skip premiers N threads)
+uv run ingest-curated --offset 300 --max-threads 300
 ```
 
 ### Web Interface
