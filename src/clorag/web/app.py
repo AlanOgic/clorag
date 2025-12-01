@@ -1,5 +1,6 @@
 """FastAPI web application for AI Search with Claude synthesis."""
 
+import hashlib
 import json
 import secrets
 import time
@@ -10,9 +11,10 @@ from typing import Annotated
 import anthropic
 import anyio
 import structlog
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Body, Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -409,22 +411,15 @@ async def search_stream(req: SearchRequest):
     # Extract top 3 unique source links
     source_links = _extract_source_links(chunks_for_synthesis)
 
-    # Log search to analytics (non-blocking)
-    response_time_ms = int((time.time() - start_time) * 1000)
-    try:
-        get_analytics_db().log_search(
-            query=req.query,
-            source=req.source.value,
-            response_time_ms=response_time_ms,
-            results_count=len(chunks_for_synthesis),
-        )
-    except Exception as e:
-        logger.warning("Failed to log search analytics", error=str(e))
+    # Capture start time for analytics
+    search_start_time = start_time
 
     async def generate():
+        collected_response = []
         try:
             # Stream the answer first
             async for chunk in synthesize_answer_stream(req.query, chunks_for_synthesis):
+                collected_response.append(chunk)
                 yield f"data: {json.dumps({'type': 'text', 'text': chunk})}\n\n"
 
             # Then send sources at the end
@@ -432,6 +427,20 @@ async def search_stream(req: SearchRequest):
 
             # Signal completion
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+            # Log search to analytics with full data after streaming completes
+            response_time_ms = int((time.time() - search_start_time) * 1000)
+            try:
+                get_analytics_db().log_search(
+                    query=req.query,
+                    source=req.source.value,
+                    response_time_ms=response_time_ms,
+                    results_count=len(chunks_for_synthesis),
+                    response="".join(collected_response),
+                    chunks=chunks_for_synthesis,
+                )
+            except Exception as e:
+                logger.warning("Failed to log search analytics", error=str(e))
         except Exception as e:
             logger.error("Error during streaming response", error=str(e), query=req.query)
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
@@ -464,7 +473,7 @@ async def search(req: SearchRequest):
     # Extract top 3 unique source links
     source_links = _extract_source_links(chunks_for_synthesis, as_model=True)
 
-    # Log search to analytics (non-blocking)
+    # Log search to analytics with full data (non-blocking)
     response_time_ms = int((time.time() - start_time) * 1000)
     try:
         get_analytics_db().log_search(
@@ -472,6 +481,8 @@ async def search(req: SearchRequest):
             source=req.source.value,
             response_time_ms=response_time_ms,
             results_count=len(results),
+            response=answer,
+            chunks=chunks_for_synthesis,
         )
     except Exception as e:
         logger.warning("Failed to log search analytics", error=str(e))
@@ -498,19 +509,53 @@ def _truncate(text: str, max_length: int) -> str:
 # =============================================================================
 
 
-def verify_admin(x_admin_password: Annotated[str | None, Header()] = None) -> bool:
-    """Verify admin password from header using timing-safe comparison."""
+# Session cookie settings
+ADMIN_SESSION_COOKIE = "admin_session"
+ADMIN_SESSION_MAX_AGE = 24 * 60 * 60  # 24 hours
+
+
+def get_session_serializer() -> URLSafeTimedSerializer:
+    """Get session serializer using admin password as secret key."""
+    settings = get_settings()
+    if not settings.admin_password:
+        raise HTTPException(status_code=503, detail="Admin access not configured")
+    return URLSafeTimedSerializer(settings.admin_password.get_secret_value())
+
+
+def verify_admin(
+    x_admin_password: Annotated[str | None, Header()] = None,
+    admin_session: Annotated[str | None, Cookie()] = None,
+) -> bool:
+    """Verify admin access via header password OR session cookie.
+
+    Two authentication methods are supported:
+    1. X-Admin-Password header - for API calls (legacy support)
+    2. admin_session cookie - for browser sessions (signed with itsdangerous)
+    """
     settings = get_settings()
     if not settings.admin_password:
         raise HTTPException(status_code=503, detail="Admin access not configured")
 
-    # Handle None password safely and use timing-safe comparison
-    if x_admin_password is None or not secrets.compare_digest(
+    # Method 1: Check session cookie first (preferred for browser)
+    if admin_session:
+        try:
+            serializer = get_session_serializer()
+            data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
+            if data.get("authenticated"):
+                return True
+        except SignatureExpired:
+            logger.debug("Admin session expired")
+        except BadSignature:
+            logger.debug("Invalid admin session signature")
+
+    # Method 2: Check header password (API calls / legacy)
+    if x_admin_password is not None and secrets.compare_digest(
         x_admin_password.encode('utf-8'),
         settings.admin_password.get_secret_value().encode('utf-8')
     ):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return True
+        return True
+
+    raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 @app.get("/cameras", response_class=HTMLResponse)
@@ -601,6 +646,98 @@ async def api_camera_get(camera_id: int):
 async def admin_index(request: Request):
     """Admin index page with links to all admin pages."""
     return templates.TemplateResponse("admin_index.html", {"request": request})
+
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    """Admin login page."""
+    return templates.TemplateResponse("admin_login.html", {"request": request})
+
+
+class LoginRequest(BaseModel):
+    """Login request model."""
+
+    password: str
+
+
+class LoginResponse(BaseModel):
+    """Login response model."""
+
+    success: bool
+    message: str
+
+
+@app.post("/api/admin/login")
+@limiter.limit("5/minute")
+async def api_admin_login(
+    request: Request,
+    login_req: LoginRequest,
+    response: Response,
+):
+    """Login and set session cookie.
+
+    Returns success status and sets httponly cookie on success.
+    """
+    settings = get_settings()
+    if not settings.admin_password:
+        raise HTTPException(status_code=503, detail="Admin access not configured")
+
+    # Verify password with timing-safe comparison
+    if not secrets.compare_digest(
+        login_req.password.encode('utf-8'),
+        settings.admin_password.get_secret_value().encode('utf-8')
+    ):
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    # Create signed session token
+    serializer = get_session_serializer()
+    token = serializer.dumps({"authenticated": True, "ts": time.time()})
+
+    # Set httponly cookie (secure in production)
+    response.set_cookie(
+        key=ADMIN_SESSION_COOKIE,
+        value=token,
+        max_age=ADMIN_SESSION_MAX_AGE,
+        httponly=True,
+        secure=True,  # HTTPS only
+        samesite="strict",
+    )
+
+    return LoginResponse(success=True, message="Login successful")
+
+
+@app.post("/api/admin/logout")
+async def api_admin_logout(response: Response):
+    """Logout and clear session cookie."""
+    response.delete_cookie(
+        key=ADMIN_SESSION_COOKIE,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+    )
+    return {"success": True, "message": "Logged out"}
+
+
+@app.get("/api/admin/session")
+async def api_admin_session(
+    admin_session: Annotated[str | None, Cookie()] = None,
+):
+    """Check if current session is valid.
+
+    Returns authenticated status without requiring password.
+    """
+    if not admin_session:
+        return {"authenticated": False}
+
+    try:
+        serializer = get_session_serializer()
+        data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
+        if data.get("authenticated"):
+            return {"authenticated": True}
+    except (SignatureExpired, BadSignature):
+        pass
+
+    return {"authenticated": False}
 
 
 @app.get("/admin/cameras", response_class=HTMLResponse)
@@ -740,6 +877,19 @@ async def api_popular_queries(
     """Get popular search queries."""
     analytics = get_analytics_db()
     return analytics.get_popular_queries(limit=limit, days=days)
+
+
+@app.get("/api/admin/search/{search_id}")
+async def api_get_search(
+    search_id: int,
+    _: bool = Depends(verify_admin),
+):
+    """Get a stored search by ID with full response and chunks data."""
+    analytics = get_analytics_db()
+    search = analytics.get_search_by_id(search_id)
+    if not search:
+        raise HTTPException(status_code=404, detail="Search not found")
+    return search
 
 
 # =============================================================================

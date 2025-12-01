@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -31,6 +32,8 @@ class AnalyticsDatabase:
                     source TEXT DEFAULT 'both',
                     response_time_ms INTEGER,
                     results_count INTEGER,
+                    response TEXT,
+                    chunks TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -38,6 +41,13 @@ class AnalyticsDatabase:
                 CREATE INDEX IF NOT EXISTS idx_search_queries_created
                 ON search_queries(created_at)
             """)
+            # Migration: add response and chunks columns if they don't exist
+            cursor = conn.execute("PRAGMA table_info(search_queries)")
+            columns = {row[1] for row in cursor.fetchall()}
+            if "response" not in columns:
+                conn.execute("ALTER TABLE search_queries ADD COLUMN response TEXT")
+            if "chunks" not in columns:
+                conn.execute("ALTER TABLE search_queries ADD COLUMN chunks TEXT")
             conn.commit()
 
     def log_search(
@@ -46,25 +56,31 @@ class AnalyticsDatabase:
         source: str = "both",
         response_time_ms: int | None = None,
         results_count: int | None = None,
+        response: str | None = None,
+        chunks: list[dict[str, Any]] | None = None,
     ) -> int:
-        """Log a search query.
+        """Log a search query with full response data.
 
         Args:
             query: The search query text.
             source: Data source used (docs, gmail, both).
             response_time_ms: Response time in milliseconds.
             results_count: Number of results returned.
+            response: The LLM-generated response text.
+            chunks: List of retrieved chunks with metadata.
 
         Returns:
             The ID of the inserted record.
         """
+        chunks_json = json.dumps(chunks) if chunks else None
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO search_queries (query, source, response_time_ms, results_count)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO search_queries
+                (query, source, response_time_ms, results_count, response, chunks)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (query, source, response_time_ms, results_count),
+                (query, source, response_time_ms, results_count, response, chunks_json),
             )
             conn.commit()
             return cursor.lastrowid or 0
@@ -181,3 +197,32 @@ class AnalyticsDatabase:
                 (limit,),
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_search_by_id(self, search_id: int) -> dict[str, Any] | None:
+        """Get a single search by ID with full data including response and chunks.
+
+        Args:
+            search_id: The ID of the search record.
+
+        Returns:
+            Dict with all search data including response and chunks, or None if not found.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT id, query, source, response_time_ms, results_count,
+                       response, chunks, created_at
+                FROM search_queries
+                WHERE id = ?
+                """,
+                (search_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            result = dict(row)
+            # Parse chunks JSON if present
+            if result.get("chunks"):
+                result["chunks"] = json.loads(result["chunks"])
+            return result

@@ -377,9 +377,157 @@
                 font-size: 1.5rem;
             }
         }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 1.5rem;
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin: 0;
+        }
+
+        .modal-subtitle {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .modal-code {
+            font-family: monospace;
+            color: var(--cyan-dark);
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .detail-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+
+        .detail-notes {
+            list-style: disc;
+            padding-left: 1.25rem;
+            color: #555;
+        }
+
+        .detail-notes li {
+            margin-bottom: 0.4rem;
+        }
+
+        .detail-links a {
+            display: inline-block;
+            margin-right: 1rem;
+            color: var(--cyan-blue);
+            text-decoration: none;
+        }
+
+        .detail-links a:hover {
+            text-decoration: underline;
+        }
+
+        .detail-empty {
+            color: #999;
+            font-style: italic;
+        }
+
+        /* Make rows clickable */
+        .cameras-table tbody tr {
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
+    <!-- Camera Detail Modal -->
+    <div id="cameraModal" class="modal-overlay hidden" onclick="if(event.target === this) closeModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <div>
+                    <h2 class="modal-title" id="modalCameraName"></h2>
+                    <div class="modal-subtitle" id="modalManufacturer"></div>
+                    <div class="modal-code" id="modalCodeModel"></div>
+                </div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
     <!-- Navbar -->
     <nav class="navbar">
         <a href="/" class="navbar__brand">
@@ -468,7 +616,9 @@
                         data-manufacturer="{{ camera.manufacturer | lower if camera.manufacturer else '' }}"
                         data-type="{{ camera.device_type.value if camera.device_type else '' }}"
                         data-ports="{{ camera.ports | join(',') | lower }}"
-                        data-protocols="{{ camera.protocols | join(',') | lower }}">
+                        data-protocols="{{ camera.protocols | join(',') | lower }}"
+                        data-camera-id="{{ camera.id }}"
+                        onclick="openCameraModal({{ camera.id }})">
                         <td>
                             {% if camera.device_type %}
                             {% set dtype = camera.device_type.value %}
@@ -586,6 +736,132 @@
     </footer>
 
     <script>
+        // Embed camera data for modal display
+        const camerasData = {
+            {% for camera in cameras %}
+            {{ camera.id }}: {
+                id: {{ camera.id }},
+                name: "{{ camera.name | replace('\"', '\\\"') }}",
+                manufacturer: "{{ camera.manufacturer | replace('\"', '\\\"') if camera.manufacturer else '' }}",
+                code_model: "{{ camera.code_model | replace('\"', '\\\"') if camera.code_model else '' }}",
+                device_type: "{{ camera.device_type.value if camera.device_type else '' }}",
+                ports: {{ camera.ports | tojson }},
+                protocols: {{ camera.protocols | tojson }},
+                supported_controls: {{ camera.supported_controls | tojson }},
+                notes: {{ camera.notes | tojson }},
+                doc_url: "{{ camera.doc_url if camera.doc_url else '' }}",
+                manufacturer_url: "{{ camera.manufacturer_url if camera.manufacturer_url else '' }}"
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        };
+
+        const cameraModal = document.getElementById('cameraModal');
+
+        function openCameraModal(cameraId) {
+            const camera = camerasData[cameraId];
+            if (!camera) return;
+
+            // Set header info
+            document.getElementById('modalCameraName').textContent = camera.name;
+            document.getElementById('modalManufacturer').textContent = camera.manufacturer || 'Unknown Manufacturer';
+            document.getElementById('modalCodeModel').textContent = camera.code_model || '';
+
+            // Build modal body content
+            let html = '';
+
+            // Device Type
+            if (camera.device_type) {
+                const typeLabel = camera.device_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                html += `<div class="detail-section">
+                    <div class="detail-label">Device Type</div>
+                    <div class="detail-tags">
+                        <span class="tag tag--type">${typeLabel}</span>
+                    </div>
+                </div>`;
+            }
+
+            // Ports
+            html += `<div class="detail-section">
+                <div class="detail-label">Ports</div>
+                <div class="detail-tags">`;
+            if (camera.ports && camera.ports.length > 0) {
+                camera.ports.forEach(port => {
+                    html += `<span class="tag">${port}</span>`;
+                });
+            } else {
+                html += `<span class="detail-empty">None specified</span>`;
+            }
+            html += `</div></div>`;
+
+            // Protocols
+            html += `<div class="detail-section">
+                <div class="detail-label">Protocols</div>
+                <div class="detail-tags">`;
+            if (camera.protocols && camera.protocols.length > 0) {
+                camera.protocols.forEach(protocol => {
+                    html += `<span class="tag tag--protocol">${protocol}</span>`;
+                });
+            } else {
+                html += `<span class="detail-empty">None specified</span>`;
+            }
+            html += `</div></div>`;
+
+            // Supported Controls
+            html += `<div class="detail-section">
+                <div class="detail-label">Supported Controls (${camera.supported_controls ? camera.supported_controls.length : 0})</div>
+                <div class="detail-tags">`;
+            if (camera.supported_controls && camera.supported_controls.length > 0) {
+                camera.supported_controls.forEach(control => {
+                    html += `<span class="tag tag--control">${control}</span>`;
+                });
+            } else {
+                html += `<span class="detail-empty">None specified</span>`;
+            }
+            html += `</div></div>`;
+
+            // Notes
+            html += `<div class="detail-section">
+                <div class="detail-label">Notes (${camera.notes ? camera.notes.length : 0})</div>`;
+            if (camera.notes && camera.notes.length > 0) {
+                html += `<ul class="detail-notes">`;
+                camera.notes.forEach(note => {
+                    html += `<li>${note}</li>`;
+                });
+                html += `</ul>`;
+            } else {
+                html += `<span class="detail-empty">No notes</span>`;
+            }
+            html += `</div>`;
+
+            // Documentation Links
+            if (camera.doc_url || camera.manufacturer_url) {
+                html += `<div class="detail-section">
+                    <div class="detail-label">Documentation</div>
+                    <div class="detail-links">`;
+                if (camera.doc_url) {
+                    html += `<a href="${camera.doc_url}" target="_blank">Cyanview Docs</a>`;
+                }
+                if (camera.manufacturer_url) {
+                    html += `<a href="${camera.manufacturer_url}" target="_blank">Manufacturer Site</a>`;
+                }
+                html += `</div></div>`;
+            }
+
+            document.getElementById('modalBody').innerHTML = html;
+            cameraModal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            cameraModal.classList.add('hidden');
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !cameraModal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
         let currentSort = { column: null, direction: 'asc' };
 
         function filterTable() {

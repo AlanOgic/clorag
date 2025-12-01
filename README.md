@@ -31,7 +31,7 @@ User Query -> Claude Agent -> MCP Tools -> RAG Retrieval -> Response
 | Orchestration | Claude Agent SDK 0.1.9+ |
 | Vector DB | Qdrant |
 | Embeddings | Voyage AI (voyage-context-3) |
-| Database | SQLite (camera data) |
+| Database | SQLite (camera + analytics) |
 | Web | FastAPI + Jinja2 |
 | Config | Pydantic Settings |
 | Async | AnyIO |
@@ -122,9 +122,14 @@ uv run rag-web
 # Access:
 # - AI Search: http://localhost:8080/
 # - Camera Compatibility: http://localhost:8080/cameras
-# - Admin Cameras (requires ADMIN_PASSWORD): http://localhost:8080/admin/cameras
+# - Admin Login: http://localhost:8080/admin/login
+# - Admin Dashboard: http://localhost:8080/admin (requires login)
+# - Admin Cameras: http://localhost:8080/admin/cameras
 # - Admin Analytics: http://localhost:8080/admin/analytics
+# - Search Debug: http://localhost:8080/admin/search-debug
 ```
+
+Admin authentication uses secure session cookies (7-day expiry). Set `ADMIN_PASSWORD` in your `.env` file.
 
 ## Tools RAG disponibles
 

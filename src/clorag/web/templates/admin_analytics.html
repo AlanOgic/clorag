@@ -369,6 +369,189 @@
             font-weight: 600;
             color: var(--cyanview-navy);
         }
+
+        /* Logout button */
+        .btn-logout {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+            background: transparent;
+            color: #606770;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #dc2626;
+        }
+
+        /* Auth loading overlay */
+        .auth-loading {
+            position: fixed;
+            inset: 0;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-loading.hidden {
+            display: none;
+        }
+
+        /* Search Detail Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal__header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal__title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .modal__close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0.25rem;
+            line-height: 1;
+        }
+
+        .modal__close:hover {
+            color: #333;
+        }
+
+        .modal__body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-section__title {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .detail-response {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .detail-chunk {
+            background: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .detail-chunk__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .detail-chunk__source {
+            font-weight: 600;
+            color: var(--cyan-dark);
+        }
+
+        .detail-chunk__url {
+            color: #606770;
+            text-decoration: none;
+        }
+
+        .detail-chunk__url:hover {
+            color: var(--cyan-blue);
+        }
+
+        .detail-chunk__text {
+            font-size: 0.9rem;
+            color: #444;
+            white-space: pre-wrap;
+        }
+
+        .detail-meta {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .detail-meta__item {
+            font-size: 0.9rem;
+        }
+
+        .detail-meta__label {
+            color: #606770;
+        }
+
+        .detail-meta__value {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .no-data {
+            color: #999;
+            font-style: italic;
+        }
+
+        /* Clickable row */
+        .clickable-row {
+            cursor: pointer;
+        }
+
+        .clickable-row:hover {
+            background: #f0f7ff !important;
+        }
     </style>
 </head>
 <body>
@@ -381,10 +564,16 @@
         <div class="navbar__links">
             <a href="/" class="navbar__link">AI Search</a>
             <a href="/cameras" class="navbar__link">Cameras</a>
-            <a href="/admin/cameras" class="navbar__link">Admin Cameras</a>
+            <a href="/admin" class="navbar__link">Admin</a>
             <a href="/admin/analytics" class="navbar__link navbar__link--active">Analytics</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
         </div>
     </nav>
+
+    <!-- Auth loading overlay -->
+    <div id="authLoading" class="auth-loading">
+        <span>Checking authentication...</span>
+    </div>
 
     <!-- Hero -->
     <section class="hero">
@@ -394,16 +583,8 @@
 
     <!-- Main Content -->
     <main class="main">
-        <!-- Auth Form (shown initially) -->
-        <div class="auth-form" id="authForm">
-            <h2>Admin Access</h2>
-            <input type="password" id="adminPassword" placeholder="Enter admin password">
-            <button onclick="authenticate()">Access Analytics</button>
-            <div class="error hidden" id="authError">Invalid password</div>
-        </div>
-
-        <!-- Dashboard (hidden until authenticated) -->
-        <div id="dashboard" class="hidden">
+        <!-- Dashboard -->
+        <div id="dashboard">
             <!-- Stats Grid -->
             <div class="stats-grid" id="statsGrid">
                 <div class="stat-card">
@@ -484,44 +665,69 @@
         </div>
     </main>
 
+    <!-- Search Detail Modal -->
+    <div id="searchModal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal__header">
+                <span class="modal__title">Search Details</span>
+                <button class="modal__close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal__body" id="modalBody">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading search details...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        let adminPassword = '';
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
 
-        async function authenticate() {
-            adminPassword = document.getElementById('adminPassword').value;
-            const authError = document.getElementById('authError');
-            authError.classList.add('hidden');
-
+        // Check session on page load
+        async function checkAuth() {
             try {
-                const response = await fetch('/api/admin/search-stats', {
-                    headers: {
-                        'X-Admin-Password': adminPassword
-                    }
-                });
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
 
-                if (response.ok) {
-                    document.getElementById('authForm').classList.add('hidden');
-                    document.getElementById('dashboard').classList.remove('hidden');
-                    loadAnalytics();
-                } else {
-                    authError.classList.remove('hidden');
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
                 }
-            } catch (error) {
-                authError.textContent = 'Connection error';
-                authError.classList.remove('hidden');
+
+                // Authenticated - show page and load data
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+                loadAnalytics();
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                window.location.href = '/admin/login';
             }
         }
+        checkAuth();
+
+        // Logout handler
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/login';
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
 
         async function loadAnalytics() {
             const loading = document.getElementById('loading');
             loading.classList.remove('hidden');
 
             try {
-                const response = await fetch('/api/admin/search-stats', {
-                    headers: {
-                        'X-Admin-Password': adminPassword
-                    }
-                });
+                const response = await fetch('/api/admin/search-stats');
+
+                if (response.status === 401) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
 
                 if (!response.ok) throw new Error('Failed to load');
 
@@ -632,10 +838,9 @@
             tbody.innerHTML = searches.map(s => {
                 const tagClass = s.source === 'docs' ? 'tag--docs' :
                                  s.source === 'gmail' ? 'tag--gmail' : 'tag--both';
-                const debugUrl = `/admin/search-debug?q=${encodeURIComponent(s.query)}&source=${s.source}`;
                 return `
-                    <tr>
-                        <td><a href="${debugUrl}" class="query-link" title="Debug this query">${escapeHtml(s.query.substring(0, 60))}${s.query.length > 60 ? '...' : ''}</a></td>
+                    <tr class="clickable-row" onclick="openSearchDetail(${s.id})" title="Click to view stored details">
+                        <td>${escapeHtml(s.query.substring(0, 60))}${s.query.length > 60 ? '...' : ''}</td>
                         <td><span class="tag ${tagClass}">${s.source}</span></td>
                         <td>${s.response_time_ms ? s.response_time_ms + ' ms' : '-'}</td>
                         <td>${s.results_count ?? '-'}</td>
@@ -662,10 +867,115 @@
             return div.innerHTML;
         }
 
-        // Allow Enter key for password
-        document.getElementById('adminPassword').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') authenticate();
+        // Modal functions
+        const searchModal = document.getElementById('searchModal');
+        const modalBody = document.getElementById('modalBody');
+
+        async function openSearchDetail(searchId) {
+            searchModal.classList.remove('hidden');
+            modalBody.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading search details...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch(`/api/admin/search/${searchId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load search details');
+                }
+                const data = await response.json();
+                renderSearchDetail(data);
+            } catch (error) {
+                modalBody.innerHTML = `<p class="error">${error.message}</p>`;
+            }
+        }
+
+        function closeModal() {
+            searchModal.classList.add('hidden');
+        }
+
+        // Close modal on overlay click
+        searchModal.addEventListener('click', (e) => {
+            if (e.target === searchModal) {
+                closeModal();
+            }
         });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !searchModal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        function renderSearchDetail(data) {
+            const tagClass = data.source === 'docs' ? 'tag--docs' :
+                             data.source === 'gmail' ? 'tag--gmail' : 'tag--both';
+
+            let chunksHtml = '<p class="no-data">No chunks stored for this search</p>';
+            if (data.chunks && data.chunks.length > 0) {
+                chunksHtml = data.chunks.map((chunk, i) => {
+                    const sourceType = chunk.source_type === 'documentation' ? 'Documentation' : 'Support Case';
+                    const url = chunk.url || chunk.subject || '';
+                    const urlHtml = chunk.url
+                        ? `<a href="${escapeHtml(chunk.url)}" class="detail-chunk__url" target="_blank">${escapeHtml(chunk.url)}</a>`
+                        : (chunk.subject ? `<span class="detail-chunk__url">${escapeHtml(chunk.subject)}</span>` : '');
+
+                    return `
+                        <div class="detail-chunk">
+                            <div class="detail-chunk__header">
+                                <span class="detail-chunk__source">#${i + 1} - ${sourceType}</span>
+                                ${urlHtml}
+                            </div>
+                            <div class="detail-chunk__text">${escapeHtml(chunk.text?.substring(0, 500) || '')}${chunk.text?.length > 500 ? '...' : ''}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            modalBody.innerHTML = `
+                <div class="detail-section">
+                    <div class="detail-section__title">Query</div>
+                    <div style="font-size: 1.1rem; font-weight: 500;">${escapeHtml(data.query)}</div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-meta">
+                        <div class="detail-meta__item">
+                            <span class="detail-meta__label">Source:</span>
+                            <span class="tag ${tagClass}">${data.source}</span>
+                        </div>
+                        <div class="detail-meta__item">
+                            <span class="detail-meta__label">Response Time:</span>
+                            <span class="detail-meta__value">${data.response_time_ms || '-'} ms</span>
+                        </div>
+                        <div class="detail-meta__item">
+                            <span class="detail-meta__label">Results:</span>
+                            <span class="detail-meta__value">${data.results_count ?? '-'}</span>
+                        </div>
+                        <div class="detail-meta__item">
+                            <span class="detail-meta__label">Time:</span>
+                            <span class="detail-meta__value">${formatDate(data.created_at)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-section__title">LLM Response</div>
+                    ${data.response
+                        ? `<div class="detail-response">${escapeHtml(data.response)}</div>`
+                        : '<p class="no-data">No response stored for this search</p>'
+                    }
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-section__title">Retrieved Chunks (${data.chunks?.length || 0})</div>
+                    ${chunksHtml}
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>

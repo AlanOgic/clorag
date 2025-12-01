@@ -77,18 +77,18 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
 
             # Parse sitemap (simple XML parsing)
             sitemap_content = response.text
-            urls = self._parse_sitemap(sitemap_content)
+            url_entries = self._parse_sitemap(sitemap_content)
 
-            logger.info("Found pages in sitemap", count=len(urls))
+            logger.info("Found pages in sitemap", count=len(url_entries))
 
             # Fetch pages in parallel batches for better performance
             documents: list[Document] = []
             batch_size = 10
 
-            for i in range(0, len(urls), batch_size):
-                batch_urls = urls[i : i + batch_size]
+            for i in range(0, len(url_entries), batch_size):
+                batch_entries = url_entries[i : i + batch_size]
                 results = await asyncio.gather(
-                    *[self._fetch_page(client, url) for url in batch_urls],
+                    *[self._fetch_page(client, url, lastmod) for url, lastmod in batch_entries],
                     return_exceptions=True,
                 )
                 for result in results:
@@ -100,37 +100,55 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         logger.info("Fetched documents", count=len(documents))
         return documents
 
-    def _parse_sitemap(self, content: str) -> list[str]:
-        """Parse URLs from sitemap XML.
+    def _parse_sitemap(self, content: str) -> list[tuple[str, str | None]]:
+        """Parse URLs and lastmod dates from sitemap XML.
 
         Args:
             content: Sitemap XML content.
 
         Returns:
-            List of URLs (filtered to exclude tag pages and search).
+            List of tuples (url, lastmod) filtered to exclude tag pages and search.
+            lastmod is ISO date string or None if not available.
         """
         import re
 
-        # Simple parsing - look for <loc> tags
+        # Parse <url> blocks to extract both <loc> and <lastmod>
+        url_pattern = re.compile(r"<url>(.*?)</url>", re.DOTALL)
         loc_pattern = re.compile(r"<loc>(.*?)</loc>")
-        matches = loc_pattern.findall(content)
+        lastmod_pattern = re.compile(r"<lastmod>(.*?)</lastmod>")
 
-        # Filter out non-documentation pages
+        results: list[tuple[str, str | None]] = []
         excluded_patterns = ["/tags", "/search", "/download"]
-        urls = [
-            url for url in matches
-            if not any(pattern in url for pattern in excluded_patterns)
-        ]
 
-        logger.info("Filtered sitemap URLs", total=len(matches), kept=len(urls))
-        return urls
+        for url_block in url_pattern.findall(content):
+            loc_match = loc_pattern.search(url_block)
+            if not loc_match:
+                continue
 
-    async def _fetch_page(self, client: httpx.AsyncClient, url: str) -> Document | None:
+            url = loc_match.group(1)
+
+            # Skip excluded patterns
+            if any(pattern in url for pattern in excluded_patterns):
+                continue
+
+            # Extract lastmod if available
+            lastmod_match = lastmod_pattern.search(url_block)
+            lastmod = lastmod_match.group(1) if lastmod_match else None
+
+            results.append((url, lastmod))
+
+        logger.info("Filtered sitemap URLs", total=len(results), with_lastmod=sum(1 for _, lm in results if lm))
+        return results
+
+    async def _fetch_page(
+        self, client: httpx.AsyncClient, url: str, lastmod: str | None = None
+    ) -> Document | None:
         """Fetch a single page and extract content.
 
         Args:
             client: HTTP client.
             url: Page URL.
+            lastmod: Last modification date from sitemap (ISO format).
 
         Returns:
             Document with page content, or None if failed.
@@ -150,14 +168,18 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         if not text or len(text) < 100:  # Skip very short pages
             return None
 
+        metadata = {
+            "source": "docusaurus",
+            "url": url,
+            "title": title,
+        }
+        if lastmod:
+            metadata["lastmod"] = lastmod
+
         return Document(
             id=str(uuid4()),
             text=text,
-            metadata={
-                "source": "docusaurus",
-                "url": url,
-                "title": title,
-            },
+            metadata=metadata,
         )
 
     def _extract_text_from_html(self, html: str) -> str:

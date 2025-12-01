@@ -628,6 +628,41 @@
             font-weight: 500;
         }
 
+        /* Example queries in help modal */
+        .example-queries {
+            list-style: none;
+            margin-left: 0;
+            padding-left: 0;
+        }
+
+        .example-queries li {
+            margin-bottom: 0.5rem;
+        }
+
+        .example-query {
+            display: inline-block;
+            color: var(--cyan-dark);
+            background: #f0f7ff;
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .example-query:hover {
+            background: #e0efff;
+            text-decoration: none;
+        }
+
+        .help-footer {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
         /* Case note styling */
         .case-note {
             font-style: italic;
@@ -769,36 +804,45 @@
     <div class="modal-overlay" id="help-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>How AI Search Works</h2>
+                <h2>How to Use AI Search</h2>
                 <button class="modal-close" id="help-close">&times;</button>
             </div>
             <div class="modal-body">
-                <h3>What is AI Search?</h3>
+                <h3>Ask Natural Questions</h3>
                 <p>
-                    AI Search uses advanced AI to help you find answers about Cyanview products.
-                    Instead of keyword matching, it understands your question and synthesizes
-                    a comprehensive answer from multiple sources.
+                    Ask questions in plain English about Cyanview products, configuration,
+                    troubleshooting, or compatibility. The AI understands context and provides
+                    synthesized answers from our documentation and support experience.
                 </p>
 
-                <h3>How It Works</h3>
-                <ul>
-                    <li><strong>Understanding:</strong> Your question is converted into a semantic representation that captures its meaning.</li>
-                    <li><strong>Retrieval:</strong> The most relevant documentation pages and support experiences are found using vector similarity search.</li>
-                    <li><strong>Synthesis:</strong> An AI model reads the retrieved content and generates a clear, comprehensive answer.</li>
+                <h3>Example Questions</h3>
+                <ul class="example-queries">
+                    <li><a href="#" class="example-query">"How do I configure tally with TSL 5.0?"</a></li>
+                    <li><a href="#" class="example-query">"What cameras are compatible with RIO Live?"</a></li>
+                    <li><a href="#" class="example-query">"How to set up VISCA over IP?"</a></li>
+                    <li><a href="#" class="example-query">"My RCP is not connecting to the camera"</a></li>
+                    <li><a href="#" class="example-query">"What's the difference between RCP and RIO?"</a></li>
                 </ul>
 
-                <h3>Data Sources</h3>
+                <h3>Source Filters</h3>
                 <ul>
-                    <li><strong>Documentation:</strong> Official Cyanview documentation from support.cyanview.com</li>
-                    <li><strong>Support Experience:</strong> Knowledge derived from anonymized support interactions</li>
+                    <li><strong>All:</strong> Searches both documentation and support experience for comprehensive answers.</li>
+                    <li><strong>Documentation:</strong> Official manuals, guides, and product pages only.</li>
+                    <li><strong>Support Cases:</strong> Real-world solutions from past support interactions (anonymized).</li>
                 </ul>
 
-                <h3>Technologies</h3>
-                <div class="tech-badges">
-                    <span class="tech-badge">Claude AI</span>
-                    <span class="tech-badge">Voyage AI</span>
-                    <span class="tech-badge">Qdrant</span>
-                </div>
+                <h3>Tips for Best Results</h3>
+                <ul>
+                    <li>Be specific about your product (RCP, RIO, CI0, VP4, etc.)</li>
+                    <li>Include relevant details (protocol, camera model, connection type)</li>
+                    <li>Describe your goal or the problem you're facing</li>
+                    <li>Try rephrasing if the first answer doesn't help</li>
+                </ul>
+
+                <p class="help-footer">
+                    <em>Powered by Claude AI. Answers are generated from Cyanview documentation
+                    and support knowledge base.</em>
+                </p>
             </div>
         </div>
     </div>
@@ -843,6 +887,18 @@
             if (e.target === helpModal) {
                 helpModal.classList.remove('active');
             }
+        });
+
+        // Example queries - click to search
+        document.querySelectorAll('.example-query').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Extract query text (remove quotes)
+                const query = link.textContent.replace(/^"|"$/g, '');
+                searchInput.value = query;
+                helpModal.classList.remove('active');
+                performSearch(query);
+            });
         });
 
         // Source selector styling

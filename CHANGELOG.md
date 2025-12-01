@@ -2,6 +2,39 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.1] - 2025-12-01
+
+### Added
+- **Session-Based Admin Authentication**
+  - Secure login page at `/admin/login` replacing header-based auth
+  - Signed session cookies using `itsdangerous` (7-day expiry)
+  - Admin dashboard at `/admin` with links to all admin features
+  - Logout functionality at `/admin/logout`
+
+- **Camera Detail Modal**
+  - Click any camera row to view full details in modal
+  - Shows all controls, notes, ports, protocols (not truncated)
+  - Keyboard support (Escape to close)
+
+- **Search Analytics Enhancements**
+  - Store full LLM response and retrieved chunks with each search
+  - Click any search in history to view stored results (no re-query)
+  - New API endpoint `GET /api/admin/search/{id}` for search details
+
+- **Improved Help Popup**
+  - Practical "How to Use" guide instead of technical explanation
+  - 5 clickable example queries that auto-execute search
+  - Tips for better results and source filter explanation
+
+- **Documentation Date Tracking**
+  - Extract `<lastmod>` from sitemap during docs ingestion
+  - Stored in metadata alongside URL and title
+  - Enables future recency-based ranking
+
+### Changed
+- Admin routes now require session cookie instead of `X-Admin-Password` header
+- Analytics database schema adds `response` and `chunks` columns
+
 ## [0.3.0] - 2025-12-01
 
 ### Added

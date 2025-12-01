@@ -460,6 +460,39 @@
             background: #e0e0e0;
         }
 
+        /* Logout button */
+        .btn-logout {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+            background: transparent;
+            color: #606770;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #dc2626;
+        }
+
+        /* Auth loading overlay */
+        .auth-loading {
+            position: fixed;
+            inset: 0;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-loading.hidden {
+            display: none;
+        }
+
         /* Two column layout */
         .two-columns {
             display: grid;
@@ -484,11 +517,17 @@
         <div class="navbar__links">
             <a href="/" class="navbar__link">AI Search</a>
             <a href="/cameras" class="navbar__link">Cameras</a>
-            <a href="/admin/cameras" class="navbar__link">Admin Cameras</a>
+            <a href="/admin" class="navbar__link">Admin</a>
             <a href="/admin/analytics" class="navbar__link">Analytics</a>
             <a href="/admin/search-debug" class="navbar__link navbar__link--active">Debug</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
         </div>
     </nav>
+
+    <!-- Auth loading overlay -->
+    <div id="authLoading" class="auth-loading">
+        <span>Checking authentication...</span>
+    </div>
 
     <!-- Hero -->
     <section class="hero">
@@ -498,16 +537,8 @@
 
     <!-- Main Content -->
     <main class="main">
-        <!-- Auth Form -->
-        <div class="auth-form" id="authForm">
-            <h2>Admin Access</h2>
-            <input type="password" id="adminPassword" placeholder="Enter admin password">
-            <button onclick="authenticate()">Access Debug</button>
-            <div class="error hidden" id="authError">Invalid password</div>
-        </div>
-
-        <!-- Search Interface (hidden until authenticated) -->
-        <div id="searchInterface" class="hidden">
+        <!-- Search Interface -->
+        <div id="searchInterface">
             <!-- Search Form -->
             <div class="search-form">
                 <div class="search-form__row">
@@ -607,33 +638,45 @@
     </main>
 
     <script>
-        let adminPassword = '';
         let lastResult = null;
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
 
-        async function authenticate() {
-            adminPassword = document.getElementById('adminPassword').value;
-            const authError = document.getElementById('authError');
-            authError.classList.add('hidden');
-
+        // Check session on page load
+        async function checkAuth() {
             try {
-                // Test auth with a minimal request
-                const response = await fetch('/api/admin/search-stats', {
-                    headers: {
-                        'X-Admin-Password': adminPassword
-                    }
-                });
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
 
-                if (response.ok) {
-                    document.getElementById('authForm').classList.add('hidden');
-                    document.getElementById('searchInterface').classList.remove('hidden');
-                } else {
-                    authError.classList.remove('hidden');
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.href);
+                    return;
                 }
-            } catch (error) {
-                authError.textContent = 'Connection error';
-                authError.classList.remove('hidden');
+
+                // Authenticated - show page
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+
+                // Check URL params and auto-search if query present
+                if (checkUrlParams() && document.getElementById('queryInput').value) {
+                    performSearch();
+                }
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                window.location.href = '/admin/login';
             }
         }
+        checkAuth();
+
+        // Logout handler
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/login';
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
 
         async function performSearch() {
             const query = document.getElementById('queryInput').value.trim();
@@ -654,11 +697,15 @@
                 const response = await fetch('/api/admin/search-debug', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Password': adminPassword
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ query, source, limit })
                 });
+
+                if (response.status === 401) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.href);
+                    return;
+                }
 
                 if (!response.ok) {
                     throw new Error('Search failed');
@@ -776,11 +823,7 @@
             return div.innerHTML;
         }
 
-        // Allow Enter key for password and search
-        document.getElementById('adminPassword').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') authenticate();
-        });
-
+        // Allow Enter key for search
         document.getElementById('queryInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') performSearch();
         });
@@ -801,38 +844,7 @@
             return !!query;
         }
 
-        // Modified authenticate to auto-search if URL params present
-        const originalAuthenticate = authenticate;
-        authenticate = async function() {
-            adminPassword = document.getElementById('adminPassword').value;
-            const authError = document.getElementById('authError');
-            authError.classList.add('hidden');
-
-            try {
-                const response = await fetch('/api/admin/search-stats', {
-                    headers: {
-                        'X-Admin-Password': adminPassword
-                    }
-                });
-
-                if (response.ok) {
-                    document.getElementById('authForm').classList.add('hidden');
-                    document.getElementById('searchInterface').classList.remove('hidden');
-
-                    // Auto-search if query parameter was present
-                    if (checkUrlParams() && document.getElementById('queryInput').value) {
-                        performSearch();
-                    }
-                } else {
-                    authError.classList.remove('hidden');
-                }
-            } catch (error) {
-                authError.textContent = 'Connection error';
-                authError.classList.remove('hidden');
-            }
-        };
-
-        // Pre-fill form on page load (before auth)
+        // Pre-fill form on page load (checkAuth will auto-search if query present)
         checkUrlParams();
     </script>
 </body>

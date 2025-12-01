@@ -203,6 +203,39 @@
         .public-link:hover {
             background: #e3f2fd;
         }
+
+        /* Logout button */
+        .btn-logout {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+            background: transparent;
+            color: #606770;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #dc2626;
+        }
+
+        /* Loading overlay */
+        .auth-loading {
+            position: fixed;
+            inset: 0;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-loading.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -216,8 +249,14 @@
             <a href="/" class="navbar__link">AI Search</a>
             <a href="/cameras" class="navbar__link">Cameras</a>
             <a href="/admin" class="navbar__link navbar__link--active">Admin</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
         </div>
     </nav>
+
+    <!-- Auth loading overlay -->
+    <div id="authLoading" class="auth-loading">
+        <span>Checking authentication...</span>
+    </div>
 
     <!-- Hero -->
     <section class="hero">
@@ -289,5 +328,42 @@
             </div>
         </div>
     </main>
+
+    <script>
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // Check session on page load
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
+
+                if (!data.authenticated) {
+                    // Redirect to login with return URL
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+
+                // Authenticated - show page
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                window.location.href = '/admin/login';
+            }
+        }
+        checkAuth();
+
+        // Logout handler
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/login';
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
+    </script>
 </body>
 </html>

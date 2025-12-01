@@ -1,6 +1,6 @@
 [project]
 name = "clorag"
-version = "0.3.0"
+version = "0.3.1"
 description = "Multi-RAG Agent with Claude Agent SDK - Docusaurus docs + Gmail support threads"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -45,6 +45,7 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "jinja2>=3.1.0",
     "slowapi>=0.1.9",
+    "itsdangerous>=2.2.0",  # Signed cookies for admin sessions
 ]
 
 [project.optional-dependencies]
