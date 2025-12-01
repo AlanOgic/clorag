@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Debug - Admin - Cyanview</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover {
+            color: var(--cyan-blue);
+        }
+
+        .navbar__link--active {
+            color: var(--cyan-blue);
+            font-weight: 600;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--hero-bg);
+            padding: 2rem;
+            text-align: center;
+            color: white;
+        }
+
+        .hero__title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .hero__subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Auth Form */
+        .auth-form {
+            max-width: 400px;
+            margin: 2rem auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-form h2 {
+            margin-bottom: 1rem;
+            color: var(--cyanview-navy);
+        }
+
+        .auth-form input[type="password"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .auth-form button {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--cyan-dark);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .auth-form button:hover {
+            background: var(--cyan-blue);
+        }
+
+        /* Search Form */
+        .search-form {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .search-form__row {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .search-form__input {
+            flex: 1;
+        }
+
+        .search-form__input label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #606770;
+            margin-bottom: 0.5rem;
+        }
+
+        .search-form__input input,
+        .search-form__input select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .search-form__btn {
+            padding: 0.75rem 2rem;
+            background: var(--cyan-dark);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .search-form__btn:hover:not(:disabled) {
+            background: var(--cyan-blue);
+        }
+
+        .search-form__btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Section */
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        .section__title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Timing Stats */
+        .timing-stats {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .timing-stat {
+            background: #f8f9fa;
+            padding: 1rem 1.5rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .timing-stat__value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--cyan-dark);
+        }
+
+        .timing-stat__label {
+            font-size: 0.8rem;
+            color: #606770;
+            margin-top: 0.25rem;
+        }
+
+        /* Chunks List */
+        .chunk {
+            border: 1px solid #eee;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .chunk__header {
+            background: #f8f9fa;
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .chunk__header:hover {
+            background: #f0f0f0;
+        }
+
+        .chunk__info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .chunk__index {
+            background: var(--cyan-dark);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .chunk__title {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .chunk__meta {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.85rem;
+            color: #606770;
+        }
+
+        .chunk__score {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .chunk__body {
+            padding: 1rem;
+            display: none;
+            background: #fff;
+        }
+
+        .chunk__body.open {
+            display: block;
+        }
+
+        .chunk__text {
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .chunk__url {
+            margin-top: 0.5rem;
+        }
+
+        .chunk__url a {
+            color: var(--cyan-blue);
+            font-size: 0.85rem;
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .tag--docs {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .tag--gmail {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        /* Code Block */
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        /* LLM Response */
+        .llm-response {
+            line-height: 1.8;
+        }
+
+        .llm-response p {
+            margin-bottom: 1rem;
+        }
+
+        .llm-response ul, .llm-response ol {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .llm-response code {
+            background: #f0f0f0;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        .llm-response pre {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #606770;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--cyan-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Error */
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        /* Collapsible toggle icon */
+        .toggle-icon {
+            transition: transform 0.2s;
+        }
+
+        .toggle-icon.open {
+            transform: rotate(90deg);
+        }
+
+        /* Copy button */
+        .copy-btn {
+            padding: 0.4rem 0.8rem;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: #e0e0e0;
+        }
+
+        /* Two column layout */
+        .two-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1000px) {
+            .two-columns {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="/admin/cameras" class="navbar__link">Admin Cameras</a>
+            <a href="/admin/analytics" class="navbar__link">Analytics</a>
+            <a href="/admin/search-debug" class="navbar__link navbar__link--active">Debug</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero__title">Search Debug</h1>
+        <p class="hero__subtitle">View RAG chunks, LLM prompt, and response details</p>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Auth Form -->
+        <div class="auth-form" id="authForm">
+            <h2>Admin Access</h2>
+            <input type="password" id="adminPassword" placeholder="Enter admin password">
+            <button onclick="authenticate()">Access Debug</button>
+            <div class="error hidden" id="authError">Invalid password</div>
+        </div>
+
+        <!-- Search Interface (hidden until authenticated) -->
+        <div id="searchInterface" class="hidden">
+            <!-- Search Form -->
+            <div class="search-form">
+                <div class="search-form__row">
+                    <div class="search-form__input" style="flex: 3;">
+                        <label for="queryInput">Search Query</label>
+                        <input type="text" id="queryInput" placeholder="Enter your search query...">
+                    </div>
+                    <div class="search-form__input" style="flex: 1;">
+                        <label for="sourceSelect">Source</label>
+                        <select id="sourceSelect">
+                            <option value="both">Both (Docs + Gmail)</option>
+                            <option value="docs">Documentation Only</option>
+                            <option value="gmail">Gmail Cases Only</option>
+                        </select>
+                    </div>
+                    <div class="search-form__input" style="flex: 0.5;">
+                        <label for="limitInput">Limit</label>
+                        <input type="number" id="limitInput" value="10" min="1" max="50">
+                    </div>
+                    <button class="search-form__btn" id="searchBtn" onclick="performSearch()">Search</button>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div class="loading hidden" id="loading">
+                <div class="spinner"></div>
+                <p>Searching and synthesizing...</p>
+            </div>
+
+            <!-- Results -->
+            <div id="results" class="hidden">
+                <!-- Timing Stats -->
+                <div class="timing-stats">
+                    <div class="timing-stat">
+                        <div class="timing-stat__value" id="retrievalTime">-</div>
+                        <div class="timing-stat__label">Retrieval</div>
+                    </div>
+                    <div class="timing-stat">
+                        <div class="timing-stat__value" id="synthesisTime">-</div>
+                        <div class="timing-stat__label">LLM Synthesis</div>
+                    </div>
+                    <div class="timing-stat">
+                        <div class="timing-stat__value" id="totalTime">-</div>
+                        <div class="timing-stat__label">Total</div>
+                    </div>
+                    <div class="timing-stat">
+                        <div class="timing-stat__value" id="chunksCount">-</div>
+                        <div class="timing-stat__label">Chunks</div>
+                    </div>
+                    <div class="timing-stat">
+                        <div class="timing-stat__value" id="modelName">-</div>
+                        <div class="timing-stat__label">Model</div>
+                    </div>
+                </div>
+
+                <div class="two-columns">
+                    <!-- Left Column: Chunks -->
+                    <div>
+                        <div class="section">
+                            <div class="section__title">
+                                <span>Retrieved Chunks</span>
+                                <button class="copy-btn" onclick="expandAllChunks()">Expand All</button>
+                            </div>
+                            <div id="chunksList"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: LLM -->
+                    <div>
+                        <div class="section">
+                            <div class="section__title">
+                                <span>LLM Response</span>
+                                <button class="copy-btn" onclick="copyResponse()">Copy</button>
+                            </div>
+                            <div class="llm-response" id="llmResponse"></div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section__title">
+                                <span>User Prompt (sent to LLM)</span>
+                                <button class="copy-btn" onclick="copyPrompt()">Copy</button>
+                            </div>
+                            <div class="code-block" id="userPrompt"></div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section__title">
+                                <span>System Prompt</span>
+                                <button class="copy-btn" onclick="copySystemPrompt()">Copy</button>
+                            </div>
+                            <div class="code-block" id="systemPrompt" style="max-height: 200px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let adminPassword = '';
+        let lastResult = null;
+
+        async function authenticate() {
+            adminPassword = document.getElementById('adminPassword').value;
+            const authError = document.getElementById('authError');
+            authError.classList.add('hidden');
+
+            try {
+                // Test auth with a minimal request
+                const response = await fetch('/api/admin/search-stats', {
+                    headers: {
+                        'X-Admin-Password': adminPassword
+                    }
+                });
+
+                if (response.ok) {
+                    document.getElementById('authForm').classList.add('hidden');
+                    document.getElementById('searchInterface').classList.remove('hidden');
+                } else {
+                    authError.classList.remove('hidden');
+                }
+            } catch (error) {
+                authError.textContent = 'Connection error';
+                authError.classList.remove('hidden');
+            }
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) return;
+
+            const source = document.getElementById('sourceSelect').value;
+            const limit = parseInt(document.getElementById('limitInput').value) || 10;
+
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const searchBtn = document.getElementById('searchBtn');
+
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+            searchBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/admin/search-debug', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': adminPassword
+                    },
+                    body: JSON.stringify({ query, source, limit })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Search failed');
+                }
+
+                lastResult = await response.json();
+                renderResults(lastResult);
+                results.classList.remove('hidden');
+            } catch (error) {
+                alert('Search error: ' + error.message);
+            } finally {
+                loading.classList.add('hidden');
+                searchBtn.disabled = false;
+            }
+        }
+
+        function renderResults(data) {
+            // Timing stats
+            document.getElementById('retrievalTime').textContent = data.retrieval_time_ms + ' ms';
+            document.getElementById('synthesisTime').textContent = data.synthesis_time_ms + ' ms';
+            document.getElementById('totalTime').textContent = data.total_time_ms + ' ms';
+            document.getElementById('chunksCount').textContent = data.chunks.length;
+            document.getElementById('modelName').textContent = data.model.replace('claude-', '').replace('-20251001', '');
+
+            // Chunks
+            const chunksList = document.getElementById('chunksList');
+            if (data.chunks.length === 0) {
+                chunksList.innerHTML = '<p style="color: #999; text-align: center;">No chunks retrieved</p>';
+            } else {
+                chunksList.innerHTML = data.chunks.map(chunk => {
+                    const tagClass = chunk.source_type === 'documentation' ? 'tag--docs' : 'tag--gmail';
+                    const tagLabel = chunk.source_type === 'documentation' ? 'Doc' : 'Case';
+                    return `
+                        <div class="chunk">
+                            <div class="chunk__header" onclick="toggleChunk(this)">
+                                <div class="chunk__info">
+                                    <span class="chunk__index">${chunk.index}</span>
+                                    <span class="chunk__title">${escapeHtml(chunk.title)}</span>
+                                </div>
+                                <div class="chunk__meta">
+                                    <span class="tag ${tagClass}">${tagLabel}</span>
+                                    <span class="chunk__score">${chunk.score.toFixed(3)}</span>
+                                    <span>${chunk.text_length} chars</span>
+                                    <span class="toggle-icon">&#9654;</span>
+                                </div>
+                            </div>
+                            <div class="chunk__body">
+                                <div class="chunk__text">${escapeHtml(chunk.text)}</div>
+                                ${chunk.url ? `<div class="chunk__url"><a href="${chunk.url}" target="_blank">${chunk.url}</a></div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // LLM Response (render markdown-ish)
+            document.getElementById('llmResponse').innerHTML = renderMarkdown(data.llm_response);
+
+            // Prompts
+            document.getElementById('userPrompt').textContent = data.llm_prompt;
+            document.getElementById('systemPrompt').textContent = data.system_prompt;
+        }
+
+        function toggleChunk(header) {
+            const body = header.nextElementSibling;
+            const icon = header.querySelector('.toggle-icon');
+            body.classList.toggle('open');
+            icon.classList.toggle('open');
+        }
+
+        function expandAllChunks() {
+            document.querySelectorAll('.chunk__body').forEach(body => {
+                body.classList.add('open');
+            });
+            document.querySelectorAll('.toggle-icon').forEach(icon => {
+                icon.classList.add('open');
+            });
+        }
+
+        function copyResponse() {
+            if (lastResult) {
+                navigator.clipboard.writeText(lastResult.llm_response);
+            }
+        }
+
+        function copyPrompt() {
+            if (lastResult) {
+                navigator.clipboard.writeText(lastResult.llm_prompt);
+            }
+        }
+
+        function copySystemPrompt() {
+            if (lastResult) {
+                navigator.clipboard.writeText(lastResult.system_prompt);
+            }
+        }
+
+        function renderMarkdown(text) {
+            // Simple markdown-like rendering
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n- /g, '<br>- ')
+                .replace(/\n(\d+)\. /g, '<br>$1. ');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Allow Enter key for password and search
+        document.getElementById('adminPassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') authenticate();
+        });
+
+        document.getElementById('queryInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+    </script>
+</body>
+</html>

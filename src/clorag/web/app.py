@@ -736,6 +736,96 @@ async def api_popular_queries(
     return analytics.get_popular_queries(limit=limit, days=days)
 
 
+# =============================================================================
+# Search Debug Routes (Admin)
+# =============================================================================
+
+
+class DebugSearchResponse(BaseModel):
+    """Debug search response with full chunk details."""
+
+    query: str
+    source: str
+    # Timing
+    retrieval_time_ms: int
+    synthesis_time_ms: int
+    total_time_ms: int
+    # Chunks retrieved
+    chunks: list[dict]
+    # Prompt sent to LLM
+    llm_prompt: str
+    system_prompt: str
+    # LLM response
+    llm_response: str
+    model: str
+
+
+@app.get("/admin/search-debug", response_class=HTMLResponse)
+async def admin_search_debug(request: Request):
+    """Admin search debug page - shows chunks and LLM response."""
+    return templates.TemplateResponse("admin_search_debug.html", {"request": request})
+
+
+@app.post("/api/admin/search-debug")
+async def api_search_debug(
+    req: SearchRequest,
+    _: bool = Depends(verify_admin),
+) -> DebugSearchResponse:
+    """Debug search endpoint showing chunks and LLM details."""
+    total_start = time.time()
+
+    # Perform search and measure retrieval time
+    retrieval_start = time.time()
+    results, chunks_for_synthesis = await _perform_search(req)
+    retrieval_time_ms = int((time.time() - retrieval_start) * 1000)
+
+    # Build context (same as synthesis)
+    context = _build_context(chunks_for_synthesis)
+    user_prompt = f"Question: {req.query}\n\nContext:\n{context}"
+
+    # Synthesize and measure time
+    synthesis_start = time.time()
+    if not chunks_for_synthesis:
+        llm_response = "No relevant information found for your query."
+    else:
+        response = await get_anthropic().messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1500,
+            system=SYNTHESIS_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        llm_response = response.content[0].text
+    synthesis_time_ms = int((time.time() - synthesis_start) * 1000)
+
+    total_time_ms = int((time.time() - total_start) * 1000)
+
+    # Build detailed chunk info
+    detailed_chunks = []
+    for i, (result, chunk) in enumerate(zip(results, chunks_for_synthesis)):
+        detailed_chunks.append({
+            "index": i + 1,
+            "score": result.score,
+            "source_type": chunk.get("source_type", "unknown"),
+            "title": chunk.get("title") or chunk.get("subject", "Untitled"),
+            "url": chunk.get("url"),
+            "text": chunk.get("text", "")[:3000],  # Limit text size
+            "text_length": len(chunk.get("text", "")),
+        })
+
+    return DebugSearchResponse(
+        query=req.query,
+        source=req.source.value,
+        retrieval_time_ms=retrieval_time_ms,
+        synthesis_time_ms=synthesis_time_ms,
+        total_time_ms=total_time_ms,
+        chunks=detailed_chunks,
+        llm_prompt=user_prompt,
+        system_prompt=SYNTHESIS_SYSTEM_PROMPT,
+        llm_response=llm_response,
+        model="claude-haiku-4-5-20251001",
+    )
+
+
 def create_app() -> FastAPI:
     """Create and return the FastAPI application."""
     return app
