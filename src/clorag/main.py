@@ -3,7 +3,6 @@
 import sys
 
 import anyio
-
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
 
 from clorag.agent.prompts import SYSTEM_PROMPT

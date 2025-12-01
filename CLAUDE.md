@@ -56,6 +56,7 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 - `embeddings.py` - Voyage AI client using `voyage-context-3` for contextualized embeddings
 - `sparse_embeddings.py` - FastEmbed BM25 for keyword matching
 - `database.py` - SQLite camera database with CRUD operations and upsert pattern
+- `analytics_db.py` - Separate SQLite database for search analytics tracking
 
 **Ingestion Layer** (`src/clorag/ingestion/`):
 - `curated_gmail.py` - 7-step pipeline: Fetch → Anonymize → Haiku analysis → Filter resolved → Sonnet QC → Embed → Store
@@ -69,7 +70,9 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 **Web Layer** (`src/clorag/web/`):
 - `app.py` - FastAPI with streaming responses, hybrid RRF search across both collections
 - Camera management routes: public `/cameras`, admin `/admin/cameras`
+- Analytics dashboard: `/admin/analytics` with search stats and history
 - REST API for cameras: `GET/POST/PUT/DELETE /api/cameras`
+- REST API for analytics: `GET /api/admin/search-stats`
 
 **Models Layer** (`src/clorag/models/`):
 - `camera.py` - Camera Pydantic models with CameraSource enum for tracking data origin
@@ -92,7 +95,9 @@ All settings via environment variables (see `.env.example`):
 - `DOCUSAURUS_URL` - Documentation site to scrape
 - `GMAIL_LABEL` - Gmail label for support threads
 - `DATABASE_PATH` - SQLite database for camera data (default: `data/clorag.db`)
-- `ADMIN_PASSWORD` - Admin authentication for camera management
+- `ANALYTICS_DATABASE_PATH` - SQLite database for search analytics (default: `data/analytics.db`)
+- `ADMIN_PASSWORD` - Admin authentication for camera management and analytics
+- `SEARXNG_URL` - SearXNG instance URL for web searches (default: `https://search.sapti.me`)
 
 Settings loaded via `clorag.config.get_settings()` (cached singleton).
 

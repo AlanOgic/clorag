@@ -2,6 +2,41 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.0] - 2025-12-01
+
+### Added
+- **Search Analytics System**
+  - Separate analytics database (`data/analytics.db`) for search tracking
+  - `AnalyticsDatabase` class with query logging and statistics
+  - Admin dashboard at `/admin/analytics` with password protection
+  - Stats: total searches, avg response time, searches by source, daily chart
+  - Popular queries and recent searches tables
+
+- **UI Improvements**
+  - Export CSV button on cameras page (client-side generation)
+  - Copy response to clipboard button on search results
+  - Type column moved to first position with icon-only display (tooltip on hover)
+  - Device type icons: camera_cinema, camera_broadcast, camera_ptz, camera_mirrorless, camera_action
+
+- **SearXNG Local Integration**
+  - Optional local SearXNG instance support via Docker network
+  - `SEARXNG_URL` environment variable (defaults to external search.sapti.me)
+  - Secured port 8888 to localhost-only binding
+
+### Changed
+- **Protocol/Port Normalization**
+  - Unified Canon XC variants (`XC`, `XC protocol`) → `Canon XC`
+  - Unified Remote-A variants → `Remote-A`
+  - Unified 8-pin variants → `8-pin Remote`
+  - Unified Ethernet variants (`RJ45`, `LAN`) → `Ethernet`
+  - Unified Wi-Fi variants → `Wi-Fi`
+  - Split `Pelco RS-485` → Protocol: `Pelco`, Port: `RS-485`
+  - LANC port → `Mini-jack 2.5mm` (LANC is protocol, 2.5mm is connector)
+  - Moved USB/Wi-Fi from protocols to ports where appropriate
+
+### Fixed
+- SearXNG public exposure on port 8888 (now localhost only)
+
 ## [0.2.0] - 2025-11-28
 
 ### Changed

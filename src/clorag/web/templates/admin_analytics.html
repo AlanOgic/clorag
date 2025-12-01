@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Analytics - Admin - Cyanview</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover {
+            color: var(--cyan-blue);
+        }
+
+        .navbar__link--active {
+            color: var(--cyan-blue);
+            font-weight: 600;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--hero-bg);
+            padding: 2rem;
+            text-align: center;
+            color: white;
+        }
+
+        .hero__title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .hero__subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Auth Form */
+        .auth-form {
+            max-width: 400px;
+            margin: 2rem auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-form h2 {
+            margin-bottom: 1rem;
+            color: var(--cyanview-navy);
+        }
+
+        .auth-form input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .auth-form button {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--cyan-dark);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .auth-form button:hover {
+            background: var(--cyan-blue);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-card__value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--cyan-dark);
+        }
+
+        .stat-card__label {
+            font-size: 0.9rem;
+            color: #606770;
+            margin-top: 0.5rem;
+        }
+
+        /* Section */
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        .section__title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #606770;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .tag--docs {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .tag--gmail {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        .tag--both {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        /* Daily Chart */
+        .daily-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 0.5rem;
+            height: 100px;
+            padding: 1rem 0;
+        }
+
+        .daily-bar {
+            flex: 1;
+            background: var(--cyan-blue);
+            border-radius: 4px 4px 0 0;
+            min-height: 4px;
+            position: relative;
+        }
+
+        .daily-bar:hover {
+            background: var(--cyan-dark);
+        }
+
+        .daily-bar__label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: #606770;
+            white-space: nowrap;
+        }
+
+        .daily-bar__count {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--cyan-dark);
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #606770;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--cyan-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Error */
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        /* Refresh button */
+        .refresh-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .refresh-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Header with actions */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .section-header__title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="/admin/cameras" class="navbar__link">Admin Cameras</a>
+            <a href="/admin/analytics" class="navbar__link navbar__link--active">Analytics</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero__title">Search Analytics</h1>
+        <p class="hero__subtitle">Monitor search usage and popular queries</p>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Auth Form (shown initially) -->
+        <div class="auth-form" id="authForm">
+            <h2>Admin Access</h2>
+            <input type="password" id="adminPassword" placeholder="Enter admin password">
+            <button onclick="authenticate()">Access Analytics</button>
+            <div class="error hidden" id="authError">Invalid password</div>
+        </div>
+
+        <!-- Dashboard (hidden until authenticated) -->
+        <div id="dashboard" class="hidden">
+            <!-- Stats Grid -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-card__value" id="totalSearches">-</div>
+                    <div class="stat-card__label">Total Searches (30d)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value" id="avgResponseTime">-</div>
+                    <div class="stat-card__label">Avg Response (ms)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value" id="avgResults">-</div>
+                    <div class="stat-card__label">Avg Results</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value" id="uniqueQueries">-</div>
+                    <div class="stat-card__label">Unique Queries</div>
+                </div>
+            </div>
+
+            <!-- Daily Chart -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-header__title">Searches per Day (Last 7 Days)</span>
+                    <button class="refresh-btn" onclick="loadAnalytics()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+                <div class="daily-chart" id="dailyChart"></div>
+            </div>
+
+            <!-- Source Distribution -->
+            <div class="section">
+                <h3 class="section__title">Searches by Source</h3>
+                <div id="sourceDistribution"></div>
+            </div>
+
+            <!-- Popular Queries -->
+            <div class="section">
+                <h3 class="section__title">Popular Queries (Last 30 Days)</h3>
+                <table class="data-table" id="popularTable">
+                    <thead>
+                        <tr>
+                            <th>Query</th>
+                            <th>Count</th>
+                            <th>Last Searched</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Recent Searches -->
+            <div class="section">
+                <h3 class="section__title">Recent Searches</h3>
+                <table class="data-table" id="recentTable">
+                    <thead>
+                        <tr>
+                            <th>Query</th>
+                            <th>Source</th>
+                            <th>Response Time</th>
+                            <th>Results</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading hidden" id="loading">
+            <div class="spinner"></div>
+            <p>Loading analytics...</p>
+        </div>
+    </main>
+
+    <script>
+        let adminPassword = '';
+
+        async function authenticate() {
+            adminPassword = document.getElementById('adminPassword').value;
+            const authError = document.getElementById('authError');
+            authError.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/admin/search-stats', {
+                    headers: {
+                        'X-Admin-Password': adminPassword
+                    }
+                });
+
+                if (response.ok) {
+                    document.getElementById('authForm').classList.add('hidden');
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    loadAnalytics();
+                } else {
+                    authError.classList.remove('hidden');
+                }
+            } catch (error) {
+                authError.textContent = 'Connection error';
+                authError.classList.remove('hidden');
+            }
+        }
+
+        async function loadAnalytics() {
+            const loading = document.getElementById('loading');
+            loading.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/admin/search-stats', {
+                    headers: {
+                        'X-Admin-Password': adminPassword
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to load');
+
+                const data = await response.json();
+                renderStats(data);
+                loading.classList.add('hidden');
+            } catch (error) {
+                loading.innerHTML = '<p class="error">Failed to load analytics</p>';
+            }
+        }
+
+        function renderStats(data) {
+            const stats = data.stats;
+
+            // Main stats
+            document.getElementById('totalSearches').textContent = stats.total_searches || 0;
+            document.getElementById('avgResponseTime').textContent =
+                stats.avg_response_time_ms ? Math.round(stats.avg_response_time_ms) : '-';
+            document.getElementById('avgResults').textContent =
+                stats.avg_results_count ? stats.avg_results_count.toFixed(1) : '-';
+            document.getElementById('uniqueQueries').textContent = data.popular_queries.length;
+
+            // Daily chart
+            renderDailyChart(stats.searches_per_day || []);
+
+            // Source distribution
+            renderSourceDistribution(stats.searches_by_source || {});
+
+            // Popular queries table
+            renderPopularTable(data.popular_queries || []);
+
+            // Recent searches table
+            renderRecentTable(data.recent_searches || []);
+        }
+
+        function renderDailyChart(dailyData) {
+            const container = document.getElementById('dailyChart');
+            if (!dailyData.length) {
+                container.innerHTML = '<p style="color: #999; text-align: center; width: 100%;">No data yet</p>';
+                return;
+            }
+
+            const maxCount = Math.max(...dailyData.map(d => d.count));
+
+            container.innerHTML = dailyData.map(day => {
+                const height = maxCount > 0 ? (day.count / maxCount * 80) : 4;
+                const date = new Date(day.date);
+                const label = date.toLocaleDateString('en-US', { weekday: 'short' });
+                return `
+                    <div class="daily-bar" style="height: ${height}px;" title="${day.date}: ${day.count} searches">
+                        <span class="daily-bar__count">${day.count}</span>
+                        <span class="daily-bar__label">${label}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSourceDistribution(sources) {
+            const container = document.getElementById('sourceDistribution');
+            const total = Object.values(sources).reduce((a, b) => a + b, 0);
+
+            if (total === 0) {
+                container.innerHTML = '<p style="color: #999;">No data yet</p>';
+                return;
+            }
+
+            const items = Object.entries(sources).map(([source, count]) => {
+                const pct = ((count / total) * 100).toFixed(1);
+                const tagClass = source === 'docs' ? 'tag--docs' :
+                                 source === 'gmail' ? 'tag--gmail' : 'tag--both';
+                return `
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+                        <span class="tag ${tagClass}">${source}</span>
+                        <div style="flex: 1; background: #eee; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${pct}%; height: 100%; background: var(--cyan-blue);"></div>
+                        </div>
+                        <span style="font-size: 0.9rem; color: #606770;">${count} (${pct}%)</span>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = items.join('');
+        }
+
+        function renderPopularTable(queries) {
+            const tbody = document.querySelector('#popularTable tbody');
+            if (!queries.length) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #999;">No queries yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = queries.map(q => `
+                <tr>
+                    <td><strong>${escapeHtml(q.query)}</strong></td>
+                    <td>${q.count}</td>
+                    <td>${formatDate(q.last_searched)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderRecentTable(searches) {
+            const tbody = document.querySelector('#recentTable tbody');
+            if (!searches.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No searches yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = searches.map(s => {
+                const tagClass = s.source === 'docs' ? 'tag--docs' :
+                                 s.source === 'gmail' ? 'tag--gmail' : 'tag--both';
+                return `
+                    <tr>
+                        <td>${escapeHtml(s.query.substring(0, 60))}${s.query.length > 60 ? '...' : ''}</td>
+                        <td><span class="tag ${tagClass}">${s.source}</span></td>
+                        <td>${s.response_time_ms ? s.response_time_ms + ' ms' : '-'}</td>
+                        <td>${s.results_count ?? '-'}</td>
+                        <td>${formatDate(s.created_at)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Allow Enter key for password
+        document.getElementById('adminPassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') authenticate();
+        });
+    </script>
+</body>
+</html>

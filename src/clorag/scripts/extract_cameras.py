@@ -8,7 +8,6 @@ camera information without re-running the full ingestion pipeline.
 from __future__ import annotations
 
 import asyncio
-import sys
 
 import structlog
 

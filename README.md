@@ -122,7 +122,8 @@ uv run rag-web
 # Access:
 # - AI Search: http://localhost:8080/
 # - Camera Compatibility: http://localhost:8080/cameras
-# - Admin (requires ADMIN_PASSWORD): http://localhost:8080/admin/cameras
+# - Admin Cameras (requires ADMIN_PASSWORD): http://localhost:8080/admin/cameras
+# - Admin Analytics: http://localhost:8080/admin/analytics
 ```
 
 ## Tools RAG disponibles

@@ -17,12 +17,33 @@ class CameraSource(str, Enum):
     MANUAL = "manual"
 
 
+class DeviceType(str, Enum):
+    """Type/category of device."""
+
+    CAMERA_CINEMA = "camera_cinema"
+    CAMERA_BROADCAST = "camera_broadcast"
+    CAMERA_PTZ = "camera_ptz"
+    CAMERA_MIRRORLESS = "camera_mirrorless"
+    CAMERA_BOX = "camera_box"
+    CAMERA_ACTION = "camera_action"
+    CAMERA_MODULE = "camera_module"  # FCB blocks, etc.
+    LENS = "lens"
+    LENS_MOTOR = "lens_motor"
+    SWITCHER = "switcher"
+    GIMBAL = "gimbal"
+    HEAD = "head"  # Pan/tilt heads
+    ENCODER = "encoder"
+    OTHER = "other"
+
+
 class Camera(BaseModel):
     """Camera compatibility information."""
 
     id: int | None = None
-    name: str = Field(..., description="Camera model name (e.g., 'Sony HDC-5500')")
+    name: str = Field(..., description="Camera model name (e.g., 'HDC-5500')")
     manufacturer: str | None = Field(None, description="Camera manufacturer (e.g., 'Sony')")
+    code_model: str | None = Field(None, description="Official model code from manufacturer (e.g., 'ILME-FX6V')")
+    device_type: DeviceType | None = Field(None, description="Device category (camera_cinema, camera_ptz, lens, etc.)")
     ports: list[str] = Field(default_factory=list, description="Control ports (RS-422, Ethernet, etc.)")
     protocols: list[str] = Field(default_factory=list, description="Control protocols (VISCA, Sony RCP, etc.)")
     supported_controls: list[str] = Field(
@@ -41,6 +62,8 @@ class CameraCreate(BaseModel):
 
     name: str
     manufacturer: str | None = None
+    code_model: str | None = None
+    device_type: DeviceType | None = None
     ports: list[str] = Field(default_factory=list)
     protocols: list[str] = Field(default_factory=list)
     supported_controls: list[str] = Field(default_factory=list)
@@ -54,6 +77,8 @@ class CameraUpdate(BaseModel):
 
     name: str | None = None
     manufacturer: str | None = None
+    code_model: str | None = None
+    device_type: DeviceType | None = None
     ports: list[str] | None = None
     protocols: list[str] | None = None
     supported_controls: list[str] | None = None

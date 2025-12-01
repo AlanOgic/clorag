@@ -218,6 +218,12 @@
             color: var(--cyanview-navy);
         }
 
+        .camera-code {
+            color: #0077b6;
+            font-size: 0.8rem;
+            font-family: monospace;
+        }
+
         .camera-manufacturer {
             color: #606770;
             font-size: 0.9rem;
@@ -376,7 +382,14 @@
                     <tr data-id="{{ camera.id }}" data-name="{{ camera.name | lower }}" data-manufacturer="{{ camera.manufacturer | lower if camera.manufacturer else '' }}">
                         <td>{{ camera.id }}</td>
                         <td>
-                            <div class="camera-name">{{ camera.name }}</div>
+                            {% set display_name = camera.name %}
+                            {% if camera.manufacturer and camera.name.lower().startswith(camera.manufacturer.lower() + ' ') %}
+                                {% set display_name = camera.name[camera.manufacturer|length + 1:] %}
+                            {% endif %}
+                            <div class="camera-name">{{ display_name }}</div>
+                            {% if camera.code_model %}
+                            <div class="camera-code">{{ camera.code_model }}</div>
+                            {% endif %}
                             <div class="camera-manufacturer">{{ camera.manufacturer or 'Unknown' }}</div>
                         </td>
                         <td>

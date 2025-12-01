@@ -159,6 +159,30 @@
             cursor: pointer;
         }
 
+        .export-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--cyan-dark);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .export-btn:hover {
+            background: var(--cyan-blue);
+        }
+
+        .export-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
         /* Table */
         .table-container {
             background: white;
@@ -185,16 +209,39 @@
             font-size: 0.85rem;
             text-transform: uppercase;
             color: #606770;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .cameras-table th:hover {
+            background: #e9ecef;
+        }
+
+        .cameras-table th.sorted-asc::after {
+            content: ' ▲';
+            font-size: 0.7rem;
+        }
+
+        .cameras-table th.sorted-desc::after {
+            content: ' ▼';
+            font-size: 0.7rem;
         }
 
         .cameras-table th:nth-child(1),
         .cameras-table td:nth-child(1) {
+            width: 50px;
+            text-align: center;
+        }
+
+        .cameras-table th:nth-child(2),
+        .cameras-table td:nth-child(2) {
             width: 20%;
             min-width: 180px;
         }
 
-        .cameras-table th:nth-child(6),
-        .cameras-table td:nth-child(6) {
+        .cameras-table th:nth-child(7),
+        .cameras-table td:nth-child(7) {
             width: 50px;
         }
 
@@ -209,6 +256,12 @@
         .camera-name {
             font-weight: 600;
             color: var(--cyanview-navy);
+        }
+
+        .camera-code {
+            color: #0077b6;
+            font-size: 0.8rem;
+            font-family: monospace;
         }
 
         .camera-manufacturer {
@@ -241,6 +294,22 @@
         .tag--control {
             background: #fff3e0;
             color: #e65100;
+        }
+
+        .tag--type {
+            background: #f3e5f5;
+            color: #7b1fa2;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.4rem;
+            border-radius: 6px;
+        }
+
+        .tag--type svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
         }
 
         /* Notes */
@@ -327,12 +396,12 @@
 
     <!-- Hero -->
     <section class="hero">
-        <h1 class="hero__title">Camera Compatibility</h1>
-        <p class="hero__subtitle">Find compatible cameras for your Cyanview setup</p>
+        <h1 class="hero__title">Device Compatibility</h1>
+        <p class="hero__subtitle">Find compatible cameras, lenses, and accessories for your Cyanview setup</p>
         <div class="stats">
             <div class="stat">
                 <div class="stat__number">{{ stats.total_cameras }}</div>
-                <div class="stat__label">Cameras</div>
+                <div class="stat__label">Devices</div>
             </div>
             <div class="stat">
                 <div class="stat__number">{{ stats.manufacturers }}</div>
@@ -346,12 +415,36 @@
         <!-- Filter Bar -->
         <div class="filter-bar">
             <input type="text" class="filter-bar__search" id="searchInput" placeholder="Search cameras..." oninput="filterTable()">
-            <select class="filter-bar__select" id="manufacturerFilter" onchange="filterByManufacturer()">
+            <select class="filter-bar__select" id="manufacturerFilter" onchange="applyFilters()">
                 <option value="">All Manufacturers</option>
                 {% for mfr in manufacturers %}
                 <option value="{{ mfr }}" {% if selected_manufacturer == mfr %}selected{% endif %}>{{ mfr }}</option>
                 {% endfor %}
             </select>
+            <select class="filter-bar__select" id="deviceTypeFilter" onchange="applyFilters()">
+                <option value="">All Types</option>
+                {% for dtype in device_types %}
+                <option value="{{ dtype }}" {% if selected_device_type == dtype %}selected{% endif %}>{{ dtype | replace('_', ' ') | title }}</option>
+                {% endfor %}
+            </select>
+            <select class="filter-bar__select" id="portFilter" onchange="applyFilters()">
+                <option value="">All Ports</option>
+                {% for port in ports %}
+                <option value="{{ port }}" {% if selected_port == port %}selected{% endif %}>{{ port }}</option>
+                {% endfor %}
+            </select>
+            <select class="filter-bar__select" id="protocolFilter" onchange="applyFilters()">
+                <option value="">All Protocols</option>
+                {% for protocol in protocols %}
+                <option value="{{ protocol }}" {% if selected_protocol == protocol %}selected{% endif %}>{{ protocol }}</option>
+                {% endfor %}
+            </select>
+            <button class="export-btn" onclick="exportCSV()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+                Export CSV
+            </button>
         </div>
 
         {% if cameras %}
@@ -360,9 +453,10 @@
             <table class="cameras-table" id="camerasTable">
                 <thead>
                     <tr>
-                        <th>Camera</th>
-                        <th>Ports</th>
-                        <th>Protocols</th>
+                        <th data-sort="type" onclick="sortTable('type')"></th>
+                        <th data-sort="name" onclick="sortTable('name')">Device</th>
+                        <th data-sort="ports" onclick="sortTable('ports')">Ports</th>
+                        <th data-sort="protocols" onclick="sortTable('protocols')">Protocols</th>
                         <th>Controls</th>
                         <th>Notes</th>
                         <th>Docs</th>
@@ -370,9 +464,58 @@
                 </thead>
                 <tbody>
                     {% for camera in cameras %}
-                    <tr data-name="{{ camera.name | lower }}" data-manufacturer="{{ camera.manufacturer | lower if camera.manufacturer else '' }}">
+                    <tr data-name="{{ camera.name | lower }}"
+                        data-manufacturer="{{ camera.manufacturer | lower if camera.manufacturer else '' }}"
+                        data-type="{{ camera.device_type.value if camera.device_type else '' }}"
+                        data-ports="{{ camera.ports | join(',') | lower }}"
+                        data-protocols="{{ camera.protocols | join(',') | lower }}">
                         <td>
-                            <div class="camera-name">{{ camera.name }}</div>
+                            {% if camera.device_type %}
+                            {% set dtype = camera.device_type.value %}
+                            <span class="tag tag--type" title="{{ dtype | replace('_', ' ') | title }}">
+                                {% if dtype.startswith('camera_cinema') %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+                                {% elif dtype.startswith('camera_broadcast') %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 6h-7.59l3.29-3.29L16 2l-4 4-4-4-.71.71L10.59 6H3c-1.1 0-2 .89-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm0 14H3V8h18v12zM9 10v8l7-4z"/></svg>
+                                {% elif dtype.startswith('camera_ptz') %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                                {% elif dtype.startswith('camera_mirrorless') %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+                                {% elif dtype.startswith('camera_box') %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 3c1.63 0 3.06.79 3.98 2H12c-1.66 0-3 1.34-3 3 0 .35.07.69.18 1H7.1c-.06-.32-.1-.66-.1-1 0-2.76 2.24-5 5-5zm0 10c-1.63 0-3.06-.79-3.98-2H12c1.66 0 3-1.34 3-3 0-.35-.07-.69-.18-1h2.08c.06.32.1.66.1 1 0 2.76-2.24 5-5 5z"/></svg>
+                                {% elif dtype.startswith('camera_action') %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                                {% elif dtype.startswith('camera_module') %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 5h-3.17L15 3H9L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 11c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                                {% elif dtype == 'lens' %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3.2"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+                                {% elif dtype == 'lens_motor' %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                                {% elif dtype == 'switcher' %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12zm-6-1h2v-4h4V9h-4V5h-2v4h-4v2h4z"/></svg>
+                                {% elif dtype == 'gimbal' %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg>
+                                {% elif dtype == 'head' %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                                {% elif dtype == 'encoder' %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z"/></svg>
+                                {% else %}
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                                {% endif %}
+                            </span>
+                            {% else %}
+                            <span style="color: #999;">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set display_name = camera.name %}
+                            {% if camera.manufacturer and camera.name.lower().startswith(camera.manufacturer.lower() + ' ') %}
+                                {% set display_name = camera.name[camera.manufacturer|length + 1:] %}
+                            {% endif %}
+                            <div class="camera-name">{{ display_name }}</div>
+                            {% if camera.code_model %}
+                            <div class="camera-code">{{ camera.code_model }}</div>
+                            {% endif %}
                             <div class="camera-manufacturer">{{ camera.manufacturer or 'Unknown' }}</div>
                         </td>
                         <td>
@@ -415,8 +558,12 @@
                         </td>
                         <td>
                             {% if camera.doc_url %}
-                            <a href="{{ camera.doc_url }}" class="doc-link" target="_blank">View</a>
-                            {% else %}
+                            <a href="{{ camera.doc_url }}" class="doc-link" target="_blank">Cyanview</a>
+                            {% endif %}
+                            {% if camera.manufacturer_url %}
+                            <br><a href="{{ camera.manufacturer_url }}" class="doc-link" target="_blank">Manufacturer</a>
+                            {% endif %}
+                            {% if not camera.doc_url and not camera.manufacturer_url %}
                             <span style="color: #999;">-</span>
                             {% endif %}
                         </td>
@@ -439,30 +586,157 @@
     </footer>
 
     <script>
+        let currentSort = { column: null, direction: 'asc' };
+
         function filterTable() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const portFilter = document.getElementById('portFilter').value.toLowerCase();
+            const protocolFilter = document.getElementById('protocolFilter').value.toLowerCase();
             const rows = document.querySelectorAll('#camerasTable tbody tr');
 
             rows.forEach(row => {
-                const name = row.dataset.name || '';
-                const manufacturer = row.dataset.manufacturer || '';
                 const text = row.textContent.toLowerCase();
+                const ports = row.dataset.ports || '';
+                const protocols = row.dataset.protocols || '';
 
-                if (text.includes(searchTerm)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
+                let visible = true;
+
+                // Search filter
+                if (searchTerm && !text.includes(searchTerm)) {
+                    visible = false;
                 }
+
+                // Port filter (client-side)
+                if (portFilter && !ports.includes(portFilter)) {
+                    visible = false;
+                }
+
+                // Protocol filter (client-side)
+                if (protocolFilter && !protocols.includes(protocolFilter)) {
+                    visible = false;
+                }
+
+                row.style.display = visible ? '' : 'none';
             });
         }
 
-        function filterByManufacturer() {
+        function applyFilters() {
             const manufacturer = document.getElementById('manufacturerFilter').value;
-            if (manufacturer) {
-                window.location.href = '/cameras?manufacturer=' + encodeURIComponent(manufacturer);
+            const deviceType = document.getElementById('deviceTypeFilter').value;
+            const port = document.getElementById('portFilter').value;
+            const protocol = document.getElementById('protocolFilter').value;
+
+            // Server-side filters (manufacturer, device_type)
+            const params = [];
+            if (manufacturer) params.push('manufacturer=' + encodeURIComponent(manufacturer));
+            if (deviceType) params.push('device_type=' + encodeURIComponent(deviceType));
+            if (port) params.push('port=' + encodeURIComponent(port));
+            if (protocol) params.push('protocol=' + encodeURIComponent(protocol));
+
+            window.location.href = '/cameras' + (params.length ? '?' + params.join('&') : '');
+        }
+
+        function sortTable(column) {
+            const table = document.getElementById('camerasTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const headers = table.querySelectorAll('th');
+
+            // Toggle direction
+            if (currentSort.column === column) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
             } else {
-                window.location.href = '/cameras';
+                currentSort.column = column;
+                currentSort.direction = 'asc';
             }
+
+            // Update header classes
+            headers.forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+                if (th.dataset.sort === column) {
+                    th.classList.add('sorted-' + currentSort.direction);
+                }
+            });
+
+            // Sort rows
+            rows.sort((a, b) => {
+                let aVal, bVal;
+
+                switch (column) {
+                    case 'name':
+                        aVal = a.dataset.name || '';
+                        bVal = b.dataset.name || '';
+                        break;
+                    case 'type':
+                        aVal = a.dataset.type || '';
+                        bVal = b.dataset.type || '';
+                        break;
+                    case 'ports':
+                        aVal = a.dataset.ports || '';
+                        bVal = b.dataset.ports || '';
+                        break;
+                    case 'protocols':
+                        aVal = a.dataset.protocols || '';
+                        bVal = b.dataset.protocols || '';
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return currentSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Apply client-side filters on input change
+        document.getElementById('searchInput').addEventListener('input', filterTable);
+
+        function exportCSV() {
+            const rows = document.querySelectorAll('#camerasTable tbody tr');
+            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+
+            // CSV header
+            let csv = 'Name,Code Model,Manufacturer,Type,Ports,Protocols,Controls\n';
+
+            visibleRows.forEach(row => {
+                const nameEl = row.querySelector('.camera-name');
+                const codeEl = row.querySelector('.camera-code');
+                const mfrEl = row.querySelector('.camera-manufacturer');
+                const typeEl = row.querySelector('.tag--type');
+                const portTags = row.querySelectorAll('td:nth-child(3) .tag');
+                const protocolTags = row.querySelectorAll('td:nth-child(4) .tag');
+                const controlTags = row.querySelectorAll('td:nth-child(5) .tag');
+
+                const name = nameEl ? nameEl.textContent.trim() : '';
+                const code = codeEl ? codeEl.textContent.trim() : '';
+                const mfr = mfrEl ? mfrEl.textContent.trim() : '';
+                const type = typeEl ? typeEl.textContent.trim() : '';
+                const ports = Array.from(portTags).map(t => t.textContent.trim()).join('; ');
+                const protocols = Array.from(protocolTags).map(t => t.textContent.trim()).join('; ');
+                const controls = Array.from(controlTags).map(t => t.textContent.trim()).join('; ');
+
+                // Escape fields with quotes
+                const escapeField = (field) => {
+                    if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+                        return '"' + field.replace(/"/g, '""') + '"';
+                    }
+                    return field;
+                };
+
+                csv += [name, code, mfr, type, ports, protocols, controls].map(escapeField).join(',') + '\n';
+            });
+
+            // Download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'cyanview-devices.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
         }
     </script>
 </body>

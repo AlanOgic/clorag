@@ -53,7 +53,7 @@ class VectorStore:
         """
         settings = get_settings()
         self._url = url or settings.qdrant_url
-        self._api_key = api_key or settings.qdrant_api_key
+        self._api_key = api_key or (settings.qdrant_api_key.get_secret_value() if settings.qdrant_api_key else None)
         self._dimensions = dimensions or settings.voyage_dimensions
         self._docs_collection = settings.qdrant_docs_collection
         self._cases_collection = settings.qdrant_cases_collection

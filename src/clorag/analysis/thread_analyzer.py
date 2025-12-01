@@ -1,7 +1,6 @@
 """Thread analyzer using Claude Haiku for fast parallel analysis."""
 
 import json
-from typing import Any
 
 import anthropic
 import structlog
@@ -90,7 +89,7 @@ class ThreadAnalyzer:
             max_concurrent: Maximum concurrent requests.
         """
         settings = get_settings()
-        self._api_key = api_key or settings.anthropic_api_key
+        self._api_key = api_key or settings.anthropic_api_key.get_secret_value()
         self._model = model
         self._max_concurrent = max_concurrent
         self._client = anthropic.AsyncAnthropic(api_key=self._api_key)

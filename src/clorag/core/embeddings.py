@@ -47,7 +47,7 @@ class EmbeddingsClient:
             dimensions: Output dimensions (256, 512, 1024, 2048). Defaults to 1024.
         """
         settings = get_settings()
-        self._api_key = api_key or settings.voyage_api_key
+        self._api_key = api_key or settings.voyage_api_key.get_secret_value()
         self._model = model or settings.voyage_model
         self._dimensions = dimensions or settings.voyage_dimensions
 

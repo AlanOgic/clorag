@@ -161,107 +161,57 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         )
 
     def _extract_text_from_html(self, html: str) -> str:
-        """Extract main content from Docusaurus HTML, excluding navigation.
+        """Extract main content from Docusaurus HTML, excluding navigation."""
+        from bs4 import BeautifulSoup
 
-        Args:
-            html: HTML content.
+        soup = BeautifulSoup(html, "html.parser")
 
-        Returns:
-            Extracted text from main content only.
-        """
-        import re
+        # Remove unwanted elements
+        for element in soup.find_all(["script", "style", "nav", "aside", "header", "footer"]):
+            element.decompose()
 
-        # Try to extract only the main content area (Docusaurus specific)
-        # Priority: <article>, then <main>, then fall back to full page
-        content = html
+        # Remove sidebar and menu elements by class
+        for element in soup.find_all(
+            class_=lambda c: c and any(x in c for x in ["sidebar", "menu", "toc"])
+        ):
+            element.decompose()
 
-        # Try article tag first (most specific for doc content)
-        article_match = re.search(r"<article[^>]*>(.*?)</article>", html, re.DOTALL)
-        if article_match:
-            content = article_match.group(1)
-        else:
-            # Try main tag
-            main_match = re.search(r"<main[^>]*>(.*?)</main>", html, re.DOTALL)
-            if main_match:
-                content = main_match.group(1)
+        # Try to find main content area
+        content = soup.find("article") or soup.find("main") or soup.body or soup
 
-        # Remove navigation, sidebar, footer, header elements
-        content = re.sub(r"<nav[^>]*>.*?</nav>", "", content, flags=re.DOTALL)
-        content = re.sub(r"<aside[^>]*>.*?</aside>", "", content, flags=re.DOTALL)
-        content = re.sub(r"<header[^>]*>.*?</header>", "", content, flags=re.DOTALL)
-        content = re.sub(r"<footer[^>]*>.*?</footer>", "", content, flags=re.DOTALL)
-        content = re.sub(r'<div[^>]*class="[^"]*sidebar[^"]*"[^>]*>.*?</div>', "", content, flags=re.DOTALL)
-        content = re.sub(r'<div[^>]*class="[^"]*menu[^"]*"[^>]*>.*?</div>', "", content, flags=re.DOTALL)
-        content = re.sub(r'<div[^>]*class="[^"]*toc[^"]*"[^>]*>.*?</div>', "", content, flags=re.DOTALL)
+        # Get text with proper spacing
+        text = content.get_text(separator=" ", strip=True)
 
-        # Remove script and style tags
-        content = re.sub(r"<script[^>]*>.*?</script>", "", content, flags=re.DOTALL)
-        content = re.sub(r"<style[^>]*>.*?</style>", "", content, flags=re.DOTALL)
-
-        # Remove HTML tags
-        text = re.sub(r"<[^>]+>", " ", content)
-
-        # Clean up whitespace
-        text = re.sub(r"\s+", " ", text)
-
-        return text.strip()
+        return text
 
     def _extract_title_from_html(self, html: str) -> str:
-        """Extract title from HTML using cascading fallback strategy.
+        """Extract title from HTML using cascading fallback strategy."""
+        from bs4 import BeautifulSoup
 
-        Order of preference:
-        1. <h1> tag - most semantic for documentation
-        2. <meta property="og:title"> - OpenGraph title
-        3. <title> tag (cleaned of site suffix)
-        4. Fallback: "Untitled"
+        soup = BeautifulSoup(html, "html.parser")
 
-        Args:
-            html: HTML content.
-
-        Returns:
-            Page title.
-        """
-        import re
-
-        # 1. Try h1 tag (most semantic for documentation pages)
-        h1_match = re.search(r"<h1[^>]*>([^<]+)</h1>", html, re.IGNORECASE)
-        if h1_match:
-            title = h1_match.group(1).strip()
-            if title:
-                return title
+        # 1. Try h1 tag
+        h1 = soup.find("h1")
+        if h1 and h1.get_text(strip=True):
+            return h1.get_text(strip=True)
 
         # 2. Try og:title meta tag
-        og_match = re.search(
-            r'<meta\s+property=["\']og:title["\']\s+content=["\']([^"\']+)["\']',
-            html,
-            re.IGNORECASE,
-        )
-        if og_match:
-            title = og_match.group(1).strip()
-            if title:
-                return title
+        og_title = soup.find("meta", property="og:title")
+        if og_title:
+            content = og_title.get("content")
+            if content and isinstance(content, str):
+                return content.strip()
 
-        # Also check for content first, then property (different order)
-        og_match2 = re.search(
-            r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:title["\']',
-            html,
-            re.IGNORECASE,
-        )
-        if og_match2:
-            title = og_match2.group(1).strip()
-            if title:
-                return title
-
-        # 3. Clean title tag (remove site suffix like "| Cyanview Support")
-        title_match = re.search(r"<title>([^<]+)</title>", html, re.IGNORECASE)
-        if title_match:
-            raw_title = title_match.group(1).strip()
+        # 3. Clean title tag
+        title = soup.find("title")
+        if title:
+            raw_title = title.get_text(strip=True)
             # Split on common separators and take first part
+            import re
             cleaned = re.split(r"\s*[|\u2013\u2014-]\s*", raw_title)[0].strip()
             if cleaned:
                 return cleaned
 
-        # 4. Fallback
         return "Untitled"
 
     async def process(self, documents: list[Document]) -> list[tuple[Document, list[Document]]]:

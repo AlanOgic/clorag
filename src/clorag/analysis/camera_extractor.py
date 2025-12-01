@@ -170,7 +170,7 @@ class CameraExtractor:
     def __init__(self) -> None:
         """Initialize the extractor with Anthropic client."""
         settings = get_settings()
-        self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value())
         self._http_client: httpx.AsyncClient | None = None
 
     async def _get_http_client(self) -> httpx.AsyncClient:

@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,12 +18,12 @@ class Settings(BaseSettings):
     )
 
     # API Keys
-    anthropic_api_key: str = Field(..., description="Anthropic API key")
-    voyage_api_key: str = Field(..., description="Voyage AI API key")
+    anthropic_api_key: SecretStr = Field(..., description="Anthropic API key")
+    voyage_api_key: SecretStr = Field(..., description="Voyage AI API key")
 
     # Qdrant
     qdrant_url: str = Field(default="http://localhost:6333", description="Qdrant server URL")
-    qdrant_api_key: str | None = Field(default=None, description="Qdrant API key (optional)")
+    qdrant_api_key: SecretStr | None = Field(default=None, description="Qdrant API key (optional)")
     qdrant_docs_collection: str = Field(
         default="docusaurus_docs", description="Collection for documentation"
     )
@@ -57,12 +57,28 @@ class Settings(BaseSettings):
     database_path: str = Field(
         default="data/clorag.db", description="SQLite database path for camera data"
     )
-    admin_password: str | None = Field(
+    admin_password: SecretStr | None = Field(
         default=None, description="Admin password for camera management"
+    )
+
+    # Analytics Database (separate from camera database)
+    analytics_database_path: str = Field(
+        default="data/analytics.db", description="SQLite database path for search analytics"
+    )
+
+    # Search Engine
+    searxng_url: str = Field(
+        default="https://search.sapti.me",
+        description="SearXNG instance URL for web searches",
     )
 
 
 @lru_cache
 def get_settings() -> Settings:
-    """Get cached settings instance."""
-    return Settings()
+    """Get cached settings instance.
+
+    Note: Required fields (API keys) are loaded from environment variables
+    by pydantic-settings. The type ignore is needed because mypy doesn't
+    understand this behavior.
+    """
+    return Settings()  # type: ignore[call-arg]

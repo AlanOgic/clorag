@@ -1,9 +1,13 @@
 """Gmail threads ingestion pipeline."""
 
+import asyncio
 import base64
 import re
 import uuid
+from collections.abc import Callable
+from functools import partial
 from pathlib import Path
+from typing import Any, TypeVar
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -18,6 +22,14 @@ from clorag.ingestion.chunker import TextChunker
 from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+T = TypeVar("T")
+
+
+async def run_sync(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
+    """Run a synchronous function in the default executor."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, partial(func, *args, **kwargs))
 
 # RMA detection patterns
 RMA_SUBJECT_PATTERNS = [
@@ -149,11 +161,11 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
         page_token = None
 
         while True:
-            results = (
+            results = await run_sync(
                 service.users()
                 .threads()
                 .list(userId="me", labelIds=[label_id], pageToken=page_token)
-                .execute()
+                .execute
             )
 
             threads.extend(results.get("threads", []))
@@ -203,7 +215,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
         Returns:
             Label ID or None if not found.
         """
-        results = service.users().labels().list(userId="me").execute()
+        results = await run_sync(service.users().labels().list(userId="me").execute)
         labels = results.get("labels", [])
 
         for label in labels:
@@ -246,7 +258,9 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
         Returns:
             Document with thread content.
         """
-        thread = service.users().threads().get(userId="me", id=thread_id).execute()
+        thread = await run_sync(
+            service.users().threads().get(userId="me", id=thread_id).execute
+        )
         messages = thread.get("messages", [])
 
         if not messages:

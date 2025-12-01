@@ -81,7 +81,7 @@ class QualityController:
             model: Model to use for QC. Defaults to Sonnet.
         """
         settings = get_settings()
-        self._api_key = api_key or settings.anthropic_api_key
+        self._api_key = api_key or settings.anthropic_api_key.get_secret_value()
         self._model = model
         self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
 

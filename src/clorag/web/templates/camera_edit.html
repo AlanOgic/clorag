@@ -284,6 +284,14 @@
                 </div>
 
                 <div class="form-group">
+                    <label class="form-label">Model Code</label>
+                    <input type="text" class="form-input" name="code_model" id="code_model"
+                           value="{{ camera.code_model if camera else '' }}"
+                           placeholder="e.g., ILME-FX6V">
+                    <div class="form-hint">Official manufacturer model code/SKU</div>
+                </div>
+
+                <div class="form-group">
                     <label class="form-label">Control Ports</label>
                     <div class="array-inputs" id="ports-container">
                         {% if camera and camera.ports %}
@@ -437,6 +445,7 @@
             const data = {
                 name: document.getElementById('name').value,
                 manufacturer: document.getElementById('manufacturer').value || null,
+                code_model: document.getElementById('code_model').value || null,
                 ports: collectArrayValues('ports[]'),
                 protocols: collectArrayValues('protocols[]'),
                 supported_controls: collectArrayValues('supported_controls[]'),

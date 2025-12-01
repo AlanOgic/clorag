@@ -1,27 +1,77 @@
 """FastAPI web application for AI Search with Claude synthesis."""
 
-from __future__ import annotations
-
 import json
+import secrets
+import time
 from enum import Enum
 from pathlib import Path
 from typing import Annotated
 
 import anthropic
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+import anyio
+import structlog
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import JSONResponse, Response
 
 from clorag.config import get_settings
-from clorag.core.database import CameraDatabase, get_camera_database
+from clorag.core.analytics_db import AnalyticsDatabase
+from clorag.core.database import get_camera_database
 from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import VectorStore
 from clorag.models.camera import Camera, CameraCreate, CameraSource, CameraUpdate
 
+# Initialize logger
+logger = structlog.get_logger()
+
+
+# =============================================================================
+# Middleware Configuration
+# =============================================================================
+
+
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    """Middleware to enforce request timeout."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Process request with 60 second timeout."""
+        try:
+            with anyio.fail_after(60):  # 60 second timeout
+                return await call_next(request)
+        except TimeoutError:
+            return JSONResponse({"detail": "Request timeout"}, status_code=504)
+
+
+# Initialize FastAPI app
 app = FastAPI(title="Cyanview AI Search", version="1.0.0")
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://cyanview.cloud"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
+)
+
+# Add timeout middleware
+app.add_middleware(TimeoutMiddleware)
 
 # Optimized system prompt - single source of truth
 SYNTHESIS_SYSTEM_PROMPT = """You are a Cyanview support expert, representing Cyanview's excellence in broadcast camera control solutions.
@@ -63,6 +113,7 @@ _vectorstore: VectorStore | None = None
 _embeddings: EmbeddingsClient | None = None
 _sparse_embeddings: SparseEmbeddingsClient | None = None
 _anthropic: anthropic.AsyncAnthropic | None = None
+_analytics_db: AnalyticsDatabase | None = None
 
 
 def get_vectorstore() -> VectorStore:
@@ -94,8 +145,17 @@ def get_anthropic() -> anthropic.AsyncAnthropic:
     global _anthropic
     if _anthropic is None:
         settings = get_settings()
-        _anthropic = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        _anthropic = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value())
     return _anthropic
+
+
+def get_analytics_db() -> AnalyticsDatabase:
+    """Get or create AnalyticsDatabase instance (separate from camera DB)."""
+    global _analytics_db
+    if _analytics_db is None:
+        settings = get_settings()
+        _analytics_db = AnalyticsDatabase(settings.analytics_database_path)
+    return _analytics_db
 
 
 def _build_context(chunks: list[dict], max_chunks: int = 8) -> str:
@@ -121,9 +181,9 @@ class SearchSource(str, Enum):
 class SearchRequest(BaseModel):
     """Search request model."""
 
-    query: str
+    query: str = Field(..., min_length=1, max_length=2000)
     source: SearchSource = SearchSource.BOTH
-    limit: int = 10
+    limit: int = Field(10, ge=1, le=50)
 
 
 class SourceLink(BaseModel):
@@ -231,88 +291,14 @@ async def synthesize_answer_stream(query: str, chunks: list[dict]):
             yield text
 
 
-@app.post("/api/search/stream")
-async def search_stream(req: SearchRequest):
-    """Perform RAG search with streaming Claude-powered answer synthesis.
+async def _perform_search(req: SearchRequest) -> tuple[list[SearchResult], list[dict]]:
+    """Perform hybrid search and return results with chunks for synthesis.
 
     Uses hybrid search (dense + sparse vectors) with RRF fusion for better
     results on queries with specific model numbers or technical terms.
-    """
-    vs = get_vectorstore()
-    emb = get_embeddings()
-    sparse_emb = get_sparse_embeddings()
 
-    # Generate both dense and sparse query embeddings
-    dense_vector = await emb.embed_query(req.query)
-    sparse_vector = sparse_emb.embed_query(req.query)
-
-    chunks_for_synthesis: list[dict] = []
-
-    if req.source == SearchSource.DOCS:
-        docs = await vs.search_docs_hybrid(dense_vector, sparse_vector, limit=req.limit)
-        for doc in docs:
-            chunks_for_synthesis.append({
-                "text": doc.payload.get("text", ""),
-                "source_type": "documentation",
-                "url": doc.payload.get("url"),
-                "title": doc.payload.get("title", "Untitled"),
-            })
-    elif req.source == SearchSource.GMAIL:
-        cases = await vs.search_cases_hybrid(dense_vector, sparse_vector, limit=req.limit)
-        for case in cases:
-            chunks_for_synthesis.append({
-                "text": case.payload.get("text", ""),
-                "source_type": "gmail_case",
-                "subject": case.payload.get("subject", "Support Case"),
-            })
-    else:
-        hybrid = await vs.hybrid_search_rrf(dense_vector, sparse_vector, limit=req.limit)
-        for item in hybrid:
-            source_type = item.payload.get("_source", "unknown")
-            if source_type == "documentation":
-                chunks_for_synthesis.append({
-                    "text": item.payload.get("text", ""),
-                    "source_type": "documentation",
-                    "url": item.payload.get("url"),
-                    "title": item.payload.get("title", "Untitled"),
-                })
-            else:
-                chunks_for_synthesis.append({
-                    "text": item.payload.get("text", ""),
-                    "source_type": "gmail_case",
-                    "subject": item.payload.get("subject", "Support Case"),
-                })
-
-    # Extract top 3 unique source links
-    source_links = _extract_source_links(chunks_for_synthesis)
-
-    async def generate():
-        # Stream the answer first
-        async for chunk in synthesize_answer_stream(req.query, chunks_for_synthesis):
-            yield f"data: {json.dumps({'type': 'text', 'text': chunk})}\n\n"
-
-        # Then send sources at the end
-        yield f"data: {json.dumps({'type': 'sources', 'sources': source_links})}\n\n"
-
-        # Signal completion
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
-
-
-@app.post("/api/search", response_model=SearchResponse)
-async def search(req: SearchRequest):
-    """Perform RAG search with Claude-powered answer synthesis.
-
-    Uses hybrid search (dense + sparse vectors) with RRF fusion for better
-    results on queries with specific model numbers or technical terms.
+    Returns:
+        Tuple of (search_results, chunks_for_synthesis)
     """
     vs = get_vectorstore()
     emb = get_embeddings()
@@ -405,11 +391,90 @@ async def search(req: SearchRequest):
                     "subject": item.payload.get("subject", "Support Case"),
                 })
 
+    return results, chunks_for_synthesis
+
+
+@app.post("/api/search/stream")
+async def search_stream(req: SearchRequest):
+    """Perform RAG search with streaming Claude-powered answer synthesis.
+
+    Uses hybrid search (dense + sparse vectors) with RRF fusion for better
+    results on queries with specific model numbers or technical terms.
+    """
+    start_time = time.time()
+
+    # Use helper to perform search (we only need chunks_for_synthesis)
+    _, chunks_for_synthesis = await _perform_search(req)
+
+    # Extract top 3 unique source links
+    source_links = _extract_source_links(chunks_for_synthesis)
+
+    # Log search to analytics (non-blocking)
+    response_time_ms = int((time.time() - start_time) * 1000)
+    try:
+        get_analytics_db().log_search(
+            query=req.query,
+            source=req.source.value,
+            response_time_ms=response_time_ms,
+            results_count=len(chunks_for_synthesis),
+        )
+    except Exception as e:
+        logger.warning("Failed to log search analytics", error=str(e))
+
+    async def generate():
+        try:
+            # Stream the answer first
+            async for chunk in synthesize_answer_stream(req.query, chunks_for_synthesis):
+                yield f"data: {json.dumps({'type': 'text', 'text': chunk})}\n\n"
+
+            # Then send sources at the end
+            yield f"data: {json.dumps({'type': 'sources', 'sources': source_links})}\n\n"
+
+            # Signal completion
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        except Exception as e:
+            logger.error("Error during streaming response", error=str(e), query=req.query)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.post("/api/search", response_model=SearchResponse)
+async def search(req: SearchRequest):
+    """Perform RAG search with Claude-powered answer synthesis.
+
+    Uses hybrid search (dense + sparse vectors) with RRF fusion for better
+    results on queries with specific model numbers or technical terms.
+    """
+    start_time = time.time()
+
+    # Use helper to perform search
+    results, chunks_for_synthesis = await _perform_search(req)
+
     # Generate synthesized answer using Claude Haiku
     answer = await synthesize_answer(req.query, chunks_for_synthesis)
 
     # Extract top 3 unique source links
     source_links = _extract_source_links(chunks_for_synthesis, as_model=True)
+
+    # Log search to analytics (non-blocking)
+    response_time_ms = int((time.time() - start_time) * 1000)
+    try:
+        get_analytics_db().log_search(
+            query=req.query,
+            source=req.source.value,
+            response_time_ms=response_time_ms,
+            results_count=len(results),
+        )
+    except Exception as e:
+        logger.warning("Failed to log search analytics", error=str(e))
 
     return SearchResponse(
         query=req.query,
@@ -434,21 +499,40 @@ def _truncate(text: str, max_length: int) -> str:
 
 
 def verify_admin(x_admin_password: Annotated[str | None, Header()] = None) -> bool:
-    """Verify admin password from header."""
+    """Verify admin password from header using timing-safe comparison."""
     settings = get_settings()
     if not settings.admin_password:
         raise HTTPException(status_code=503, detail="Admin access not configured")
-    if x_admin_password != settings.admin_password:
+
+    # Handle None password safely and use timing-safe comparison
+    if x_admin_password is None or not secrets.compare_digest(
+        x_admin_password.encode('utf-8'),
+        settings.admin_password.get_secret_value().encode('utf-8')
+    ):
         raise HTTPException(status_code=401, detail="Unauthorized")
     return True
 
 
 @app.get("/cameras", response_class=HTMLResponse)
-async def cameras_list(request: Request, manufacturer: str | None = None):
+async def cameras_list(
+    request: Request,
+    manufacturer: str | None = None,
+    device_type: str | None = None,
+    port: str | None = None,
+    protocol: str | None = None,
+):
     """Render the public camera compatibility list."""
     db = get_camera_database()
-    cameras = db.list_cameras(manufacturer=manufacturer)
+    cameras = db.list_cameras(
+        manufacturer=manufacturer,
+        device_type=device_type,
+        port=port,
+        protocol=protocol,
+    )
     manufacturers = db.get_manufacturers()
+    device_types = db.get_device_types()
+    ports = db.get_all_ports()
+    protocols = db.get_all_protocols()
     stats = db.get_stats()
 
     return templates.TemplateResponse(
@@ -457,17 +541,33 @@ async def cameras_list(request: Request, manufacturer: str | None = None):
             "request": request,
             "cameras": cameras,
             "manufacturers": manufacturers,
+            "device_types": device_types,
+            "ports": ports,
+            "protocols": protocols,
             "selected_manufacturer": manufacturer,
+            "selected_device_type": device_type,
+            "selected_port": port,
+            "selected_protocol": protocol,
             "stats": stats,
         },
     )
 
 
 @app.get("/api/cameras", response_model=list[Camera])
-async def api_cameras_list(manufacturer: str | None = None):
+async def api_cameras_list(
+    manufacturer: str | None = None,
+    device_type: str | None = None,
+    port: str | None = None,
+    protocol: str | None = None,
+):
     """Get all cameras as JSON."""
     db = get_camera_database()
-    return db.list_cameras(manufacturer=manufacturer)
+    return db.list_cameras(
+        manufacturer=manufacturer,
+        device_type=device_type,
+        port=port,
+        protocol=protocol,
+    )
 
 
 @app.get("/api/cameras/search", response_model=list[Camera])
@@ -559,8 +659,10 @@ async def admin_camera_new(
 
 
 @app.post("/api/admin/cameras", response_model=Camera)
+@limiter.limit("5/minute")
 async def api_camera_create(
-    camera: CameraCreate,
+    request: Request,
+    camera: Annotated[CameraCreate, Body()],
     _: bool = Depends(verify_admin),
 ):
     """Create a new camera entry."""
@@ -569,9 +671,11 @@ async def api_camera_create(
 
 
 @app.put("/api/admin/cameras/{camera_id}", response_model=Camera)
+@limiter.limit("5/minute")
 async def api_camera_update(
     camera_id: int,
-    updates: CameraUpdate,
+    request: Request,
+    updates: Annotated[CameraUpdate, Body()],
     _: bool = Depends(verify_admin),
 ):
     """Update an existing camera."""
@@ -583,8 +687,10 @@ async def api_camera_update(
 
 
 @app.delete("/api/admin/cameras/{camera_id}")
+@limiter.limit("5/minute")
 async def api_camera_delete(
     camera_id: int,
+    request: Request,
     _: bool = Depends(verify_admin),
 ):
     """Delete a camera entry."""
@@ -592,6 +698,42 @@ async def api_camera_delete(
     if not db.delete_camera(camera_id):
         raise HTTPException(status_code=404, detail="Camera not found")
     return {"status": "deleted", "id": camera_id}
+
+
+# =============================================================================
+# Search Analytics Routes (Admin)
+# =============================================================================
+
+
+@app.get("/admin/analytics", response_class=HTMLResponse)
+async def admin_analytics(request: Request):
+    """Admin analytics dashboard page."""
+    return templates.TemplateResponse("admin_analytics.html", {"request": request})
+
+
+@app.get("/api/admin/search-stats")
+async def api_search_stats(
+    days: int = 30,
+    _: bool = Depends(verify_admin),
+):
+    """Get search analytics statistics."""
+    analytics = get_analytics_db()
+    return {
+        "stats": analytics.get_search_stats(days=days),
+        "popular_queries": analytics.get_popular_queries(limit=10, days=days),
+        "recent_searches": analytics.get_recent_searches(limit=20),
+    }
+
+
+@app.get("/api/admin/search-stats/popular")
+async def api_popular_queries(
+    limit: int = 10,
+    days: int = 30,
+    _: bool = Depends(verify_admin),
+):
+    """Get popular search queries."""
+    analytics = get_analytics_db()
+    return analytics.get_popular_queries(limit=limit, days=days)
 
 
 def create_app() -> FastAPI:

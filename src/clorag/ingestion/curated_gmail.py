@@ -14,7 +14,11 @@ from clorag.core.vectorstore import VectorStore
 from clorag.ingestion.base import Document
 from clorag.ingestion.chunker import TextChunker
 from clorag.ingestion.gmail import GmailIngestionPipeline
-from clorag.models import CaseStatus, QualityControlResult, ResolutionQuality, SupportCase, ThreadAnalysis
+from clorag.models import (
+    CaseStatus,
+    ResolutionQuality,
+    SupportCase,
+)
 from clorag.models.camera import CameraSource
 from clorag.utils.anonymizer import AnonymizationContext, TextAnonymizer
 
