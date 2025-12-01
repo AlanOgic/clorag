@@ -84,8 +84,7 @@ class CameraDatabase:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cameras_manufacturer ON cameras(manufacturer)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cameras_name ON cameras(name COLLATE NOCASE)")
-            # Index on code_model for fast lookups (unique constraint enforced in application layer)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_cameras_code_model ON cameras(code_model)")
+
             # Add code_model column if it doesn't exist (migration)
             try:
                 conn.execute("ALTER TABLE cameras ADD COLUMN code_model TEXT")
@@ -93,6 +92,7 @@ class CameraDatabase:
                 logger.info("Added code_model column to cameras table")
             except sqlite3.OperationalError:
                 pass  # Column already exists
+
             # Add device_type column if it doesn't exist (migration)
             try:
                 conn.execute("ALTER TABLE cameras ADD COLUMN device_type TEXT")
@@ -100,6 +100,9 @@ class CameraDatabase:
                 logger.info("Added device_type column to cameras table")
             except sqlite3.OperationalError:
                 pass  # Column already exists
+
+            # Index on code_model for fast lookups (after migration ensures column exists)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_cameras_code_model ON cameras(code_model)")
             conn.commit()
             logger.debug("Database schema ensured", db_path=self._db_path)
 
