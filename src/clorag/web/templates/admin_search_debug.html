@@ -784,6 +784,56 @@
         document.getElementById('queryInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') performSearch();
         });
+
+        // Check URL parameters for pre-filled query
+        function checkUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const query = params.get('q');
+            const source = params.get('source');
+
+            if (query) {
+                document.getElementById('queryInput').value = query;
+            }
+            if (source && ['docs', 'gmail', 'both'].includes(source)) {
+                document.getElementById('sourceSelect').value = source;
+            }
+
+            return !!query;
+        }
+
+        // Modified authenticate to auto-search if URL params present
+        const originalAuthenticate = authenticate;
+        authenticate = async function() {
+            adminPassword = document.getElementById('adminPassword').value;
+            const authError = document.getElementById('authError');
+            authError.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/admin/search-stats', {
+                    headers: {
+                        'X-Admin-Password': adminPassword
+                    }
+                });
+
+                if (response.ok) {
+                    document.getElementById('authForm').classList.add('hidden');
+                    document.getElementById('searchInterface').classList.remove('hidden');
+
+                    // Auto-search if query parameter was present
+                    if (checkUrlParams() && document.getElementById('queryInput').value) {
+                        performSearch();
+                    }
+                } else {
+                    authError.classList.remove('hidden');
+                }
+            } catch (error) {
+                authError.textContent = 'Connection error';
+                authError.classList.remove('hidden');
+            }
+        };
+
+        // Pre-fill form on page load (before auth)
+        checkUrlParams();
     </script>
 </body>
 </html>

@@ -319,6 +319,18 @@
             margin-bottom: 1rem;
         }
 
+        /* Query links */
+        .query-link {
+            color: var(--cyan-dark);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .query-link:hover {
+            color: var(--cyan-blue);
+            text-decoration: underline;
+        }
+
         /* Refresh button */
         .refresh-btn {
             display: inline-flex;
@@ -603,7 +615,7 @@
 
             tbody.innerHTML = queries.map(q => `
                 <tr>
-                    <td><strong>${escapeHtml(q.query)}</strong></td>
+                    <td><a href="/admin/search-debug?q=${encodeURIComponent(q.query)}" class="query-link" title="Debug this query"><strong>${escapeHtml(q.query)}</strong></a></td>
                     <td>${q.count}</td>
                     <td>${formatDate(q.last_searched)}</td>
                 </tr>
@@ -620,9 +632,10 @@
             tbody.innerHTML = searches.map(s => {
                 const tagClass = s.source === 'docs' ? 'tag--docs' :
                                  s.source === 'gmail' ? 'tag--gmail' : 'tag--both';
+                const debugUrl = `/admin/search-debug?q=${encodeURIComponent(s.query)}&source=${s.source}`;
                 return `
                     <tr>
-                        <td>${escapeHtml(s.query.substring(0, 60))}${s.query.length > 60 ? '...' : ''}</td>
+                        <td><a href="${debugUrl}" class="query-link" title="Debug this query">${escapeHtml(s.query.substring(0, 60))}${s.query.length > 60 ? '...' : ''}</a></td>
                         <td><span class="tag ${tagClass}">${s.source}</span></td>
                         <td>${s.response_time_ms ? s.response_time_ms + ' ms' : '-'}</td>
                         <td>${s.results_count ?? '-'}</td>
