@@ -642,10 +642,22 @@ async def api_camera_get(camera_id: int):
 # Admin routes (protected)
 
 
+@app.get("/help", response_class=HTMLResponse)
+async def help_page(request: Request):
+    """Public user guide page."""
+    return templates.TemplateResponse("help.html", {"request": request})
+
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_index(request: Request):
     """Admin index page with links to all admin pages."""
     return templates.TemplateResponse("admin_index.html", {"request": request})
+
+
+@app.get("/admin/docs", response_class=HTMLResponse)
+async def admin_docs(request: Request):
+    """Admin technical documentation page."""
+    return templates.TemplateResponse("admin_docs.html", {"request": request})
 
 
 @app.get("/admin/login", response_class=HTMLResponse)

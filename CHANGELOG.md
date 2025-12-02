@@ -2,12 +2,34 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.2] - 2025-12-02
+
+### Added
+- **Technical Documentation Page** (`/admin/docs`)
+  - Comprehensive architecture overview
+  - API reference with all endpoints documented
+  - Authentication and security documentation
+  - Deployment and configuration guide
+  - Sidebar navigation for easy browsing
+
+- **User Guide Page** (`/help`)
+  - Getting started instructions
+  - Example queries with click-to-search
+  - Source filter explanations
+  - Tips for better search results
+  - Feature overview
+
+### Security
+- Fixed XSS vulnerability in camera detail modal (HTML escaping)
+- Fixed XSS vulnerability in analytics chunk URLs (URL validation)
+- Fixed open redirect vulnerability in login page
+
 ## [0.3.1] - 2025-12-01
 
 ### Added
 - **Session-Based Admin Authentication**
   - Secure login page at `/admin/login` replacing header-based auth
-  - Signed session cookies using `itsdangerous` (7-day expiry)
+  - Signed session cookies using `itsdangerous` (24-hour expiry)
   - Admin dashboard at `/admin` with links to all admin features
   - Logout functionality at `/admin/logout`
 

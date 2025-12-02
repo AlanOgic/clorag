@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technical Documentation - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --ifm-font-family-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover {
+            color: var(--cyan-blue);
+        }
+
+        .navbar__link--active {
+            color: var(--cyan-blue);
+            font-weight: 600;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--hero-bg);
+            padding: 2rem;
+            text-align: center;
+            color: white;
+        }
+
+        .hero__title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .hero__subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Two-column layout */
+        .docs-layout {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .docs-layout {
+                grid-template-columns: 1fr;
+            }
+            .docs-nav {
+                display: none;
+            }
+        }
+
+        /* Sidebar Navigation */
+        .docs-nav {
+            position: sticky;
+            top: 80px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .docs-nav__title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #606770;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+        }
+
+        .docs-nav__list {
+            list-style: none;
+        }
+
+        .docs-nav__item {
+            margin-bottom: 0.25rem;
+        }
+
+        .docs-nav__link {
+            display: block;
+            padding: 0.4rem 0.75rem;
+            color: #444;
+            text-decoration: none;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            transition: all 0.15s;
+        }
+
+        .docs-nav__link:hover {
+            background: #e3f2fd;
+            color: var(--cyan-dark);
+        }
+
+        .docs-nav__link--active {
+            background: var(--cyan-blue);
+            color: white;
+        }
+
+        /* Content */
+        .docs-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .docs-content h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--cyanview-navy);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e1e4e8;
+        }
+
+        .docs-content h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin: 2rem 0 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e1e4e8;
+        }
+
+        .docs-content h2:first-of-type {
+            border-top: none;
+            padding-top: 0;
+        }
+
+        .docs-content h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #444;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        .docs-content p {
+            margin-bottom: 1rem;
+            color: #444;
+        }
+
+        .docs-content ul, .docs-content ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+
+        .docs-content li {
+            margin-bottom: 0.5rem;
+            color: #444;
+        }
+
+        .docs-content code {
+            font-family: var(--ifm-font-family-mono);
+            font-size: 0.9em;
+            background: #f1f3f5;
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: #c92a2a;
+        }
+
+        .docs-content pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-bottom: 1rem;
+            font-family: var(--ifm-font-family-mono);
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .docs-content pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        .docs-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+        }
+
+        .docs-content th, .docs-content td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e1e4e8;
+        }
+
+        .docs-content th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .docs-content a {
+            color: var(--cyan-dark);
+            text-decoration: none;
+        }
+
+        .docs-content a:hover {
+            text-decoration: underline;
+        }
+
+        /* Info boxes */
+        .info-box {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .info-box--info {
+            background: #e3f2fd;
+            border-left: 4px solid var(--cyan-blue);
+        }
+
+        .info-box--warning {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+        }
+
+        .info-box--success {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+        }
+
+        .info-box__title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Logout button */
+        .btn-logout {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+            background: transparent;
+            color: #606770;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #dc2626;
+        }
+
+        /* Loading overlay */
+        .auth-loading {
+            position: fixed;
+            inset: 0;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-loading.hidden {
+            display: none;
+        }
+
+        /* Endpoint badge */
+        .endpoint {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .endpoint__method {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .endpoint__method--get {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .endpoint__method--post {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .endpoint__method--put {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+
+        .endpoint__method--delete {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .endpoint__path {
+            font-family: var(--ifm-font-family-mono);
+            font-size: 0.9rem;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="/admin" class="navbar__link">Admin</a>
+            <a href="/admin/docs" class="navbar__link navbar__link--active">Docs</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Auth loading overlay -->
+    <div id="authLoading" class="auth-loading">
+        <span>Checking authentication...</span>
+    </div>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero__title">Technical Documentation</h1>
+        <p class="hero__subtitle">Architecture, API reference, and administration guide</p>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="docs-layout">
+            <!-- Sidebar Navigation -->
+            <nav class="docs-nav">
+                <h3 class="docs-nav__title">Contents</h3>
+                <ul class="docs-nav__list">
+                    <li class="docs-nav__item"><a href="#architecture" class="docs-nav__link">Architecture</a></li>
+                    <li class="docs-nav__item"><a href="#search-system" class="docs-nav__link">Search System</a></li>
+                    <li class="docs-nav__item"><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
+                    <li class="docs-nav__item"><a href="#authentication" class="docs-nav__link">Authentication</a></li>
+                    <li class="docs-nav__item"><a href="#api-reference" class="docs-nav__link">API Reference</a></li>
+                    <li class="docs-nav__item"><a href="#analytics" class="docs-nav__link">Analytics</a></li>
+                    <li class="docs-nav__item"><a href="#deployment" class="docs-nav__link">Deployment</a></li>
+                    <li class="docs-nav__item"><a href="#configuration" class="docs-nav__link">Configuration</a></li>
+                </ul>
+            </nav>
+
+            <!-- Documentation Content -->
+            <div class="docs-content">
+                <h1>Cyanview AI Search - Technical Documentation</h1>
+
+                <p>This document provides comprehensive technical documentation for administrators and developers working with the Cyanview AI Search platform.</p>
+
+                <h2 id="architecture">System Architecture</h2>
+
+                <h3>Overview</h3>
+                <p>Cyanview AI Search is a Multi-RAG (Retrieval-Augmented Generation) system that combines:</p>
+                <ul>
+                    <li><strong>Documentation</strong> - Official Docusaurus support documentation</li>
+                    <li><strong>Support Cases</strong> - Curated and anonymized Gmail support threads</li>
+                    <li><strong>Camera Database</strong> - Structured camera compatibility information</li>
+                </ul>
+
+                <h3>Data Flow</h3>
+                <pre><code>User Query
+    ↓
+Embeddings Generation (Voyage AI voyage-context-3)
+    ↓
+Hybrid Search (Dense + Sparse vectors)
+    ↓
+RRF Fusion (Reciprocal Rank Fusion)
+    ↓
+Claude Haiku 4.5 Synthesis
+    ↓
+Streaming Response</code></pre>
+
+                <h3>Technology Stack</h3>
+                <table>
+                    <tr><th>Component</th><th>Technology</th></tr>
+                    <tr><td>Vector Database</td><td>Qdrant</td></tr>
+                    <tr><td>Dense Embeddings</td><td>Voyage AI (voyage-context-3)</td></tr>
+                    <tr><td>Sparse Embeddings</td><td>FastEmbed BM25</td></tr>
+                    <tr><td>LLM Synthesis</td><td>Claude Haiku 4.5</td></tr>
+                    <tr><td>Web Framework</td><td>FastAPI + Jinja2</td></tr>
+                    <tr><td>Database</td><td>SQLite (cameras + analytics)</td></tr>
+                    <tr><td>Session Management</td><td>itsdangerous (signed cookies)</td></tr>
+                </table>
+
+                <h2 id="search-system">Search System</h2>
+
+                <h3>Hybrid Search</h3>
+                <p>The search system uses a hybrid approach combining semantic and keyword matching:</p>
+                <ul>
+                    <li><strong>Dense vectors</strong> (1024-dim) - Voyage AI contextualized embeddings for semantic similarity</li>
+                    <li><strong>Sparse vectors</strong> - BM25 for exact keyword matching (important for model numbers)</li>
+                    <li><strong>RRF Fusion</strong> - Reciprocal Rank Fusion combines both results for optimal ranking</li>
+                </ul>
+
+                <h3>Collections</h3>
+                <p>Two Qdrant collections store the indexed data:</p>
+                <table>
+                    <tr><th>Collection</th><th>Content</th><th>Vectors</th></tr>
+                    <tr><td><code>docusaurus_docs</code></td><td>Documentation pages</td><td>dense + sparse</td></tr>
+                    <tr><td><code>gmail_cases</code></td><td>Anonymized support cases</td><td>dense + sparse</td></tr>
+                </table>
+
+                <h3>Retrieval Settings</h3>
+                <ul>
+                    <li>Retrieved chunks: 10 per collection</li>
+                    <li>Used for synthesis: 8 top chunks</li>
+                    <li>Max chunk size: 2000 characters</li>
+                </ul>
+
+                <h2 id="camera-database">Camera Database</h2>
+
+                <h3>Schema</h3>
+                <p>The camera compatibility database stores structured information:</p>
+                <table>
+                    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                    <tr><td>id</td><td>INTEGER</td><td>Primary key</td></tr>
+                    <tr><td>name</td><td>TEXT</td><td>Camera model name</td></tr>
+                    <tr><td>manufacturer</td><td>TEXT</td><td>Manufacturer (Canon, Sony, etc.)</td></tr>
+                    <tr><td>device_type</td><td>TEXT</td><td>Type (cinema, broadcast, PTZ, etc.)</td></tr>
+                    <tr><td>ports</td><td>JSON</td><td>Physical connection ports</td></tr>
+                    <tr><td>protocols</td><td>JSON</td><td>Communication protocols</td></tr>
+                    <tr><td>supported_controls</td><td>JSON</td><td>Controllable features</td></tr>
+                    <tr><td>notes</td><td>JSON</td><td>Additional notes</td></tr>
+                    <tr><td>doc_url</td><td>TEXT</td><td>Documentation URL</td></tr>
+                    <tr><td>manufacturer_url</td><td>TEXT</td><td>Manufacturer product page</td></tr>
+                    <tr><td>source</td><td>TEXT</td><td>Data source (documentation, support_case, manual)</td></tr>
+                </table>
+
+                <h3>Data Sources</h3>
+                <p>Camera data is extracted from multiple sources:</p>
+                <ul>
+                    <li><strong>Documentation</strong> - Automatic extraction during docs ingestion</li>
+                    <li><strong>Support Cases</strong> - Extraction from resolved support threads</li>
+                    <li><strong>Manual Entry</strong> - Admin interface for manual additions</li>
+                </ul>
+
+                <h2 id="authentication">Authentication</h2>
+
+                <h3>Session-Based Auth</h3>
+                <p>Admin routes are protected by session-based authentication:</p>
+                <ul>
+                    <li>Login via <code>/admin/login</code> page</li>
+                    <li>Signed session cookies using <code>itsdangerous</code></li>
+                    <li>Cookie settings: HttpOnly, Secure, SameSite=Strict</li>
+                    <li>Session expiry: 24 hours</li>
+                </ul>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Legacy Support</div>
+                    <p>API calls can also authenticate via <code>X-Admin-Password</code> header for backward compatibility with scripts.</p>
+                </div>
+
+                <h3>Rate Limiting</h3>
+                <ul>
+                    <li>Login attempts: 5/minute per IP</li>
+                    <li>Camera create/update/delete: 5/minute per IP</li>
+                </ul>
+
+                <h2 id="api-reference">API Reference</h2>
+
+                <h3>Search Endpoints</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/search</span>
+                </div>
+                <p>Perform RAG search with Claude-powered synthesis.</p>
+                <pre><code>{
+  "query": "How to configure RIO IP address?",
+  "source": "both",  // "docs", "gmail", or "both"
+  "limit": 10
+}</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/search/stream</span>
+                </div>
+                <p>Streaming version with Server-Sent Events (SSE).</p>
+
+                <h3>Camera Endpoints (Public)</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/cameras</span>
+                </div>
+                <p>List all cameras. Supports filters: <code>manufacturer</code>, <code>device_type</code>, <code>port</code>, <code>protocol</code>.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/cameras/search?q={query}</span>
+                </div>
+                <p>Search cameras by name or manufacturer.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/cameras/{id}</span>
+                </div>
+                <p>Get a single camera by ID.</p>
+
+                <h3>Camera Endpoints (Admin)</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/cameras</span>
+                </div>
+                <p>Create a new camera entry. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--put">PUT</span>
+                    <span class="endpoint__path">/api/admin/cameras/{id}</span>
+                </div>
+                <p>Update an existing camera. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--delete">DELETE</span>
+                    <span class="endpoint__path">/api/admin/cameras/{id}</span>
+                </div>
+                <p>Delete a camera entry. Requires authentication.</p>
+
+                <h3>Analytics Endpoints</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/search-stats?days=30</span>
+                </div>
+                <p>Get search statistics. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/search/{id}</span>
+                </div>
+                <p>Get stored search details including response and chunks. Requires authentication.</p>
+
+                <h3>Auth Endpoints</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/login</span>
+                </div>
+                <p>Authenticate and receive session cookie.</p>
+                <pre><code>{ "password": "your_admin_password" }</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/logout</span>
+                </div>
+                <p>Clear session cookie.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/session</span>
+                </div>
+                <p>Check if current session is valid.</p>
+
+                <h2 id="analytics">Analytics System</h2>
+
+                <h3>Data Collected</h3>
+                <p>Each search logs the following data:</p>
+                <ul>
+                    <li>Query text and source filter</li>
+                    <li>Response time (milliseconds)</li>
+                    <li>Number of results</li>
+                    <li>Full LLM response text</li>
+                    <li>Retrieved chunks (for replay without re-query)</li>
+                    <li>Timestamp</li>
+                </ul>
+
+                <h3>Statistics Available</h3>
+                <ul>
+                    <li>Total searches (with time range)</li>
+                    <li>Average response time</li>
+                    <li>Searches by source (docs/gmail/both)</li>
+                    <li>Daily search volume chart</li>
+                    <li>Popular queries (ranked)</li>
+                    <li>Recent searches (clickable to view details)</li>
+                </ul>
+
+                <h2 id="deployment">Deployment</h2>
+
+                <h3>Docker Deployment</h3>
+                <pre><code># Build and deploy
+rsync -avz --exclude '.venv' --exclude 'data' . root@server:/opt/clorag/
+ssh root@server "cd /opt/clorag && docker compose build && docker compose up -d"</code></pre>
+
+                <h3>Environment Variables</h3>
+                <table>
+                    <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
+                    <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Yes</td><td>Anthropic API key for Claude</td></tr>
+                    <tr><td><code>VOYAGE_API_KEY</code></td><td>Yes</td><td>Voyage AI API key for embeddings</td></tr>
+                    <tr><td><code>QDRANT_URL</code></td><td>Yes</td><td>Qdrant server URL</td></tr>
+                    <tr><td><code>QDRANT_API_KEY</code></td><td>No</td><td>Qdrant API key (if secured)</td></tr>
+                    <tr><td><code>ADMIN_PASSWORD</code></td><td>Yes</td><td>Admin authentication password</td></tr>
+                    <tr><td><code>DATABASE_PATH</code></td><td>No</td><td>Camera DB path (default: data/clorag.db)</td></tr>
+                    <tr><td><code>ANALYTICS_DATABASE_PATH</code></td><td>No</td><td>Analytics DB path (default: data/analytics.db)</td></tr>
+                </table>
+
+                <h2 id="configuration">Configuration</h2>
+
+                <h3>Ingestion Commands</h3>
+                <pre><code># Ingest documentation
+uv run ingest-docs
+
+# Ingest Gmail support cases (curated)
+uv run ingest-curated --max-threads 300
+
+# Incremental ingestion
+uv run ingest-curated --offset 300 --max-threads 300</code></pre>
+
+                <h3>Database Locations</h3>
+                <ul>
+                    <li><code>data/clorag.db</code> - Camera compatibility database</li>
+                    <li><code>data/analytics.db</code> - Search analytics database</li>
+                </ul>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Backup Recommendation</div>
+                    <p>Regularly backup the SQLite databases in the <code>data/</code> directory. These contain camera entries and search analytics that cannot be recovered from vector stores alone.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
+
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                window.location.href = '/admin/login';
+            }
+        }
+        checkAuth();
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/login';
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('.docs-nav__link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const id = link.getAttribute('href').slice(1);
+                document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    </script>
+</body>
+</html>

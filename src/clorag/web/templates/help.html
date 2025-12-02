@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Guide - Cyanview AI Search</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover {
+            color: var(--cyan-blue);
+        }
+
+        .navbar__link--active {
+            color: var(--cyan-blue);
+            font-weight: 600;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--hero-bg);
+            padding: 3rem 2rem;
+            text-align: center;
+            color: white;
+        }
+
+        .hero__title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .hero__subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Section Cards */
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .section__icon {
+            width: 48px;
+            height: 48px;
+            background: #e3f2fd;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .section__title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 1rem;
+        }
+
+        .section p {
+            color: #444;
+            margin-bottom: 1rem;
+        }
+
+        .section ul, .section ol {
+            padding-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .section li {
+            color: #444;
+            margin-bottom: 0.5rem;
+        }
+
+        .section strong {
+            color: var(--cyanview-navy);
+        }
+
+        /* Example queries */
+        .examples {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+        }
+
+        .example {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.2s;
+            border: 1px solid #e1e4e8;
+        }
+
+        .example:hover {
+            background: #e3f2fd;
+            border-color: var(--cyan-blue);
+            transform: translateX(4px);
+        }
+
+        .example__icon {
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .example__text {
+            flex: 1;
+        }
+
+        .example__query {
+            font-weight: 500;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.25rem;
+        }
+
+        .example__desc {
+            font-size: 0.85rem;
+            color: #606770;
+        }
+
+        /* Tips box */
+        .tips {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .tips__title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: #2e7d32;
+            margin-bottom: 1rem;
+        }
+
+        .tips__list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .tips__list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            color: #1b5e20;
+        }
+
+        .tips__list li:last-child {
+            margin-bottom: 0;
+        }
+
+        .tips__check {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            background: #4caf50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 2px;
+        }
+
+        /* Source filters */
+        .filters {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+
+        .filter {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e1e4e8;
+        }
+
+        .filter__icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .filter__name {
+            font-weight: 500;
+            color: var(--cyanview-navy);
+        }
+
+        .filter__desc {
+            font-size: 0.85rem;
+            color: #606770;
+        }
+
+        /* Feature grid */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .feature {
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .feature__title {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .feature__desc {
+            font-size: 0.9rem;
+            color: #606770;
+        }
+
+        /* CTA Button */
+        .cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.5rem;
+            background: var(--cyan-blue);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .cta:hover {
+            background: var(--cyan-dark);
+        }
+
+        /* Footer links */
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            padding: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-link {
+            color: var(--cyan-dark);
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .footer-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="/help" class="navbar__link navbar__link--active">Help</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero__title">User Guide</h1>
+        <p class="hero__subtitle">Learn how to get the most out of Cyanview AI Search to find answers to your camera control questions</p>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Getting Started -->
+        <section class="section">
+            <div class="section__icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1565c0" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 16v-4M12 8h.01"/>
+                </svg>
+            </div>
+            <h2 class="section__title">Getting Started</h2>
+            <p>Cyanview AI Search is your intelligent assistant for finding information about Cyanview camera control products. It combines official documentation with real-world support cases to give you comprehensive, accurate answers.</p>
+
+            <ol>
+                <li><strong>Type your question</strong> in natural language - just like you'd ask a colleague</li>
+                <li><strong>Press Enter or click Search</strong> to get an AI-powered answer</li>
+                <li><strong>Review the sources</strong> linked at the bottom for more details</li>
+            </ol>
+
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <a href="/" class="cta">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    Try AI Search Now
+                </a>
+            </div>
+        </section>
+
+        <!-- Example Queries -->
+        <section class="section">
+            <div class="section__icon" style="background: #fff3e0;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef6c00" stroke-width="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+            </div>
+            <h2 class="section__title">Example Questions</h2>
+            <p>Not sure what to ask? Here are some examples to get you started:</p>
+
+            <div class="examples">
+                <a href="/?q=How%20do%20I%20configure%20the%20RIO%20IP%20address%3F" class="example">
+                    <div class="example__icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1565c0" stroke-width="2">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                            <line x1="6" y1="6" x2="6.01" y2="6"/>
+                            <line x1="6" y1="18" x2="6.01" y2="18"/>
+                        </svg>
+                    </div>
+                    <div class="example__text">
+                        <div class="example__query">How do I configure the RIO IP address?</div>
+                        <div class="example__desc">Network configuration for RIO units</div>
+                    </div>
+                </a>
+
+                <a href="/?q=Which%20Sony%20cameras%20are%20compatible%20with%20Cyanview%3F" class="example">
+                    <div class="example__icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                    </div>
+                    <div class="example__text">
+                        <div class="example__query">Which Sony cameras are compatible with Cyanview?</div>
+                        <div class="example__desc">Camera compatibility information</div>
+                    </div>
+                </a>
+
+                <a href="/?q=What%20is%20the%20difference%20between%20RCP%20and%20VP4%3F" class="example">
+                    <div class="example__icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7b1fa2" stroke-width="2">
+                            <circle cx="18" cy="5" r="3"/>
+                            <circle cx="6" cy="12" r="3"/>
+                            <circle cx="18" cy="19" r="3"/>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        </svg>
+                    </div>
+                    <div class="example__text">
+                        <div class="example__query">What is the difference between RCP and VP4?</div>
+                        <div class="example__desc">Product comparison</div>
+                    </div>
+                </a>
+
+                <a href="/?q=How%20to%20update%20firmware%20on%20CI0%3F" class="example">
+                    <div class="example__icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef6c00" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </div>
+                    <div class="example__text">
+                        <div class="example__query">How to update firmware on CI0?</div>
+                        <div class="example__desc">Firmware update procedures</div>
+                    </div>
+                </a>
+
+                <a href="/?q=My%20camera%20shows%20offline%20in%20the%20web%20interface" class="example">
+                    <div class="example__icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                    </div>
+                    <div class="example__text">
+                        <div class="example__query">My camera shows offline in the web interface</div>
+                        <div class="example__desc">Troubleshooting connection issues</div>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <!-- Source Filters -->
+        <section class="section">
+            <div class="section__icon" style="background: #fce4ec;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c2185b" stroke-width="2">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                </svg>
+            </div>
+            <h2 class="section__title">Source Filters</h2>
+            <p>You can filter search results by source to focus on specific types of information:</p>
+
+            <div class="filters">
+                <div class="filter">
+                    <svg class="filter__icon" viewBox="0 0 24 24" fill="none" stroke="#1565c0" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <div>
+                        <div class="filter__name">Documentation</div>
+                        <div class="filter__desc">Official product documentation and guides</div>
+                    </div>
+                </div>
+
+                <div class="filter">
+                    <svg class="filter__icon" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                    <div>
+                        <div class="filter__name">Support Cases</div>
+                        <div class="filter__desc">Real-world solutions from past support requests</div>
+                    </div>
+                </div>
+
+                <div class="filter">
+                    <svg class="filter__icon" viewBox="0 0 24 24" fill="none" stroke="#7b1fa2" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <div>
+                        <div class="filter__name">Both (Default)</div>
+                        <div class="filter__desc">Searches all available sources</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section class="section">
+            <div class="section__icon" style="background: #e8f5e9;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2">
+                    <polyline points="9 11 12 14 22 4"/>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+            </div>
+            <h2 class="section__title">Features</h2>
+
+            <div class="features">
+                <div class="feature">
+                    <div class="feature__title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                        </svg>
+                        Real-Time Streaming
+                    </div>
+                    <div class="feature__desc">Answers stream in real-time as they're generated - no waiting for the full response</div>
+                </div>
+
+                <div class="feature">
+                    <div class="feature__title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                        Source Links
+                    </div>
+                    <div class="feature__desc">Every answer includes links to the original documentation for further reading</div>
+                </div>
+
+                <div class="feature">
+                    <div class="feature__title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        Copy to Clipboard
+                    </div>
+                    <div class="feature__desc">Easily copy answers to share with colleagues or save for later</div>
+                </div>
+
+                <div class="feature">
+                    <div class="feature__title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                        Hybrid Search
+                    </div>
+                    <div class="feature__desc">Combines semantic understanding with keyword matching for accurate results</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tips -->
+        <section class="section">
+            <div class="tips">
+                <div class="tips__title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                    Tips for Better Results
+                </div>
+                <ul class="tips__list">
+                    <li>
+                        <div class="tips__check">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <span><strong>Be specific</strong> - Include product names like RIO, RCP, CI0, VP4</span>
+                    </li>
+                    <li>
+                        <div class="tips__check">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <span><strong>Describe the problem</strong> - "Camera offline" is better than just "help"</span>
+                    </li>
+                    <li>
+                        <div class="tips__check">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <span><strong>Include context</strong> - Mention camera models, firmware versions, or error messages</span>
+                    </li>
+                    <li>
+                        <div class="tips__check">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <span><strong>Use either language</strong> - The AI understands both English and French</span>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Camera Compatibility -->
+        <section class="section">
+            <div class="section__icon" style="background: #e3f2fd;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1565c0" stroke-width="2">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                </svg>
+            </div>
+            <h2 class="section__title">Camera Compatibility Database</h2>
+            <p>Looking for specific camera compatibility information? Check out our dedicated camera database with detailed information on supported cameras, protocols, ports, and controls.</p>
+
+            <div style="margin-top: 1rem;">
+                <a href="/cameras" class="cta" style="background: #2e7d32;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    Browse Camera Compatibility
+                </a>
+            </div>
+        </section>
+
+        <!-- Need More Help -->
+        <section class="section" style="text-align: center; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);">
+            <h2 class="section__title" style="margin-bottom: 0.5rem;">Need More Help?</h2>
+            <p style="margin-bottom: 1.5rem;">For detailed product documentation, visit the official Cyanview support site.</p>
+            <a href="https://support.cyanview.com" target="_blank" rel="noopener" class="cta">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                Visit Cyanview Documentation
+            </a>
+        </section>
+    </main>
+
+    <!-- Footer Links -->
+    <div class="footer-links">
+        <a href="/" class="footer-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            AI Search
+        </a>
+        <a href="/cameras" class="footer-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+            </svg>
+            Camera Compatibility
+        </a>
+        <a href="https://support.cyanview.com" target="_blank" rel="noopener" class="footer-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            Full Documentation
+        </a>
+    </div>
+</body>
+</html>
