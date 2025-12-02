@@ -867,6 +867,17 @@
             return div.innerHTML;
         }
 
+        // Security: Validate URL is safe (http/https only, no javascript:)
+        function isSafeUrl(url) {
+            if (!url) return false;
+            try {
+                const parsed = new URL(url);
+                return ['http:', 'https:'].includes(parsed.protocol);
+            } catch {
+                return false;
+            }
+        }
+
         // Modal functions
         const searchModal = document.getElementById('searchModal');
         const modalBody = document.getElementById('modalBody');
@@ -918,9 +929,9 @@
             if (data.chunks && data.chunks.length > 0) {
                 chunksHtml = data.chunks.map((chunk, i) => {
                     const sourceType = chunk.source_type === 'documentation' ? 'Documentation' : 'Support Case';
-                    const url = chunk.url || chunk.subject || '';
-                    const urlHtml = chunk.url
-                        ? `<a href="${escapeHtml(chunk.url)}" class="detail-chunk__url" target="_blank">${escapeHtml(chunk.url)}</a>`
+                    // Security: Validate URL before rendering as link
+                    const urlHtml = (chunk.url && isSafeUrl(chunk.url))
+                        ? `<a href="${escapeHtml(chunk.url)}" class="detail-chunk__url" target="_blank" rel="noopener">${escapeHtml(chunk.url)}</a>`
                         : (chunk.subject ? `<span class="detail-chunk__url">${escapeHtml(chunk.subject)}</span>` : '');
 
                     return `

@@ -757,11 +757,30 @@
 
         const cameraModal = document.getElementById('cameraModal');
 
+        // Security: Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        // Security: Validate URL is safe (http/https only)
+        function isSafeUrl(url) {
+            if (!url) return false;
+            try {
+                const parsed = new URL(url);
+                return ['http:', 'https:'].includes(parsed.protocol);
+            } catch {
+                return false;
+            }
+        }
+
         function openCameraModal(cameraId) {
             const camera = camerasData[cameraId];
             if (!camera) return;
 
-            // Set header info
+            // Set header info (using textContent is safe)
             document.getElementById('modalCameraName').textContent = camera.name;
             document.getElementById('modalManufacturer').textContent = camera.manufacturer || 'Unknown Manufacturer';
             document.getElementById('modalCodeModel').textContent = camera.code_model || '';
@@ -775,7 +794,7 @@
                 html += `<div class="detail-section">
                     <div class="detail-label">Device Type</div>
                     <div class="detail-tags">
-                        <span class="tag tag--type">${typeLabel}</span>
+                        <span class="tag tag--type">${escapeHtml(typeLabel)}</span>
                     </div>
                 </div>`;
             }
@@ -786,7 +805,7 @@
                 <div class="detail-tags">`;
             if (camera.ports && camera.ports.length > 0) {
                 camera.ports.forEach(port => {
-                    html += `<span class="tag">${port}</span>`;
+                    html += `<span class="tag">${escapeHtml(port)}</span>`;
                 });
             } else {
                 html += `<span class="detail-empty">None specified</span>`;
@@ -799,7 +818,7 @@
                 <div class="detail-tags">`;
             if (camera.protocols && camera.protocols.length > 0) {
                 camera.protocols.forEach(protocol => {
-                    html += `<span class="tag tag--protocol">${protocol}</span>`;
+                    html += `<span class="tag tag--protocol">${escapeHtml(protocol)}</span>`;
                 });
             } else {
                 html += `<span class="detail-empty">None specified</span>`;
@@ -807,12 +826,13 @@
             html += `</div></div>`;
 
             // Supported Controls
+            const controlCount = camera.supported_controls ? camera.supported_controls.length : 0;
             html += `<div class="detail-section">
-                <div class="detail-label">Supported Controls (${camera.supported_controls ? camera.supported_controls.length : 0})</div>
+                <div class="detail-label">Supported Controls (${controlCount})</div>
                 <div class="detail-tags">`;
             if (camera.supported_controls && camera.supported_controls.length > 0) {
                 camera.supported_controls.forEach(control => {
-                    html += `<span class="tag tag--control">${control}</span>`;
+                    html += `<span class="tag tag--control">${escapeHtml(control)}</span>`;
                 });
             } else {
                 html += `<span class="detail-empty">None specified</span>`;
@@ -820,12 +840,13 @@
             html += `</div></div>`;
 
             // Notes
+            const noteCount = camera.notes ? camera.notes.length : 0;
             html += `<div class="detail-section">
-                <div class="detail-label">Notes (${camera.notes ? camera.notes.length : 0})</div>`;
+                <div class="detail-label">Notes (${noteCount})</div>`;
             if (camera.notes && camera.notes.length > 0) {
                 html += `<ul class="detail-notes">`;
                 camera.notes.forEach(note => {
-                    html += `<li>${note}</li>`;
+                    html += `<li>${escapeHtml(note)}</li>`;
                 });
                 html += `</ul>`;
             } else {
@@ -833,16 +854,18 @@
             }
             html += `</div>`;
 
-            // Documentation Links
-            if (camera.doc_url || camera.manufacturer_url) {
+            // Documentation Links (validate URLs before rendering)
+            const hasDocUrl = isSafeUrl(camera.doc_url);
+            const hasMfrUrl = isSafeUrl(camera.manufacturer_url);
+            if (hasDocUrl || hasMfrUrl) {
                 html += `<div class="detail-section">
                     <div class="detail-label">Documentation</div>
                     <div class="detail-links">`;
-                if (camera.doc_url) {
-                    html += `<a href="${camera.doc_url}" target="_blank">Cyanview Docs</a>`;
+                if (hasDocUrl) {
+                    html += `<a href="${escapeHtml(camera.doc_url)}" target="_blank" rel="noopener">Cyanview Docs</a>`;
                 }
-                if (camera.manufacturer_url) {
-                    html += `<a href="${camera.manufacturer_url}" target="_blank">Manufacturer Site</a>`;
+                if (hasMfrUrl) {
+                    html += `<a href="${escapeHtml(camera.manufacturer_url)}" target="_blank" rel="noopener">Manufacturer Site</a>`;
                 }
                 html += `</div></div>`;
             }

@@ -207,15 +207,23 @@
         const submitBtn = document.getElementById('submitBtn');
         const errorMessage = document.getElementById('errorMessage');
 
+        // Security: Validate redirect URL to prevent open redirect attacks
+        function getSafeRedirect() {
+            const redirect = new URLSearchParams(window.location.search).get('redirect');
+            // Only allow relative paths starting with / but not // (protocol-relative)
+            if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+                return redirect;
+            }
+            return '/admin';
+        }
+
         // Check if already logged in
         async function checkSession() {
             try {
                 const res = await fetch('/api/admin/session');
                 const data = await res.json();
                 if (data.authenticated) {
-                    // Redirect to admin or previous page
-                    const redirect = new URLSearchParams(window.location.search).get('redirect') || '/admin';
-                    window.location.href = redirect;
+                    window.location.href = getSafeRedirect();
                 }
             } catch (e) {
                 console.error('Session check failed:', e);
@@ -243,8 +251,7 @@
 
                 if (res.ok) {
                     // Success - redirect to admin or previous page
-                    const redirect = new URLSearchParams(window.location.search).get('redirect') || '/admin';
-                    window.location.href = redirect;
+                    window.location.href = getSafeRedirect();
                 } else {
                     const data = await res.json();
                     errorMessage.textContent = data.detail || 'Invalid password';
