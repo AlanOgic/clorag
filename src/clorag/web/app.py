@@ -255,6 +255,15 @@ async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/robots.txt")
+async def robots_txt():
+    """Block search engine crawlers from indexing."""
+    return Response(
+        content="User-agent: *\nDisallow: /\n",
+        media_type="text/plain",
+    )
+
+
 @app.get("/health")
 async def health():
     """Health check endpoint for monitoring."""
