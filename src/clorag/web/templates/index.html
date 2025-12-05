@@ -312,62 +312,6 @@
             color: inherit;
         }
 
-        /* Source Links */
-        .source-links {
-            margin-top: 1.5rem;
-            padding-top: 1rem;
-            border-top: 1px solid #d0e3ff;
-        }
-
-        .source-links-title {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #666;
-            margin-bottom: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .source-links-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .source-link-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .source-link-item a {
-            color: var(--cyan-dark);
-            text-decoration: none;
-        }
-
-        .source-link-item a:hover {
-            text-decoration: underline;
-        }
-
-        .source-link-badge {
-            font-size: 0.7rem;
-            padding: 0.15rem 0.4rem;
-            border-radius: 3px;
-            font-weight: 500;
-            text-transform: uppercase;
-        }
-
-        .source-link-badge.docs {
-            background: #e3f2fd;
-            color: #1976d2;
-        }
-
-        .source-link-badge.case {
-            background: #fce4ec;
-            color: #c2185b;
-        }
-
         .results-header {
             display: flex;
             justify-content: space-between;
@@ -664,13 +608,6 @@
             color: #666;
         }
 
-        /* Case note styling */
-        .case-note {
-            font-style: italic;
-            color: #666;
-            font-size: 0.9rem;
-        }
-
         /* Conversation Flow - Chat Style */
         .conversation-container {
             display: flex;
@@ -729,12 +666,6 @@
         .ai-answer-card .answer-content {
             color: #333;
             line-height: 1.7;
-        }
-
-        .ai-answer-card .source-links {
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid #f0f0f0;
         }
 
         /* Follow-up input below answer */
@@ -1098,10 +1029,6 @@
                         <span class="answer-title">AI Answer</span>
                     </div>
                     <div class="answer-content" id="answer-content-${exchangeId}"></div>
-                    <div class="source-links" id="source-links-${exchangeId}" style="display: none;">
-                        <div class="source-links-title">Sources</div>
-                        <div class="source-links-list" id="source-links-list-${exchangeId}"></div>
-                    </div>
                 </div>
                 <div class="followup-input-container" id="followup-container-${exchangeId}" style="display: none;">
                     <form class="followup-form" onsubmit="handleFollowup(event, ${exchangeId})">
@@ -1176,10 +1103,8 @@
                 const exchangeEl = createExchangeElement(query, exchangeId);
                 conversationContainer.appendChild(exchangeEl);
 
-                // Get references to this exchange's content areas
+                // Get reference to this exchange's content area
                 const answerContentEl = document.getElementById(`answer-content-${exchangeId}`);
-                const sourceLinksEl = document.getElementById(`source-links-${exchangeId}`);
-                const sourceLinksListEl = document.getElementById(`source-links-list-${exchangeId}`);
 
                 // Scroll to the new exchange
                 exchangeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1207,9 +1132,6 @@
                                     fullText += data.text;
                                     // Render markdown incrementally
                                     answerContentEl.innerHTML = marked.parse(fullText);
-                                } else if (data.type === 'sources') {
-                                    // Display sources for this exchange
-                                    displaySourcesInElement(data.sources, sourceLinksEl, sourceLinksListEl);
                                 } else if (data.type === 'done') {
                                     // Final render
                                     answerContentEl.innerHTML = marked.parse(fullText);
@@ -1259,36 +1181,6 @@
                 searchButton.disabled = false;
             }
         }
-
-        // Display sources in a specific element
-        function displaySourcesInElement(sources, containerEl, listEl) {
-            const docLinks = sources.filter(link => link.source_type === 'documentation');
-            const hasCases = sources.some(link => link.source_type !== 'documentation');
-
-            let sourceHtml = docLinks.map(link => {
-                return `
-                    <div class="source-link-item">
-                        <span class="source-link-badge docs">Doc</span>
-                        <a href="${escapeHtml(link.url)}" target="_blank">${escapeHtml(link.title)}</a>
-                    </div>
-                `;
-            }).join('');
-
-            if (hasCases) {
-                sourceHtml += `
-                    <div class="source-link-item">
-                        <span class="source-link-badge case">Case</span>
-                        <span class="case-note">Insights from similar resolved support cases</span>
-                    </div>
-                `;
-            }
-
-            if (sourceHtml) {
-                listEl.innerHTML = sourceHtml;
-                containerEl.style.display = 'block';
-            }
-        }
-
 
         // Escape HTML
         function escapeHtml(text) {
