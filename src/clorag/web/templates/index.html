@@ -737,6 +737,60 @@
             border-top: 1px solid #f0f0f0;
         }
 
+        /* Follow-up input below answer */
+        .followup-input-container {
+            margin-top: 1rem;
+        }
+
+        .followup-form {
+            display: flex;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e0e0e0;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .followup-form:focus-within {
+            border-color: var(--cyan-blue);
+            box-shadow: 0 2px 12px rgba(0, 168, 232, 0.2);
+        }
+
+        .followup-input {
+            flex: 1;
+            padding: 0.75rem 1.25rem;
+            border: none;
+            font-size: 0.95rem;
+            outline: none;
+            background: transparent;
+        }
+
+        .followup-input::placeholder {
+            color: #999;
+        }
+
+        .followup-submit {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            background: var(--cyan-dark);
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .followup-submit:hover {
+            background: var(--cyan-blue);
+        }
+
+        .followup-submit svg {
+            width: 20px;
+            height: 20px;
+            color: white;
+        }
+
         /* New conversation button - floating */
         .new-conversation-btn {
             position: fixed;
@@ -1049,8 +1103,36 @@
                         <div class="source-links-list" id="source-links-list-${exchangeId}"></div>
                     </div>
                 </div>
+                <div class="followup-input-container" id="followup-container-${exchangeId}" style="display: none;">
+                    <form class="followup-form" onsubmit="handleFollowup(event, ${exchangeId})">
+                        <input type="text"
+                               class="followup-input"
+                               id="followup-input-${exchangeId}"
+                               placeholder="Ask a follow-up question..."
+                               autocomplete="off">
+                        <button type="submit" class="followup-submit">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                        </button>
+                    </form>
+                </div>
             `;
             return exchange;
+        }
+
+        // Handle follow-up question submission
+        function handleFollowup(event, exchangeId) {
+            event.preventDefault();
+            const input = document.getElementById(`followup-input-${exchangeId}`);
+            const query = input.value.trim();
+            if (!query) return;
+
+            // Hide this follow-up input
+            document.getElementById(`followup-container-${exchangeId}`).style.display = 'none';
+
+            // Perform the search (will create new exchange below)
+            performSearch(query);
         }
 
         // Perform search with streaming - chat flow
@@ -1135,16 +1217,22 @@
                                     // Show new conversation button
                                     newConversationBtn.classList.remove('hidden');
 
-                                    // Update placeholder to suggest follow-up
-                                    searchInput.placeholder = 'Ask a follow-up question...';
+                                    // Hide any previous follow-up inputs
+                                    document.querySelectorAll('.followup-input-container').forEach(el => {
+                                        el.style.display = 'none';
+                                    });
 
-                                    // Clear input for next question
+                                    // Show follow-up input for this exchange
+                                    const followupContainer = document.getElementById(`followup-container-${exchangeId}`);
+                                    followupContainer.style.display = 'block';
+
+                                    // Clear main search input
                                     searchInput.value = '';
-                                    searchInput.focus();
 
-                                    // Scroll to show the complete answer
+                                    // Scroll to show the follow-up input and focus it
                                     setTimeout(() => {
-                                        exchangeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        followupContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                        document.getElementById(`followup-input-${exchangeId}`).focus();
                                     }, 100);
                                 }
                             } catch (e) {
