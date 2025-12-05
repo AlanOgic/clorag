@@ -313,6 +313,18 @@
                 <h2 class="admin-card__title">Technical Documentation</h2>
                 <p class="admin-card__description">Architecture overview, API reference, authentication, deployment, and configuration guide.</p>
             </a>
+
+            <button id="backupBtn" class="admin-card" style="border: none; text-align: left; width: 100%; cursor: pointer;">
+                <div class="admin-card__icon" style="background: #fce4ec;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c2185b" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                </div>
+                <h2 class="admin-card__title">Backup Databases</h2>
+                <p class="admin-card__description">Download a ZIP archive of all SQLite databases (cameras, analytics).</p>
+            </button>
         </div>
 
         <!-- Public Pages -->
@@ -385,6 +397,47 @@
                 window.location.href = '/admin/login';
             } catch (e) {
                 console.error('Logout failed:', e);
+            }
+        });
+
+        // Backup handler
+        const backupBtn = document.getElementById('backupBtn');
+        backupBtn.addEventListener('click', async () => {
+            // Show loading state
+            const originalText = backupBtn.querySelector('.admin-card__title').textContent;
+            backupBtn.querySelector('.admin-card__title').textContent = 'Downloading...';
+            backupBtn.style.opacity = '0.7';
+            backupBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/admin/backup');
+                if (!response.ok) {
+                    throw new Error('Backup failed');
+                }
+
+                // Get filename from Content-Disposition header
+                const disposition = response.headers.get('Content-Disposition');
+                const filenameMatch = disposition?.match(/filename=(.+)/);
+                const filename = filenameMatch ? filenameMatch[1] : 'clorag_backup.zip';
+
+                // Download the file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } catch (e) {
+                console.error('Backup failed:', e);
+                alert('Backup failed. Please try again.');
+            } finally {
+                // Restore button state
+                backupBtn.querySelector('.admin-card__title').textContent = originalText;
+                backupBtn.style.opacity = '1';
+                backupBtn.disabled = false;
             }
         });
     </script>
