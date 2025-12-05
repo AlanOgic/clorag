@@ -65,7 +65,18 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 └────────────────────────────────────────────────────────────┘
 ```
 
-### Ingestion Flow (Gmail Support Cases)
+### Ingestion Pipelines
+
+Two data ingestion pipelines populate the vector database:
+
+| Pipeline | Command | Description |
+|----------|---------|-------------|
+| Documentation | `uv run ingest-docs` | Fetches sitemap, scrapes pages, chunks, embeds |
+| Support Cases | `uv run ingest-curated` | Gmail → Anonymize → Haiku → Filter → Sonnet QC → Embed |
+
+> **📖 Complete flow diagrams available in [Admin Docs](/admin/docs#data-ingestion)** after authentication.
+
+#### Gmail Support Cases Pipeline
 
 ```
 ┌────────────────────────────────────────────────────────────┐

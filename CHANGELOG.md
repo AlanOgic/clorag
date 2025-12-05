@@ -12,6 +12,13 @@ All notable changes to CLORAG will be documented in this file.
   - Inline follow-up input appears below each AI answer for natural conversation flow
   - "New conversation" floating button to reset session and start fresh
 
+- **Data Ingestion Documentation** (`/admin/docs#data-ingestion`)
+  - Complete Docusaurus pipeline flow diagram (sitemap → fetch → extract → chunk → embed → store)
+  - Complete Gmail curated pipeline flow diagram (8-step process with LLM analysis)
+  - Hybrid embedding flow diagram showing dense + sparse vector generation
+  - Stage-by-stage tables with models, tools, and descriptions
+  - Incremental ingestion examples with `--offset` parameter
+
 ### Changed
 - Chat-style UI with user question bubbles and AI answer cards
 - Search results now stack vertically as conversation exchanges

@@ -412,6 +412,7 @@
                 <ul class="docs-nav__list">
                     <li class="docs-nav__item"><a href="#architecture" class="docs-nav__link">Architecture</a></li>
                     <li class="docs-nav__item"><a href="#search-system" class="docs-nav__link">Search System</a></li>
+                    <li class="docs-nav__item"><a href="#data-ingestion" class="docs-nav__link">Data Ingestion</a></li>
                     <li class="docs-nav__item"><a href="#conversations" class="docs-nav__link">Conversations</a></li>
                     <li class="docs-nav__item"><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
                     <li class="docs-nav__item"><a href="#authentication" class="docs-nav__link">Authentication</a></li>
@@ -487,6 +488,257 @@ Streaming Response</code></pre>
                     <li>Used for synthesis: 8 top chunks</li>
                     <li>Max chunk size: 2000 characters</li>
                 </ul>
+
+                <h2 id="data-ingestion">Data Ingestion Pipelines</h2>
+
+                <p>Two parallel ingestion pipelines populate the vector database with searchable content. Both use hybrid vectors (dense + sparse) for optimal retrieval.</p>
+
+                <h3>Docusaurus Documentation Pipeline</h3>
+                <p>Command: <code>uv run ingest-docs</code></p>
+
+                <pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                    DOCUSAURUS INGESTION PIPELINE                    │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│   SITEMAP     │     │   PARALLEL    │     │   CONTENT     │
+│    FETCH      │────▶│ PAGE FETCH    │────▶│  EXTRACTION   │
+│  sitemap.xml  │     │  (batch=10)   │     │ BeautifulSoup │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│    TEXT       │     │    DENSE      │     │    SPARSE     │
+│   CHUNKING    │────▶│  EMBEDDINGS   │────▶│  EMBEDDINGS   │
+│  1000 chars   │     │ voyage-ctx-3  │     │     BM25      │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐     ┌───────────────┐
+│    QDRANT     │     │    CAMERA     │
+│    UPSERT     │────▶│  EXTRACTION   │
+│ docusaurus_   │     │ Claude Haiku  │
+│    docs       │     └───────────────┘
+└───────────────┘</code></pre>
+
+                <table>
+                    <tr><th>Stage</th><th>Description</th><th>Output</th></tr>
+                    <tr>
+                        <td>1. Sitemap Fetch</td>
+                        <td>Fetch <code>/sitemap.xml</code> and parse URLs with lastmod dates</td>
+                        <td>List of (url, lastmod) tuples</td>
+                    </tr>
+                    <tr>
+                        <td>2. Page Fetch</td>
+                        <td>Parallel HTTP requests in batches of 10 with 30s timeout</td>
+                        <td>Raw HTML pages</td>
+                    </tr>
+                    <tr>
+                        <td>3. Content Extraction</td>
+                        <td>BeautifulSoup extracts main content, removes nav/sidebar/footer</td>
+                        <td>Clean text + title</td>
+                    </tr>
+                    <tr>
+                        <td>4. Text Chunking</td>
+                        <td>Split into 1000-char chunks with 100-char overlap</td>
+                        <td>Document chunks</td>
+                    </tr>
+                    <tr>
+                        <td>5. Dense Embeddings</td>
+                        <td>Contextualized batch embedding with voyage-context-3</td>
+                        <td>1024-dim vectors</td>
+                    </tr>
+                    <tr>
+                        <td>6. Sparse Embeddings</td>
+                        <td>FastEmbed BM25 for keyword matching</td>
+                        <td>Sparse vectors</td>
+                    </tr>
+                    <tr>
+                        <td>7. Qdrant Storage</td>
+                        <td>Upsert to <code>docusaurus_docs</code> collection with hybrid vectors</td>
+                        <td>Indexed documents</td>
+                    </tr>
+                    <tr>
+                        <td>8. Camera Extraction</td>
+                        <td>Claude Haiku extracts camera compatibility info</td>
+                        <td>Camera database entries</td>
+                    </tr>
+                </table>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">URL Filtering</div>
+                    <p>Sitemap parsing excludes URLs containing <code>/tags</code>, <code>/search</code>, or <code>/download</code> to focus on content pages.</p>
+                </div>
+
+                <h3>Gmail Support Cases Pipeline</h3>
+                <p>Command: <code>uv run ingest-curated --max-threads 300</code></p>
+
+                <pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                 CURATED GMAIL INGESTION PIPELINE                    │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│    GMAIL      │     │     RMA       │     │  ANONYMIZE    │
+│    FETCH      │────▶│   FILTER      │────▶│   CONTENT     │
+│   via API     │     │ (exclude RMA) │     │  [SERIAL:XXX] │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│ HAIKU ANALYZE │     │   FILTER      │     │  SONNET QC    │
+│  (parallel)   │────▶│   RESOLVED    │────▶│   REFINEMENT  │
+│ problem/soln  │     │ conf >= 0.7   │     │  quality ctrl │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│  BUILD CASE   │     │    CHUNK      │     │    EMBED      │
+│ SupportCase   │────▶│   DOCUMENT    │────▶│  dense+sparse │
+│   objects     │     │  1000 chars   │     │ voyage + BM25 │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐     ┌───────────────┐
+│    QDRANT     │     │    CAMERA     │
+│    UPSERT     │────▶│  EXTRACTION   │
+│ gmail_cases   │     │ Claude Haiku  │
+└───────────────┘     └───────────────┘</code></pre>
+
+                <table>
+                    <tr><th>Step</th><th>Stage</th><th>Model/Tool</th><th>Description</th></tr>
+                    <tr>
+                        <td>1</td>
+                        <td>Fetch Threads</td>
+                        <td>Gmail API</td>
+                        <td>Fetch threads from configured label with pagination</td>
+                    </tr>
+                    <tr>
+                        <td>1.5</td>
+                        <td>RMA Filter</td>
+                        <td>Metadata check</td>
+                        <td>Exclude RMA (Return Merchandise) cases</td>
+                    </tr>
+                    <tr>
+                        <td>1.6</td>
+                        <td>Anonymization</td>
+                        <td>TextAnonymizer</td>
+                        <td>Replace PII with placeholders: <code>[SERIAL:XXX-N]</code>, <code>[EMAIL-N]</code></td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>Haiku Analysis</td>
+                        <td>Claude Haiku</td>
+                        <td>Parallel classification: problem, solution, keywords, is_resolved, confidence</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>Resolution Filter</td>
+                        <td>Logic filter</td>
+                        <td>Keep only resolved cases with confidence >= 0.7</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td>Sonnet QC</td>
+                        <td>Claude Sonnet</td>
+                        <td>Refine problem/solution, validate quality, generate clean document</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td>Build Cases</td>
+                        <td>SupportCase model</td>
+                        <td>Create structured objects with metadata</td>
+                    </tr>
+                    <tr>
+                        <td>6</td>
+                        <td>Embed</td>
+                        <td>Voyage + BM25</td>
+                        <td>Generate contextualized dense and sparse vectors</td>
+                    </tr>
+                    <tr>
+                        <td>7</td>
+                        <td>Store</td>
+                        <td>Qdrant</td>
+                        <td>Upsert to <code>gmail_cases</code> collection with hybrid vectors</td>
+                    </tr>
+                    <tr>
+                        <td>8</td>
+                        <td>Camera Extraction</td>
+                        <td>Claude Haiku</td>
+                        <td>Extract camera compatibility from resolved cases</td>
+                    </tr>
+                </table>
+
+                <div class="info-box info-box--success">
+                    <div class="info-box__title">Quality Assurance</div>
+                    <p>The two-stage LLM analysis (Haiku for speed + Sonnet for quality) ensures only high-quality, resolved cases with proper anonymization are indexed. Unresolved or low-confidence cases are discarded.</p>
+                </div>
+
+                <h3>Incremental Ingestion</h3>
+                <p>Gmail ingestion supports incremental loading with <code>--offset</code>:</p>
+                <pre><code># First batch (newest 300 threads)
+uv run ingest-curated --max-threads 300
+
+# Next batch (skip first 300, get next 300)
+uv run ingest-curated --offset 300 --max-threads 300
+
+# Continue incrementally
+uv run ingest-curated --offset 600 --max-threads 300</code></pre>
+
+                <h3>Embedding Pipeline</h3>
+                <p>Both pipelines share the same embedding strategy for consistency:</p>
+                <pre><code>┌──────────────────────────────────────────────────────────────┐
+│                    HYBRID EMBEDDING FLOW                     │
+└──────────────────────────────────────────────────────────────┘
+
+     Document Text
+          │
+          ├──────────────────┬──────────────────┐
+          ▼                  ▼                  │
+   ┌─────────────┐    ┌─────────────┐          │
+   │   VOYAGE    │    │  FASTEMBED  │          │
+   │voyage-ctx-3 │    │    BM25     │          │
+   │ input_type= │    │   sparse    │          │
+   │  document   │    │   vectors   │          │
+   └─────────────┘    └─────────────┘          │
+          │                  │                  │
+          ▼                  ▼                  │
+   ┌─────────────┐    ┌─────────────┐          │
+   │   DENSE     │    │   SPARSE    │          │
+   │  1024-dim   │    │  variable   │          │
+   │   vector    │    │   indices   │          │
+   └─────────────┘    └─────────────┘          │
+          │                  │                  │
+          └────────┬─────────┘                  │
+                   ▼                            │
+          ┌───────────────┐                     │
+          │    QDRANT     │◀────────────────────┘
+          │ Named Vectors │      Metadata
+          │ dense+sparse  │
+          └───────────────┘</code></pre>
+
+                <table>
+                    <tr><th>Vector Type</th><th>Model</th><th>Purpose</th></tr>
+                    <tr>
+                        <td>Dense</td>
+                        <td>voyage-context-3 (1024-dim)</td>
+                        <td>Semantic similarity matching</td>
+                    </tr>
+                    <tr>
+                        <td>Sparse</td>
+                        <td>FastEmbed BM25</td>
+                        <td>Exact keyword matching (model numbers, technical terms)</td>
+                    </tr>
+                    <tr>
+                        <td>Fusion</td>
+                        <td>RRF (k=60)</td>
+                        <td>Reciprocal Rank Fusion combines both at query time</td>
+                    </tr>
+                </table>
 
                 <h3 id="conversations">Conversation Sessions</h3>
                 <p>The search system supports follow-up conversations with context retention:</p>
