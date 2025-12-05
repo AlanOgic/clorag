@@ -671,87 +671,106 @@
             font-size: 0.9rem;
         }
 
-        /* Conversation History */
-        .conversation-history {
-            margin-bottom: 1.5rem;
+        /* Conversation Flow - Chat Style */
+        .conversation-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
         }
 
         .conversation-exchange {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 1rem 1.25rem;
-            margin-bottom: 1rem;
-            border-left: 3px solid #d0e3ff;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
 
-        .exchange-query {
-            font-weight: 600;
-            color: var(--cyanview-navy);
-            margin-bottom: 0.5rem;
+        /* User question bubble */
+        .user-question {
+            align-self: flex-end;
+            max-width: 85%;
+            background: var(--cyanview-navy);
+            color: white;
+            padding: 0.875rem 1.25rem;
+            border-radius: 18px 18px 4px 18px;
             font-size: 0.95rem;
+            line-height: 1.5;
         }
 
-        .exchange-answer {
-            color: #555;
-            font-size: 0.9rem;
-            line-height: 1.6;
-            max-height: 100px;
-            overflow: hidden;
-            position: relative;
+        /* AI answer card */
+        .ai-answer-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e8f4fc;
         }
 
-        .exchange-answer::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 30px;
-            background: linear-gradient(transparent, #f8f9fa);
-        }
-
-        /* Follow-up indicator */
-        .followup-indicator {
+        .ai-answer-card .answer-header {
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .ai-answer-card .answer-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--cyan-blue);
+        }
+
+        .ai-answer-card .answer-title {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            font-size: 0.9rem;
+        }
+
+        .ai-answer-card .answer-content {
+            color: #333;
+            line-height: 1.7;
+        }
+
+        .ai-answer-card .source-links {
             margin-top: 1rem;
-            padding: 0.75rem 1rem;
-            background: #e8f5e9;
-            border-radius: 8px;
-            color: #2e7d32;
-            font-size: 0.85rem;
+            padding-top: 1rem;
+            border-top: 1px solid #f0f0f0;
         }
 
-        .followup-indicator svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        /* New conversation button */
+        /* New conversation button - floating */
         .new-conversation-btn {
+            position: fixed;
+            bottom: 100px;
+            right: 2rem;
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            padding: 0.5rem 1rem;
-            background: transparent;
+            padding: 0.6rem 1rem;
+            background: white;
             border: 1px solid #d0e3ff;
-            border-radius: 6px;
+            border-radius: 20px;
             color: var(--cyan-dark);
             font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s;
-            margin-left: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 50;
         }
 
         .new-conversation-btn:hover {
             background: #e8f4fc;
             border-color: var(--cyan-dark);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .new-conversation-btn svg {
             width: 16px;
             height: 16px;
+        }
+
+        /* Hide new button when no conversation */
+        .new-conversation-btn.hidden {
+            display: none;
         }
 
         /* Responsive */
@@ -839,44 +858,10 @@
         </div>
     </section>
 
-    <!-- Results Section -->
+    <!-- Results Section - Chat Flow -->
     <section class="results-section" id="results-section" style="display: none;">
-        <!-- Conversation History -->
-        <div class="conversation-history" id="conversation-history" style="display: none;"></div>
-
-        <!-- AI Answer -->
-        <div class="answer-card" id="answer-card">
-            <div class="answer-header">
-                <svg class="answer-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-                <span class="answer-title">AI Answer</span>
-                <button class="copy-btn" id="copy-btn" onclick="copyAnswer()">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    <span id="copy-text">Copy</span>
-                </button>
-                <button class="new-conversation-btn" id="new-conversation-btn" onclick="startNewConversation()" title="Start a new conversation">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span>New</span>
-                </button>
-            </div>
-            <div class="answer-content" id="answer-content"></div>
-            <div class="source-links" id="source-links">
-                <div class="source-links-title">Sources</div>
-                <div class="source-links-list" id="source-links-list"></div>
-            </div>
-            <!-- Follow-up indicator -->
-            <div class="followup-indicator" id="followup-indicator" style="display: none;">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                <span>Ask a follow-up question above to continue this conversation</span>
-            </div>
-        </div>
+        <!-- Conversation Container - exchanges are appended here -->
+        <div class="conversation-container" id="conversation-container"></div>
 
         <!-- Raw Results (collapsible) - hidden for streaming mode -->
         <div class="results-header" id="results-header" style="display: none;">
@@ -885,6 +870,14 @@
         </div>
         <div class="results-list collapsed" id="results-list"></div>
     </section>
+
+    <!-- Floating New Conversation Button -->
+    <button class="new-conversation-btn hidden" id="new-conversation-btn" onclick="startNewConversation()" title="Start a new conversation">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        <span>New conversation</span>
+    </button>
 
     <!-- Loading State -->
     <div class="loading" id="loading" style="display: none;">
@@ -959,20 +952,18 @@
         const searchInput = document.getElementById('search-input');
         const searchButton = document.getElementById('search-button');
         const resultsSection = document.getElementById('results-section');
-        const answerContent = document.getElementById('answer-content');
-        const sourceLinksList = document.getElementById('source-links-list');
         const resultsList = document.getElementById('results-list');
         const resultsCount = document.getElementById('results-count');
         const resultsToggle = document.getElementById('results-toggle');
         const loadingEl = document.getElementById('loading');
         const emptyState = document.getElementById('empty-state');
         const sourceOptions = document.querySelectorAll('.source-option');
-        const conversationHistoryEl = document.getElementById('conversation-history');
-        const followupIndicator = document.getElementById('followup-indicator');
+        const conversationContainer = document.getElementById('conversation-container');
+        const newConversationBtn = document.getElementById('new-conversation-btn');
 
         // Session management for follow-up conversations
         let currentSessionId = null;
-        let conversationHistory = []; // Local copy for UI display
+        let currentExchangeId = 0;
 
         // Help modal
         const helpLink = document.getElementById('help-link');
@@ -1029,38 +1020,45 @@
         // Start a new conversation (reset session)
         function startNewConversation() {
             currentSessionId = null;
-            conversationHistory = [];
-            conversationHistoryEl.style.display = 'none';
-            conversationHistoryEl.innerHTML = '';
-            followupIndicator.style.display = 'none';
+            currentExchangeId = 0;
+            conversationContainer.innerHTML = '';
+            resultsSection.style.display = 'none';
+            newConversationBtn.classList.add('hidden');
             searchInput.value = '';
             searchInput.focus();
             searchInput.placeholder = 'How do I configure tally with TSL 5.0?';
         }
 
-        // Render conversation history in UI
-        function renderConversationHistory() {
-            if (conversationHistory.length === 0) {
-                conversationHistoryEl.style.display = 'none';
-                return;
-            }
-
-            conversationHistoryEl.style.display = 'block';
-            conversationHistoryEl.innerHTML = conversationHistory.map(exchange => `
-                <div class="conversation-exchange">
-                    <div class="exchange-query">Q: ${escapeHtml(exchange.query)}</div>
-                    <div class="exchange-answer">${marked.parse(exchange.answer)}</div>
+        // Create exchange HTML structure
+        function createExchangeElement(query, exchangeId) {
+            const exchange = document.createElement('div');
+            exchange.className = 'conversation-exchange';
+            exchange.id = `exchange-${exchangeId}`;
+            exchange.innerHTML = `
+                <div class="user-question">${escapeHtml(query)}</div>
+                <div class="ai-answer-card">
+                    <div class="answer-header">
+                        <svg class="answer-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        <span class="answer-title">AI Answer</span>
+                    </div>
+                    <div class="answer-content" id="answer-content-${exchangeId}"></div>
+                    <div class="source-links" id="source-links-${exchangeId}" style="display: none;">
+                        <div class="source-links-title">Sources</div>
+                        <div class="source-links-list" id="source-links-list-${exchangeId}"></div>
+                    </div>
                 </div>
-            `).join('');
+            `;
+            return exchange;
         }
 
-        // Perform search with streaming
+        // Perform search with streaming - chat flow
         async function performSearch(query) {
             const source = getSelectedSource();
 
-            // Show loading then transition to results
+            // Show loading
             loadingEl.style.display = 'block';
-            resultsSection.style.display = 'none';
             emptyState.style.display = 'none';
             searchButton.disabled = true;
 
@@ -1087,16 +1085,22 @@
                     throw new Error('Search failed');
                 }
 
-                // Prepare UI for streaming
+                // Hide loading, show results section
                 loadingEl.style.display = 'none';
                 resultsSection.style.display = 'block';
-                answerContent.innerHTML = '';
-                sourceLinksList.innerHTML = '';
-                resultsList.innerHTML = '';
-                resultsCount.textContent = '';
 
-                // Show conversation history if we have any
-                renderConversationHistory();
+                // Create new exchange element and append to container
+                const exchangeId = ++currentExchangeId;
+                const exchangeEl = createExchangeElement(query, exchangeId);
+                conversationContainer.appendChild(exchangeEl);
+
+                // Get references to this exchange's content areas
+                const answerContentEl = document.getElementById(`answer-content-${exchangeId}`);
+                const sourceLinksEl = document.getElementById(`source-links-${exchangeId}`);
+                const sourceLinksListEl = document.getElementById(`source-links-list-${exchangeId}`);
+
+                // Scroll to the new exchange
+                exchangeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
                 let fullText = '';
                 const reader = response.body.getReader();
@@ -1120,31 +1124,28 @@
                                 } else if (data.type === 'text') {
                                     fullText += data.text;
                                     // Render markdown incrementally
-                                    answerContent.innerHTML = marked.parse(fullText);
-                                    // Auto-scroll to show new content
-                                    answerContent.scrollTop = answerContent.scrollHeight;
+                                    answerContentEl.innerHTML = marked.parse(fullText);
                                 } else if (data.type === 'sources') {
-                                    // Sources arrive after the answer
-                                    displaySources(data.sources);
+                                    // Display sources for this exchange
+                                    displaySourcesInElement(data.sources, sourceLinksEl, sourceLinksListEl);
                                 } else if (data.type === 'done') {
                                     // Final render
-                                    answerContent.innerHTML = marked.parse(fullText);
+                                    answerContentEl.innerHTML = marked.parse(fullText);
 
-                                    // Store this exchange in local history for UI
-                                    conversationHistory.push({
-                                        query: query,
-                                        answer: fullText
-                                    });
-                                    // Keep only last 3 exchanges (matching server-side)
-                                    if (conversationHistory.length > 3) {
-                                        conversationHistory = conversationHistory.slice(-3);
-                                    }
-
-                                    // Show follow-up indicator
-                                    followupIndicator.style.display = 'flex';
+                                    // Show new conversation button
+                                    newConversationBtn.classList.remove('hidden');
 
                                     // Update placeholder to suggest follow-up
                                     searchInput.placeholder = 'Ask a follow-up question...';
+
+                                    // Clear input for next question
+                                    searchInput.value = '';
+                                    searchInput.focus();
+
+                                    // Scroll to show the complete answer
+                                    setTimeout(() => {
+                                        exchangeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }, 100);
                                 }
                             } catch (e) {
                                 // Ignore parse errors for incomplete chunks
@@ -1154,8 +1155,12 @@
                 }
 
                 if (!fullText) {
-                    emptyState.style.display = 'block';
-                    resultsSection.style.display = 'none';
+                    // Remove the empty exchange
+                    exchangeEl.remove();
+                    if (conversationContainer.children.length === 0) {
+                        emptyState.style.display = 'block';
+                        resultsSection.style.display = 'none';
+                    }
                 }
 
             } catch (error) {
@@ -1167,8 +1172,8 @@
             }
         }
 
-        // Display source links
-        function displaySources(sources) {
+        // Display sources in a specific element
+        function displaySourcesInElement(sources, containerEl, listEl) {
             const docLinks = sources.filter(link => link.source_type === 'documentation');
             const hasCases = sources.some(link => link.source_type !== 'documentation');
 
@@ -1183,83 +1188,19 @@
 
             if (hasCases) {
                 sourceHtml += `
-                    <div class="source-link-item case-note">
-                        This answer also draws from internal support cases.
-                    </div>
-                `;
-            }
-
-            sourceLinksList.innerHTML = sourceHtml;
-        }
-
-        // Display results
-        function displayResults(data) {
-            if (data.results.length === 0) {
-                emptyState.style.display = 'block';
-                resultsSection.style.display = 'none';
-                return;
-            }
-
-            resultsSection.style.display = 'block';
-            emptyState.style.display = 'none';
-
-            // Display AI answer (render markdown)
-            answerContent.innerHTML = marked.parse(data.answer || 'No answer generated.');
-
-            // Display source links - only show documentation URLs, add note for cases
-            const docLinks = data.source_links.filter(link => link.source_type === 'documentation');
-            const hasCases = data.source_links.some(link => link.source_type !== 'documentation');
-
-            let sourceHtml = docLinks.map(link => {
-                return `
                     <div class="source-link-item">
-                        <span class="source-link-badge docs">Doc</span>
-                        <a href="${escapeHtml(link.url)}" target="_blank">${escapeHtml(link.title)}</a>
-                    </div>
-                `;
-            }).join('');
-
-            if (hasCases) {
-                sourceHtml += `
-                    <div class="source-link-item case-note">
-                        This answer also draws from internal support cases.
+                        <span class="source-link-badge case">Case</span>
+                        <span class="case-note">Insights from similar resolved support cases</span>
                     </div>
                 `;
             }
 
-            sourceLinksList.innerHTML = sourceHtml;
-
-            // Display raw results count
-            resultsCount.textContent = `${data.total} chunks retrieved`;
-
-            // Keep results collapsed by default
-            resultsList.classList.add('collapsed');
-            resultsToggle.textContent = 'Show retrieved chunks';
-
-            // Display raw results
-            resultsList.innerHTML = data.results.map(result => {
-                const isDoc = result.source === 'documentation';
-                const badgeClass = isDoc ? 'badge-docs' : 'badge-gmail';
-                const badgeText = isDoc ? 'Docs' : 'Case';
-                const title = result.title || 'Untitled';
-                const url = result.url;
-
-                return `
-                    <div class="result-card">
-                        <div class="result-header">
-                            ${url ?
-                                `<a href="${url}" class="result-title" target="_blank">${escapeHtml(title)}</a>` :
-                                `<span class="result-title">${escapeHtml(title)}</span>`
-                            }
-                            <span class="result-badge ${badgeClass}">${badgeText}</span>
-                        </div>
-                        <div class="result-score">Relevance: ${(result.score * 100).toFixed(1)}%</div>
-                        ${url ? `<div class="result-url">${escapeHtml(url)}</div>` : ''}
-                        <p class="result-snippet">${escapeHtml(result.snippet)}</p>
-                    </div>
-                `;
-            }).join('');
+            if (sourceHtml) {
+                listEl.innerHTML = sourceHtml;
+                containerEl.style.display = 'block';
+            }
         }
+
 
         // Escape HTML
         function escapeHtml(text) {
