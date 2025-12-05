@@ -41,13 +41,19 @@ class AnalyticsDatabase:
                 CREATE INDEX IF NOT EXISTS idx_search_queries_created
                 ON search_queries(created_at)
             """)
-            # Migration: add response and chunks columns if they don't exist
+            # Migration: add columns if they don't exist
             cursor = conn.execute("PRAGMA table_info(search_queries)")
             columns = {row[1] for row in cursor.fetchall()}
             if "response" not in columns:
                 conn.execute("ALTER TABLE search_queries ADD COLUMN response TEXT")
             if "chunks" not in columns:
                 conn.execute("ALTER TABLE search_queries ADD COLUMN chunks TEXT")
+            if "session_id" not in columns:
+                conn.execute("ALTER TABLE search_queries ADD COLUMN session_id TEXT")
+                conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_search_queries_session
+                    ON search_queries(session_id)
+                """)
             conn.commit()
 
     def log_search(
@@ -58,6 +64,7 @@ class AnalyticsDatabase:
         results_count: int | None = None,
         response: str | None = None,
         chunks: list[dict[str, Any]] | None = None,
+        session_id: str | None = None,
     ) -> int:
         """Log a search query with full response data.
 
@@ -68,6 +75,7 @@ class AnalyticsDatabase:
             results_count: Number of results returned.
             response: The LLM-generated response text.
             chunks: List of retrieved chunks with metadata.
+            session_id: Conversation session ID for grouping follow-ups.
 
         Returns:
             The ID of the inserted record.
@@ -77,10 +85,10 @@ class AnalyticsDatabase:
             cursor = conn.execute(
                 """
                 INSERT INTO search_queries
-                (query, source, response_time_ms, results_count, response, chunks)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (query, source, response_time_ms, results_count, response, chunks, session_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (query, source, response_time_ms, results_count, response, chunks_json),
+                (query, source, response_time_ms, results_count, response, chunks_json, session_id),
             )
             conn.commit()
             return cursor.lastrowid or 0
@@ -212,7 +220,7 @@ class AnalyticsDatabase:
             cursor = conn.execute(
                 """
                 SELECT id, query, source, response_time_ms, results_count,
-                       response, chunks, created_at
+                       response, chunks, session_id, created_at
                 FROM search_queries
                 WHERE id = ?
                 """,
@@ -226,3 +234,54 @@ class AnalyticsDatabase:
             if result.get("chunks"):
                 result["chunks"] = json.loads(result["chunks"])
             return result
+
+    def get_recent_conversations(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Get recent conversations grouped by session_id.
+
+        Args:
+            limit: Maximum number of conversations to return.
+
+        Returns:
+            List of conversations, each with session_id, query count,
+            first query, last query time, and all queries in the session.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            # Get recent unique sessions with their stats
+            cursor = conn.execute(
+                """
+                SELECT
+                    session_id,
+                    COUNT(*) as query_count,
+                    MIN(created_at) as started_at,
+                    MAX(created_at) as last_query_at,
+                    GROUP_CONCAT(id) as query_ids
+                FROM search_queries
+                WHERE session_id IS NOT NULL
+                GROUP BY session_id
+                ORDER BY MAX(created_at) DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+            conversations = []
+            for row in cursor.fetchall():
+                conv = dict(row)
+                # Get all queries for this session
+                query_ids = conv.pop("query_ids", "").split(",")
+                if query_ids and query_ids[0]:
+                    placeholders = ",".join("?" * len(query_ids))
+                    queries_cursor = conn.execute(
+                        f"""
+                        SELECT id, query, source, response_time_ms, results_count, created_at
+                        FROM search_queries
+                        WHERE id IN ({placeholders})
+                        ORDER BY created_at ASC
+                        """,
+                        query_ids,
+                    )
+                    conv["queries"] = [dict(q) for q in queries_cursor.fetchall()]
+                else:
+                    conv["queries"] = []
+                conversations.append(conv)
+            return conversations

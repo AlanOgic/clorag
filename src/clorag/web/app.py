@@ -615,6 +615,7 @@ async def search_stream(request: Request, req: SearchRequest):
                     results_count=len(chunks_for_synthesis),
                     response=full_response,
                     chunks=chunks_for_synthesis,
+                    session_id=session.session_id,
                 )
             except Exception as e:
                 logger.warning("Failed to log search analytics", error=str(e))
@@ -672,6 +673,7 @@ async def search(request: Request, req: SearchRequest):
             results_count=len(results),
             response=answer,
             chunks=chunks_for_synthesis,
+            session_id=session.session_id,
         )
     except Exception as e:
         logger.warning("Failed to log search analytics", error=str(e))
@@ -1161,6 +1163,16 @@ async def api_get_search(
     if not search:
         raise HTTPException(status_code=404, detail="Search not found")
     return search
+
+
+@app.get("/api/admin/conversations")
+async def api_get_conversations(
+    limit: int = 20,
+    _: bool = Depends(verify_admin),
+):
+    """Get recent conversations grouped by session_id."""
+    analytics = get_analytics_db()
+    return analytics.get_recent_conversations(limit=limit)
 
 
 # =============================================================================

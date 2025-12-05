@@ -553,6 +553,127 @@
         .clickable-row:hover {
             background: #f0f7ff !important;
         }
+
+        /* Conversation cards */
+        .conversation-card {
+            background: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .conversation-card__header {
+            background: #f8f9fa;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e1e4e8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .conversation-card__header:hover {
+            background: #f0f7ff;
+        }
+
+        .conversation-card__meta {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .conversation-card__count {
+            background: var(--cyan-blue);
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .conversation-card__time {
+            font-size: 0.85rem;
+            color: #606770;
+        }
+
+        .conversation-card__session {
+            font-size: 0.75rem;
+            color: #999;
+            font-family: monospace;
+        }
+
+        .conversation-card__body {
+            display: none;
+            padding: 0;
+        }
+
+        .conversation-card__body.expanded {
+            display: block;
+        }
+
+        .conversation-query {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .conversation-query:last-child {
+            border-bottom: none;
+        }
+
+        .conversation-query:hover {
+            background: #fafafa;
+        }
+
+        .conversation-query__text {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+
+        .conversation-query__meta {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .conversation-query__time {
+            font-size: 0.8rem;
+            color: #999;
+        }
+
+        .conversation-query__number {
+            background: #e3f2fd;
+            color: var(--cyan-dark);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .no-conversations {
+            color: #999;
+            font-style: italic;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .expand-icon {
+            transition: transform 0.2s;
+        }
+
+        .expand-icon.rotated {
+            transform: rotate(180deg);
+        }
     </style>
 </head>
 <body>
@@ -641,9 +762,15 @@
                 </table>
             </div>
 
+            <!-- Recent Conversations -->
+            <div class="section">
+                <h3 class="section__title">Recent Conversations</h3>
+                <div id="conversationsContainer"></div>
+            </div>
+
             <!-- Recent Searches -->
             <div class="section">
-                <h3 class="section__title">Recent Searches</h3>
+                <h3 class="section__title">Recent Searches (All)</h3>
                 <table class="data-table" id="recentTable">
                     <thead>
                         <tr>
@@ -762,6 +889,75 @@
 
             // Recent searches table
             renderRecentTable(data.recent_searches || []);
+
+            // Load conversations separately
+            loadConversations();
+        }
+
+        async function loadConversations() {
+            try {
+                const response = await fetch('/api/admin/conversations?limit=20');
+                if (!response.ok) throw new Error('Failed to load conversations');
+                const conversations = await response.json();
+                renderConversations(conversations);
+            } catch (error) {
+                console.error('Failed to load conversations:', error);
+                document.getElementById('conversationsContainer').innerHTML =
+                    '<p class="no-conversations">Failed to load conversations</p>';
+            }
+        }
+
+        function renderConversations(conversations) {
+            const container = document.getElementById('conversationsContainer');
+
+            if (!conversations || conversations.length === 0) {
+                container.innerHTML = '<p class="no-conversations">No conversations yet</p>';
+                return;
+            }
+
+            container.innerHTML = conversations.map((conv, idx) => {
+                const firstQuery = conv.queries[0]?.query || 'Unknown';
+                const truncatedQuery = firstQuery.length > 80 ? firstQuery.substring(0, 80) + '...' : firstQuery;
+                const sessionShort = conv.session_id ? conv.session_id.substring(0, 8) : 'Unknown';
+
+                const queriesHtml = conv.queries.map((q, i) => `
+                    <div class="conversation-query clickable-row" onclick="openSearchDetail(${q.id})" title="Click to view details">
+                        <span class="conversation-query__number">${i + 1}</span>
+                        <span class="conversation-query__text">${escapeHtml(q.query)}</span>
+                        <div class="conversation-query__meta">
+                            <span class="conversation-query__time">${formatDate(q.created_at)}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="conversation-card">
+                        <div class="conversation-card__header" onclick="toggleConversation(${idx})">
+                            <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0;">
+                                <span class="conversation-card__count">${conv.query_count} ${conv.query_count === 1 ? 'query' : 'queries'}</span>
+                                <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(truncatedQuery)}</span>
+                            </div>
+                            <div class="conversation-card__meta">
+                                <span class="conversation-card__time">${formatDate(conv.last_query_at)}</span>
+                                <span class="conversation-card__session">${sessionShort}...</span>
+                                <svg class="expand-icon" id="expandIcon${idx}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="conversation-card__body" id="convBody${idx}">
+                            ${queriesHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleConversation(idx) {
+            const body = document.getElementById('convBody' + idx);
+            const icon = document.getElementById('expandIcon' + idx);
+            body.classList.toggle('expanded');
+            icon.classList.toggle('rotated');
         }
 
         function renderDailyChart(dailyData) {
