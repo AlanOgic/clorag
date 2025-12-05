@@ -2,6 +2,21 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.3] - 2025-12-05
+
+### Added
+- **Follow-up Conversations**
+  - Server-side session storage with LRU cache (max 1000 sessions, 30-min TTL)
+  - Conversation context includes last 3 Q&A exchanges for Claude synthesis
+  - Session ID passed via `session_id` field in search requests/responses
+  - Inline follow-up input appears below each AI answer for natural conversation flow
+  - "New conversation" floating button to reset session and start fresh
+
+### Changed
+- Chat-style UI with user question bubbles and AI answer cards
+- Search results now stack vertically as conversation exchanges
+- Focus automatically moves to follow-up input after answer completes
+
 ## [0.3.2] - 2025-12-02
 
 ### Added
