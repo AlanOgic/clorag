@@ -210,8 +210,9 @@ class CameraExtractor:
             content = content[:max_content] + "\n...[truncated]"
 
         try:
+            settings = get_settings()
             response = await self._client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model=settings.haiku_model,
                 max_tokens=2048,
                 messages=[
                     {
@@ -356,8 +357,9 @@ class CameraExtractor:
                 text_content = text_content[:8000]
 
             # Use LLM to extract specs
+            settings = get_settings()
             llm_response = await self._client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model=settings.haiku_model,
                 max_tokens=1024,
                 messages=[
                     {

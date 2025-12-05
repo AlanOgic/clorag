@@ -72,17 +72,17 @@ class QualityController:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-sonnet-4-5-20250929",
+        model: str | None = None,
     ) -> None:
         """Initialize the quality controller.
 
         Args:
             api_key: Anthropic API key. Defaults to ANTHROPIC_API_KEY env var.
-            model: Model to use for QC. Defaults to Sonnet.
+            model: Model to use for QC. Defaults to settings.sonnet_model.
         """
         settings = get_settings()
         self._api_key = api_key or settings.anthropic_api_key.get_secret_value()
-        self._model = model
+        self._model = model or settings.sonnet_model
         self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
 
     async def review_case(

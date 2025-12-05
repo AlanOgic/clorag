@@ -350,8 +350,9 @@ async def search_enrichment(
         search_text = "\n---\n".join(search_results)
 
         # Use LLM to extract model code and URL
+        settings = get_settings()
         llm_response = await anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=settings.haiku_model,
             max_tokens=200,
             messages=[
                 {

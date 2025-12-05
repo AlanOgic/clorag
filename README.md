@@ -5,6 +5,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 ## Features
 
 - **AI-Powered Search** - Natural language queries with Claude Haiku 4.5 synthesis
+- **Follow-up Conversations** - Ask follow-up questions with context from last 3 exchanges
 - **Hybrid RAG Search** - Combines semantic (Voyage AI) and keyword (BM25) matching with RRF fusion
 - **Camera Compatibility Database** - Structured camera info with automatic extraction from docs/support
 - **Search Analytics** - Track popular queries, response times, and usage patterns
@@ -52,6 +53,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 │                    ANSWER SYNTHESIS                        │
 │              Claude Haiku 4.5 (streaming)                  │
 │         Warm, professional Cyanview support tone           │
+│           + Conversation context (last 3 Q&A)              │
 │                 + Related documentation links              │
 └────────────────────────────────────────────────────────────┘
                               │
@@ -59,6 +61,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 ┌────────────────────────────────────────────────────────────┐
 │                     STREAMING RESPONSE                     │
 │                  Real-time SSE to frontend                 │
+│             + Session ID for follow-up questions           │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -264,6 +267,18 @@ Admin authentication uses secure session cookies (24-hour expiry). Set `ADMIN_PA
 |--------|----------|-------------|
 | POST | `/api/search` | RAG search with synthesis |
 | POST | `/api/search/stream` | Streaming search (SSE) |
+
+Both search endpoints support follow-up conversations via `session_id`:
+
+```json
+{
+  "query": "What ports does it support?",
+  "source": "both",
+  "session_id": "uuid-from-previous-response"
+}
+```
+
+Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minutes.
 
 ### Cameras (Public)
 

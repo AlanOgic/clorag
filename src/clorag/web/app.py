@@ -4,6 +4,9 @@ import hashlib
 import json
 import secrets
 import time
+import uuid
+from collections import OrderedDict
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Annotated
@@ -160,6 +163,112 @@ def get_analytics_db() -> AnalyticsDatabase:
     return _analytics_db
 
 
+# =============================================================================
+# Conversation Session Management
+# =============================================================================
+
+MAX_CONVERSATION_HISTORY = 3  # Keep last 3 Q&A exchanges
+SESSION_TTL_SECONDS = 30 * 60  # 30 minutes session timeout
+MAX_SESSIONS = 1000  # Maximum concurrent sessions
+
+
+@dataclass
+class ConversationExchange:
+    """A single Q&A exchange in the conversation."""
+
+    query: str
+    answer: str
+    timestamp: float = field(default_factory=time.time)
+
+
+@dataclass
+class ConversationSession:
+    """Server-side conversation session with history."""
+
+    session_id: str
+    exchanges: list[ConversationExchange] = field(default_factory=list)
+    created_at: float = field(default_factory=time.time)
+    last_accessed: float = field(default_factory=time.time)
+
+    def add_exchange(self, query: str, answer: str) -> None:
+        """Add a new exchange and trim to max history."""
+        self.exchanges.append(ConversationExchange(query=query, answer=answer))
+        # Keep only the last N exchanges
+        if len(self.exchanges) > MAX_CONVERSATION_HISTORY:
+            self.exchanges = self.exchanges[-MAX_CONVERSATION_HISTORY:]
+        self.last_accessed = time.time()
+
+    def get_context_messages(self) -> list[dict]:
+        """Get conversation history as Claude message format."""
+        messages = []
+        for exchange in self.exchanges:
+            messages.append({"role": "user", "content": exchange.query})
+            messages.append({"role": "assistant", "content": exchange.answer})
+        return messages
+
+    def is_expired(self) -> bool:
+        """Check if session has expired."""
+        return (time.time() - self.last_accessed) > SESSION_TTL_SECONDS
+
+
+class SessionStore:
+    """Thread-safe session store with LRU eviction and TTL."""
+
+    def __init__(self, max_sessions: int = MAX_SESSIONS) -> None:
+        self._sessions: OrderedDict[str, ConversationSession] = OrderedDict()
+        self._max_sessions = max_sessions
+
+    def create_session(self) -> ConversationSession:
+        """Create a new conversation session."""
+        self._cleanup_expired()
+        session_id = str(uuid.uuid4())
+        session = ConversationSession(session_id=session_id)
+        self._sessions[session_id] = session
+        self._sessions.move_to_end(session_id)
+        # Evict oldest if over limit
+        while len(self._sessions) > self._max_sessions:
+            self._sessions.popitem(last=False)
+        return session
+
+    def get_session(self, session_id: str) -> ConversationSession | None:
+        """Get a session by ID, returns None if not found or expired."""
+        session = self._sessions.get(session_id)
+        if session is None:
+            return None
+        if session.is_expired():
+            del self._sessions[session_id]
+            return None
+        session.last_accessed = time.time()
+        self._sessions.move_to_end(session_id)
+        return session
+
+    def get_or_create_session(self, session_id: str | None) -> ConversationSession:
+        """Get existing session or create new one."""
+        if session_id:
+            session = self.get_session(session_id)
+            if session:
+                return session
+        return self.create_session()
+
+    def _cleanup_expired(self) -> None:
+        """Remove expired sessions (called periodically)."""
+        expired = [sid for sid, s in self._sessions.items() if s.is_expired()]
+        for sid in expired:
+            del self._sessions[sid]
+
+
+# Global session store
+_session_store: SessionStore | None = None
+
+
+def get_session_store() -> SessionStore:
+    """Get or create session store singleton."""
+    global _session_store
+    if _session_store is None:
+        _session_store = SessionStore()
+    return _session_store
+
+
 def _build_context(chunks: list[dict], max_chunks: int = 8) -> str:
     """Build context string from chunks for Claude synthesis."""
     parts = []
@@ -186,6 +295,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     source: SearchSource = SearchSource.BOTH
     limit: int = Field(10, ge=1, le=50)
+    session_id: str | None = Field(None, description="Session ID for follow-up conversations")
 
 
 class SourceLink(BaseModel):
@@ -217,6 +327,7 @@ class SearchResponse(BaseModel):
     source_links: list[SourceLink]  # Top 3 relevant sources
     results: list[SearchResult]
     total: int
+    session_id: str | None = None  # Session ID for follow-up conversations
 
 
 def _extract_source_links(
@@ -270,33 +381,69 @@ async def health():
     return {"status": "healthy", "version": "1.0.0"}
 
 
-async def synthesize_answer(query: str, chunks: list[dict]) -> str:
-    """Use Claude Haiku to synthesize an answer from retrieved chunks."""
+async def synthesize_answer(
+    query: str,
+    chunks: list[dict],
+    conversation_history: list[dict] | None = None,
+) -> str:
+    """Use Claude Haiku to synthesize an answer from retrieved chunks.
+
+    Args:
+        query: The user's question.
+        chunks: Retrieved context chunks.
+        conversation_history: Optional list of previous messages for follow-up context.
+    """
     if not chunks:
         return "No relevant information found for your query."
 
+    settings = get_settings()
     context = _build_context(chunks)
+
+    # Build messages with conversation history
+    messages = []
+    if conversation_history:
+        messages.extend(conversation_history)
+    messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
+
     response = await get_anthropic().messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=settings.haiku_model,
         max_tokens=1500,
         system=SYNTHESIS_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"}],
+        messages=messages,
     )
     return response.content[0].text
 
 
-async def synthesize_answer_stream(query: str, chunks: list[dict]):
-    """Stream answer synthesis using Claude Haiku 4.5."""
+async def synthesize_answer_stream(
+    query: str,
+    chunks: list[dict],
+    conversation_history: list[dict] | None = None,
+):
+    """Stream answer synthesis using Claude Haiku.
+
+    Args:
+        query: The user's question.
+        chunks: Retrieved context chunks.
+        conversation_history: Optional list of previous messages for follow-up context.
+    """
     if not chunks:
         yield "No relevant information found for your query."
         return
 
+    settings = get_settings()
     context = _build_context(chunks)
+
+    # Build messages with conversation history
+    messages = []
+    if conversation_history:
+        messages.extend(conversation_history)
+    messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
+
     async with get_anthropic().messages.stream(
-        model="claude-haiku-4-5-20251001",
+        model=settings.haiku_model,
         max_tokens=1500,
         system=SYNTHESIS_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"}],
+        messages=messages,
     ) as stream:
         async for text in stream.text_stream:
             yield text
@@ -406,13 +553,23 @@ async def _perform_search(req: SearchRequest) -> tuple[list[SearchResult], list[
 
 
 @app.post("/api/search/stream")
-async def search_stream(req: SearchRequest):
+@limiter.limit("30/minute")
+async def search_stream(request: Request, req: SearchRequest):
     """Perform RAG search with streaming Claude-powered answer synthesis.
 
     Uses hybrid search (dense + sparse vectors) with RRF fusion for better
     results on queries with specific model numbers or technical terms.
+
+    Supports follow-up conversations via session_id. If provided, the response
+    will include conversation history context for more relevant answers.
+
+    Rate limited to 30 requests per minute per IP to prevent abuse.
     """
     start_time = time.time()
+
+    # Get or create conversation session
+    session = get_session_store().get_or_create_session(req.session_id)
+    conversation_history = session.get_context_messages()
 
     # Use helper to perform search (we only need chunks_for_synthesis)
     _, chunks_for_synthesis = await _perform_search(req)
@@ -426,8 +583,13 @@ async def search_stream(req: SearchRequest):
     async def generate():
         collected_response = []
         try:
-            # Stream the answer first
-            async for chunk in synthesize_answer_stream(req.query, chunks_for_synthesis):
+            # Send session_id first so frontend can track the conversation
+            yield f"data: {json.dumps({'type': 'session', 'session_id': session.session_id})}\n\n"
+
+            # Stream the answer with conversation history context
+            async for chunk in synthesize_answer_stream(
+                req.query, chunks_for_synthesis, conversation_history
+            ):
                 collected_response.append(chunk)
                 yield f"data: {json.dumps({'type': 'text', 'text': chunk})}\n\n"
 
@@ -437,6 +599,10 @@ async def search_stream(req: SearchRequest):
             # Signal completion
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
+            # Store this exchange in the session for future follow-ups
+            full_response = "".join(collected_response)
+            session.add_exchange(req.query, full_response)
+
             # Log search to analytics with full data after streaming completes
             response_time_ms = int((time.time() - search_start_time) * 1000)
             try:
@@ -445,7 +611,7 @@ async def search_stream(req: SearchRequest):
                     source=req.source.value,
                     response_time_ms=response_time_ms,
                     results_count=len(chunks_for_synthesis),
-                    response="".join(collected_response),
+                    response=full_response,
                     chunks=chunks_for_synthesis,
                 )
             except Exception as e:
@@ -465,19 +631,31 @@ async def search_stream(req: SearchRequest):
 
 
 @app.post("/api/search", response_model=SearchResponse)
-async def search(req: SearchRequest):
+@limiter.limit("30/minute")
+async def search(request: Request, req: SearchRequest):
     """Perform RAG search with Claude-powered answer synthesis.
 
     Uses hybrid search (dense + sparse vectors) with RRF fusion for better
     results on queries with specific model numbers or technical terms.
+
+    Supports follow-up conversations via session_id.
+
+    Rate limited to 30 requests per minute per IP to prevent abuse.
     """
     start_time = time.time()
+
+    # Get or create conversation session
+    session = get_session_store().get_or_create_session(req.session_id)
+    conversation_history = session.get_context_messages()
 
     # Use helper to perform search
     results, chunks_for_synthesis = await _perform_search(req)
 
-    # Generate synthesized answer using Claude Haiku
-    answer = await synthesize_answer(req.query, chunks_for_synthesis)
+    # Generate synthesized answer using Claude Haiku with conversation history
+    answer = await synthesize_answer(req.query, chunks_for_synthesis, conversation_history)
+
+    # Store this exchange in the session for future follow-ups
+    session.add_exchange(req.query, answer)
 
     # Extract top 3 unique source links
     source_links = _extract_source_links(chunks_for_synthesis, as_model=True)
@@ -503,6 +681,7 @@ async def search(req: SearchRequest):
         source_links=source_links,
         results=results,
         total=len(results),
+        session_id=session.session_id,
     )
 
 
@@ -961,12 +1140,13 @@ async def api_search_debug(
     user_prompt = f"Question: {req.query}\n\nContext:\n{context}"
 
     # Synthesize and measure time
+    settings = get_settings()
     synthesis_start = time.time()
     if not chunks_for_synthesis:
         llm_response = "No relevant information found for your query."
     else:
         response = await get_anthropic().messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=settings.haiku_model,
             max_tokens=1500,
             system=SYNTHESIS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
@@ -999,7 +1179,7 @@ async def api_search_debug(
         llm_prompt=user_prompt,
         system_prompt=SYNTHESIS_SYSTEM_PROMPT,
         llm_response=llm_response,
-        model="claude-haiku-4-5-20251001",
+        model=settings.haiku_model,
     )
 
 

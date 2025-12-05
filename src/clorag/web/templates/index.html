@@ -671,6 +671,89 @@
             font-size: 0.9rem;
         }
 
+        /* Conversation History */
+        .conversation-history {
+            margin-bottom: 1.5rem;
+        }
+
+        .conversation-exchange {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1rem;
+            border-left: 3px solid #d0e3ff;
+        }
+
+        .exchange-query {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .exchange-answer {
+            color: #555;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            max-height: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .exchange-answer::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(transparent, #f8f9fa);
+        }
+
+        /* Follow-up indicator */
+        .followup-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: #e8f5e9;
+            border-radius: 8px;
+            color: #2e7d32;
+            font-size: 0.85rem;
+        }
+
+        .followup-indicator svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* New conversation button */
+        .new-conversation-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: 1px solid #d0e3ff;
+            border-radius: 6px;
+            color: var(--cyan-dark);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-left: 0.5rem;
+        }
+
+        .new-conversation-btn:hover {
+            background: #e8f4fc;
+            border-color: var(--cyan-dark);
+        }
+
+        .new-conversation-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
         /* Responsive */
         @media (max-width: 600px) {
             .hero__title {
@@ -758,6 +841,9 @@
 
     <!-- Results Section -->
     <section class="results-section" id="results-section" style="display: none;">
+        <!-- Conversation History -->
+        <div class="conversation-history" id="conversation-history" style="display: none;"></div>
+
         <!-- AI Answer -->
         <div class="answer-card" id="answer-card">
             <div class="answer-header">
@@ -771,11 +857,24 @@
                     </svg>
                     <span id="copy-text">Copy</span>
                 </button>
+                <button class="new-conversation-btn" id="new-conversation-btn" onclick="startNewConversation()" title="Start a new conversation">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>New</span>
+                </button>
             </div>
             <div class="answer-content" id="answer-content"></div>
             <div class="source-links" id="source-links">
                 <div class="source-links-title">Sources</div>
                 <div class="source-links-list" id="source-links-list"></div>
+            </div>
+            <!-- Follow-up indicator -->
+            <div class="followup-indicator" id="followup-indicator" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span>Ask a follow-up question above to continue this conversation</span>
             </div>
         </div>
 
@@ -868,6 +967,12 @@
         const loadingEl = document.getElementById('loading');
         const emptyState = document.getElementById('empty-state');
         const sourceOptions = document.querySelectorAll('.source-option');
+        const conversationHistoryEl = document.getElementById('conversation-history');
+        const followupIndicator = document.getElementById('followup-indicator');
+
+        // Session management for follow-up conversations
+        let currentSessionId = null;
+        let conversationHistory = []; // Local copy for UI display
 
         // Help modal
         const helpLink = document.getElementById('help-link');
@@ -921,6 +1026,34 @@
             return document.querySelector('input[name="source"]:checked').value;
         }
 
+        // Start a new conversation (reset session)
+        function startNewConversation() {
+            currentSessionId = null;
+            conversationHistory = [];
+            conversationHistoryEl.style.display = 'none';
+            conversationHistoryEl.innerHTML = '';
+            followupIndicator.style.display = 'none';
+            searchInput.value = '';
+            searchInput.focus();
+            searchInput.placeholder = 'How do I configure tally with TSL 5.0?';
+        }
+
+        // Render conversation history in UI
+        function renderConversationHistory() {
+            if (conversationHistory.length === 0) {
+                conversationHistoryEl.style.display = 'none';
+                return;
+            }
+
+            conversationHistoryEl.style.display = 'block';
+            conversationHistoryEl.innerHTML = conversationHistory.map(exchange => `
+                <div class="conversation-exchange">
+                    <div class="exchange-query">Q: ${escapeHtml(exchange.query)}</div>
+                    <div class="exchange-answer">${marked.parse(exchange.answer)}</div>
+                </div>
+            `).join('');
+        }
+
         // Perform search with streaming
         async function performSearch(query) {
             const source = getSelectedSource();
@@ -932,16 +1065,22 @@
             searchButton.disabled = true;
 
             try {
+                // Build request body with session_id if we have one
+                const requestBody = {
+                    query: query,
+                    source: source,
+                    limit: 10
+                };
+                if (currentSessionId) {
+                    requestBody.session_id = currentSessionId;
+                }
+
                 const response = await fetch('/api/search/stream', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        query: query,
-                        source: source,
-                        limit: 10
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!response.ok) {
@@ -955,6 +1094,9 @@
                 sourceLinksList.innerHTML = '';
                 resultsList.innerHTML = '';
                 resultsCount.textContent = '';
+
+                // Show conversation history if we have any
+                renderConversationHistory();
 
                 let fullText = '';
                 const reader = response.body.getReader();
@@ -972,7 +1114,10 @@
                             try {
                                 const data = JSON.parse(line.slice(6));
 
-                                if (data.type === 'text') {
+                                if (data.type === 'session') {
+                                    // Store session_id for follow-up questions
+                                    currentSessionId = data.session_id;
+                                } else if (data.type === 'text') {
                                     fullText += data.text;
                                     // Render markdown incrementally
                                     answerContent.innerHTML = marked.parse(fullText);
@@ -984,6 +1129,22 @@
                                 } else if (data.type === 'done') {
                                     // Final render
                                     answerContent.innerHTML = marked.parse(fullText);
+
+                                    // Store this exchange in local history for UI
+                                    conversationHistory.push({
+                                        query: query,
+                                        answer: fullText
+                                    });
+                                    // Keep only last 3 exchanges (matching server-side)
+                                    if (conversationHistory.length > 3) {
+                                        conversationHistory = conversationHistory.slice(-3);
+                                    }
+
+                                    // Show follow-up indicator
+                                    followupIndicator.style.display = 'flex';
+
+                                    // Update placeholder to suggest follow-up
+                                    searchInput.placeholder = 'Ask a follow-up question...';
                                 }
                             } catch (e) {
                                 // Ignore parse errors for incomplete chunks

@@ -78,19 +78,19 @@ class ThreadAnalyzer:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-haiku-4-5-20251001",
+        model: str | None = None,
         max_concurrent: int = 10,
     ) -> None:
         """Initialize the thread analyzer.
 
         Args:
             api_key: Anthropic API key. Defaults to ANTHROPIC_API_KEY env var.
-            model: Model to use for analysis. Defaults to Haiku.
+            model: Model to use for analysis. Defaults to settings.haiku_model.
             max_concurrent: Maximum concurrent requests.
         """
         settings = get_settings()
         self._api_key = api_key or settings.anthropic_api_key.get_secret_value()
-        self._model = model
+        self._model = model or settings.haiku_model
         self._max_concurrent = max_concurrent
         self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
 

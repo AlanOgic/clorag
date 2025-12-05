@@ -412,6 +412,7 @@
                 <ul class="docs-nav__list">
                     <li class="docs-nav__item"><a href="#architecture" class="docs-nav__link">Architecture</a></li>
                     <li class="docs-nav__item"><a href="#search-system" class="docs-nav__link">Search System</a></li>
+                    <li class="docs-nav__item"><a href="#conversations" class="docs-nav__link">Conversations</a></li>
                     <li class="docs-nav__item"><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
                     <li class="docs-nav__item"><a href="#authentication" class="docs-nav__link">Authentication</a></li>
                     <li class="docs-nav__item"><a href="#api-reference" class="docs-nav__link">API Reference</a></li>
@@ -487,6 +488,16 @@ Streaming Response</code></pre>
                     <li>Max chunk size: 2000 characters</li>
                 </ul>
 
+                <h3 id="conversations">Conversation Sessions</h3>
+                <p>The search system supports follow-up conversations with context retention:</p>
+                <ul>
+                    <li><strong>Session Storage</strong> - Server-side LRU cache with max 1000 concurrent sessions</li>
+                    <li><strong>History Depth</strong> - Last 3 Q&A exchanges are kept for context</li>
+                    <li><strong>Session Timeout</strong> - 30 minutes of inactivity</li>
+                    <li><strong>Context Passing</strong> - Previous exchanges are included in Claude messages</li>
+                </ul>
+                <p>Users can ask follow-up questions without repeating context. A "New" button resets the conversation.</p>
+
                 <h2 id="camera-database">Camera Database</h2>
 
                 <h3>Schema</h3>
@@ -548,14 +559,16 @@ Streaming Response</code></pre>
                 <pre><code>{
   "query": "How to configure RIO IP address?",
   "source": "both",  // "docs", "gmail", or "both"
-  "limit": 10
+  "limit": 10,
+  "session_id": null  // Optional: UUID from previous response for follow-ups
 }</code></pre>
+                <p>Response includes <code>session_id</code> to use in subsequent requests for follow-up conversations.</p>
 
                 <div class="endpoint">
                     <span class="endpoint__method endpoint__method--post">POST</span>
                     <span class="endpoint__path">/api/search/stream</span>
                 </div>
-                <p>Streaming version with Server-Sent Events (SSE).</p>
+                <p>Streaming version with Server-Sent Events (SSE). First event sends <code>{"type": "session", "session_id": "..."}</code>.</p>
 
                 <h3>Camera Endpoints (Public)</h3>
 
