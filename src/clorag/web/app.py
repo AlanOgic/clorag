@@ -974,7 +974,8 @@ async def api_admin_backup(
     if not authenticated and x_admin_password:
         settings = get_settings()
         if settings.admin_password and secrets.compare_digest(
-            x_admin_password, settings.admin_password
+            x_admin_password.encode('utf-8'),
+            settings.admin_password.get_secret_value().encode('utf-8')
         ):
             authenticated = True
 
