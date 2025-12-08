@@ -18,7 +18,9 @@ import anyio
 import structlog
 from fastapi import Body, Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -871,7 +873,7 @@ class LoginResponse(BaseModel):
     message: str
 
 
-@app.post("/api/admin/login")
+@app.post("/api/admin/login", tags=["Authentication"])
 @limiter.limit("5/minute")
 async def api_admin_login(
     request: Request,
@@ -910,7 +912,7 @@ async def api_admin_login(
     return LoginResponse(success=True, message="Login successful")
 
 
-@app.post("/api/admin/logout")
+@app.post("/api/admin/logout", tags=["Authentication"])
 async def api_admin_logout(response: Response):
     """Logout and clear session cookie."""
     response.delete_cookie(
@@ -922,7 +924,7 @@ async def api_admin_logout(response: Response):
     return {"success": True, "message": "Logged out"}
 
 
-@app.get("/api/admin/session")
+@app.get("/api/admin/session", tags=["Authentication"])
 async def api_admin_session(
     admin_session: Annotated[str | None, Cookie()] = None,
 ):
@@ -944,7 +946,7 @@ async def api_admin_session(
     return {"authenticated": False}
 
 
-@app.get("/api/admin/backup")
+@app.get("/api/admin/backup", tags=["Backup"])
 async def api_admin_backup(
     request: Request,
     admin_session: Annotated[str | None, Cookie()] = None,
@@ -1075,7 +1077,7 @@ async def admin_camera_new(
     )
 
 
-@app.post("/api/admin/cameras", response_model=Camera)
+@app.post("/api/admin/cameras", response_model=Camera, tags=["Cameras"])
 @limiter.limit("5/minute")
 async def api_camera_create(
     request: Request,
@@ -1087,7 +1089,7 @@ async def api_camera_create(
     return db.create_camera(camera, CameraSource.MANUAL)
 
 
-@app.put("/api/admin/cameras/{camera_id}", response_model=Camera)
+@app.put("/api/admin/cameras/{camera_id}", response_model=Camera, tags=["Cameras"])
 @limiter.limit("5/minute")
 async def api_camera_update(
     camera_id: int,
@@ -1103,7 +1105,7 @@ async def api_camera_update(
     return camera
 
 
-@app.delete("/api/admin/cameras/{camera_id}")
+@app.delete("/api/admin/cameras/{camera_id}", tags=["Cameras"])
 @limiter.limit("5/minute")
 async def api_camera_delete(
     camera_id: int,
@@ -1128,7 +1130,7 @@ async def admin_analytics(request: Request):
     return templates.TemplateResponse("admin_analytics.html", {"request": request})
 
 
-@app.get("/api/admin/search-stats")
+@app.get("/api/admin/search-stats", tags=["Analytics"])
 async def api_search_stats(
     days: int = 30,
     _: bool = Depends(verify_admin),
@@ -1142,7 +1144,7 @@ async def api_search_stats(
     }
 
 
-@app.get("/api/admin/search-stats/popular")
+@app.get("/api/admin/search-stats/popular", tags=["Analytics"])
 async def api_popular_queries(
     limit: int = 10,
     days: int = 30,
@@ -1153,7 +1155,7 @@ async def api_popular_queries(
     return analytics.get_popular_queries(limit=limit, days=days)
 
 
-@app.get("/api/admin/search/{search_id}")
+@app.get("/api/admin/search/{search_id}", tags=["Analytics"])
 async def api_get_search(
     search_id: int,
     _: bool = Depends(verify_admin),
@@ -1166,7 +1168,7 @@ async def api_get_search(
     return search
 
 
-@app.get("/api/admin/conversations")
+@app.get("/api/admin/conversations", tags=["Analytics"])
 async def api_get_conversations(
     limit: int = 20,
     _: bool = Depends(verify_admin),
@@ -1206,7 +1208,7 @@ async def admin_search_debug(request: Request):
     return templates.TemplateResponse("admin_search_debug.html", {"request": request})
 
 
-@app.post("/api/admin/search-debug")
+@app.post("/api/admin/search-debug", tags=["Debug"])
 async def api_search_debug(
     req: SearchRequest,
     _: bool = Depends(verify_admin),
@@ -1264,6 +1266,94 @@ async def api_search_debug(
         system_prompt=SYNTHESIS_SYSTEM_PROMPT,
         llm_response=llm_response,
         model=settings.haiku_model,
+    )
+
+
+# =============================================================================
+# Admin OpenAPI Documentation
+# =============================================================================
+
+# Cache for admin OpenAPI schema
+_admin_openapi_schema: dict | None = None
+
+
+def get_admin_openapi_schema() -> dict:
+    """Generate OpenAPI schema for admin endpoints only.
+
+    Filters the main app schema to include only /api/admin/* routes.
+    """
+    global _admin_openapi_schema
+    if _admin_openapi_schema:
+        return _admin_openapi_schema
+
+    # Generate full schema
+    full_schema = get_openapi(
+        title="Cyanview Admin API",
+        version="1.0.0",
+        description="Admin API for Cyanview AI Search.",
+        routes=app.routes,
+    )
+
+    # Filter paths to include only /api/admin/* routes
+    admin_paths = {
+        path: ops
+        for path, ops in full_schema.get("paths", {}).items()
+        if path.startswith("/api/admin")
+    }
+    full_schema["paths"] = admin_paths
+
+    # Filter tags to include only admin-related tags
+    admin_tags = ["Authentication", "Backup", "Cameras", "Analytics", "Debug"]
+    full_schema["tags"] = [
+        {"name": tag, "description": f"{tag} operations"}
+        for tag in admin_tags
+    ]
+
+    _admin_openapi_schema = full_schema
+    return _admin_openapi_schema
+
+
+@app.get("/admin/openapi.json", include_in_schema=False)
+async def admin_openapi_json(
+    admin_session: Annotated[str | None, Cookie()] = None,
+):
+    """Serve OpenAPI schema for admin endpoints only (requires authentication)."""
+    # Verify session
+    if not admin_session:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    try:
+        serializer = get_session_serializer()
+        data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
+        if not data.get("authenticated"):
+            raise HTTPException(status_code=401, detail="Authentication required")
+    except (SignatureExpired, BadSignature):
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
+
+    return JSONResponse(content=get_admin_openapi_schema())
+
+
+@app.get("/admin/api-docs", include_in_schema=False)
+async def admin_swagger_ui(
+    admin_session: Annotated[str | None, Cookie()] = None,
+):
+    """Serve Swagger UI for admin API (requires authentication)."""
+    # Verify session
+    if not admin_session:
+        return RedirectResponse(url="/admin/login?next=/admin/api-docs")
+
+    try:
+        serializer = get_session_serializer()
+        data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
+        if not data.get("authenticated"):
+            return RedirectResponse(url="/admin/login?next=/admin/api-docs")
+    except (SignatureExpired, BadSignature):
+        return RedirectResponse(url="/admin/login?next=/admin/api-docs")
+
+    return get_swagger_ui_html(
+        openapi_url="/admin/openapi.json",
+        title="Cyanview Admin API",
+        swagger_favicon_url="/static/favicon.ico",
     )
 
 
