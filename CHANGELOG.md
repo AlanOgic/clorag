@@ -2,6 +2,30 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.5] - 2025-12-09
+
+### Added
+- **Chunk Editor** - Admin UI for browsing, searching, editing, and deleting individual chunks in Qdrant
+  - Browse chunks by collection (docs/cases) with pagination
+  - Text search using hybrid search (semantic + keyword)
+  - Edit chunk text and metadata (title/subject) with automatic re-embedding
+  - Delete individual chunks from collections
+  - Warning displayed when text changes will trigger re-embedding cost
+  - Read-only display of technical fields (ID, URL, chunk_index, etc.)
+
+### API Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/chunks` | List/search chunks (paginated) |
+| GET | `/api/admin/chunks/{collection}/{id}` | Get chunk details |
+| PUT | `/api/admin/chunks/{collection}/{id}` | Update chunk (re-embeds if text changed) |
+| DELETE | `/api/admin/chunks/{collection}/{id}` | Delete chunk |
+
+### Changed
+- Added VectorStore CRUD methods: `get_chunk`, `scroll_chunks`, `update_chunk`, `delete_chunk`
+- New templates: `admin_chunks.html` (browser), `admin_chunk_edit.html` (editor)
+- Admin dashboard now includes Chunk Editor card
+
 ## [0.3.4] - 2025-12-09
 
 ### Added

@@ -548,3 +548,170 @@ class VectorStore:
             "points_count": info.points_count,
             "status": info.status.value,
         }
+
+    async def get_chunk(
+        self,
+        collection: str,
+        chunk_id: str,
+        with_vectors: bool = False,
+    ) -> dict[str, Any] | None:
+        """Retrieve a single chunk by ID.
+
+        Args:
+            collection: Collection name (docusaurus_docs or gmail_cases).
+            chunk_id: UUID of the chunk to retrieve.
+            with_vectors: Whether to include dense/sparse vectors.
+
+        Returns:
+            Dict with id, payload, and optionally vectors, or None if not found.
+        """
+        results = await self._client.retrieve(
+            collection_name=collection,
+            ids=[chunk_id],
+            with_payload=True,
+            with_vectors=with_vectors,
+        )
+        if not results:
+            return None
+
+        point = results[0]
+        result: dict[str, Any] = {
+            "id": str(point.id),
+            "payload": point.payload or {},
+        }
+        if with_vectors and point.vector:
+            result["vectors"] = point.vector
+        return result
+
+    async def scroll_chunks(
+        self,
+        collection: str,
+        limit: int = 20,
+        offset: str | None = None,
+        filter_conditions: dict[str, Any] | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """Paginated listing of chunks with optional filtering.
+
+        Args:
+            collection: Collection name.
+            limit: Maximum chunks per page.
+            offset: Point ID to start from (for pagination).
+            filter_conditions: Optional filters (e.g., {"parent_case_id": "xxx"}).
+
+        Returns:
+            Tuple of (list of chunk dicts, next_offset for pagination).
+        """
+        # Build filter if conditions provided
+        query_filter = None
+        if filter_conditions:
+            must_conditions = [
+                models.FieldCondition(
+                    key=key,
+                    match=models.MatchValue(value=value),
+                )
+                for key, value in filter_conditions.items()
+            ]
+            query_filter = models.Filter(must=must_conditions)
+
+        records, next_offset = await self._client.scroll(
+            collection_name=collection,
+            limit=limit,
+            offset=offset,
+            scroll_filter=query_filter,
+            with_payload=True,
+            with_vectors=False,
+        )
+
+        chunks = [
+            {
+                "id": str(record.id),
+                "payload": record.payload or {},
+            }
+            for record in records
+        ]
+
+        # next_offset is a PointId which can be str or int
+        next_offset_str = str(next_offset) if next_offset is not None else None
+        return chunks, next_offset_str
+
+    async def update_chunk(
+        self,
+        collection: str,
+        chunk_id: str,
+        text: str | None = None,
+        metadata_updates: dict[str, Any] | None = None,
+        dense_vector: list[float] | None = None,
+        sparse_vector: SparseVector | None = None,
+    ) -> bool:
+        """Update a chunk's text, metadata, and/or vectors.
+
+        Args:
+            collection: Collection name.
+            chunk_id: UUID of the chunk.
+            text: New text content (should provide vectors if text changes).
+            metadata_updates: Dict of metadata fields to update.
+            dense_vector: New dense embedding (required if text changes).
+            sparse_vector: New sparse embedding (required if text changes).
+
+        Returns:
+            True if successful, False if chunk not found.
+        """
+        # Check if chunk exists
+        existing = await self.get_chunk(collection, chunk_id)
+        if not existing:
+            return False
+
+        # Build payload updates
+        payload_updates: dict[str, Any] = {}
+        if text is not None:
+            payload_updates["text"] = text
+        if metadata_updates:
+            payload_updates.update(metadata_updates)
+
+        # Update payload if there are changes
+        if payload_updates:
+            await self._client.set_payload(
+                collection_name=collection,
+                payload=payload_updates,
+                points=[chunk_id],
+            )
+
+        # Update vectors if provided
+        if dense_vector is not None or sparse_vector is not None:
+            vectors: dict[str, Any] = {}
+            if dense_vector is not None:
+                vectors["dense"] = dense_vector
+            if sparse_vector is not None:
+                vectors["sparse"] = sparse_vector
+
+            await self._client.update_vectors(
+                collection_name=collection,
+                points=[
+                    models.PointVectors(
+                        id=chunk_id,
+                        vector=vectors,
+                    )
+                ],
+            )
+
+        return True
+
+    async def delete_chunk(
+        self,
+        collection: str,
+        chunk_id: str,
+    ) -> bool:
+        """Delete a single chunk by ID.
+
+        Args:
+            collection: Collection name.
+            chunk_id: UUID of the chunk to delete.
+
+        Returns:
+            True if successful.
+        """
+        await self._client.delete(
+            collection_name=collection,
+            points_selector=models.PointIdsList(points=[chunk_id]),
+        )
+        return True

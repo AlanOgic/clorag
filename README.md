@@ -285,6 +285,7 @@ uv run rag-web
 | `/admin/drafts` | Draft auto-reply management |
 | `/admin/search-debug` | Debug RAG: view chunks, prompts, timing |
 | `/admin/docs` | Technical documentation |
+| `/admin/chunks` | Chunk editor: browse, search, edit, delete vectors |
 
 Admin authentication uses secure session cookies (24-hour expiry). Set `ADMIN_PASSWORD` in your `.env` file.
 
@@ -343,6 +344,15 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 | POST | `/api/admin/drafts/preview/{id}` | Preview AI-generated draft |
 | POST | `/api/admin/drafts/create/{id}` | Create draft in Gmail |
 | POST | `/api/admin/drafts/run` | Run draft pipeline |
+
+### Chunks (Admin)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/chunks` | List/search chunks (paginated) |
+| GET | `/api/admin/chunks/{collection}/{id}` | Get chunk details |
+| PUT | `/api/admin/chunks/{collection}/{id}` | Update chunk (re-embeds if text changed) |
+| DELETE | `/api/admin/chunks/{collection}/{id}` | Delete chunk |
 
 ### Authentication
 
@@ -409,6 +419,8 @@ clorag/
             admin_drafts.html    # Draft management
             admin_search_debug.html  # Search debug
             admin_docs.html      # Technical documentation
+            admin_chunks.html    # Chunk browser
+            admin_chunk_edit.html # Chunk editor
             camera_edit.html     # Camera edit form
          static/           # CSS, JS assets
       scripts/

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Edit Chunk - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --danger: #dc3545;
+            --success: #28a745;
+            --warning: #ffc107;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: var(--cyanview-navy);
+            color: white;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+            filter: brightness(0) invert(1);
+        }
+
+        .navbar__badge {
+            background: var(--danger);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Main */
+        .main {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            color: var(--cyanview-navy);
+        }
+
+        .back-link {
+            color: var(--cyan-blue);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Form */
+        .form-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+        }
+
+        .form-section {
+            margin-bottom: 2rem;
+        }
+
+        .form-section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e8f4fd;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .form-label--readonly {
+            color: #666;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--cyan-blue);
+        }
+
+        .form-input--readonly {
+            background: #f8f9fa;
+            color: #666;
+        }
+
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-family: monospace;
+            min-height: 300px;
+            resize: vertical;
+        }
+
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--cyan-blue);
+        }
+
+        .form-hint {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .char-count {
+            text-align: right;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        /* Warning */
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid var(--warning);
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+
+        .warning-box.visible {
+            display: block;
+        }
+
+        .warning-box strong {
+            color: #856404;
+        }
+
+        /* Metadata grid */
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .metadata-item {
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .metadata-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+
+        .metadata-value {
+            font-size: 0.9rem;
+            color: #333;
+            word-break: break-all;
+        }
+
+        .metadata-value a {
+            color: var(--cyan-blue);
+        }
+
+        /* Buttons */
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #eee;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--cyan-dark);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--cyan-blue);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #eee;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+            margin-left: auto;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        /* Messages */
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none;
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            background: #e8f4fd;
+            color: var(--cyan-dark);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-right: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2aWV3Qm94PSIwIDAgMjUxLjkgMTUwLjU4Ij48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6dXJsKCNsb2dvX2dyKTt9LmNscy0ye2ZpbGw6I2ZmZjt9LmNscy0ze2ZpbGw6IzZkYzlmMzt9PC9zdHlsZT48bGluZWFyR3JhZGllbnQgaWQ9ImxvZ29fZ3IiIHgxPSIyNTEuOSIgeTE9Ijc1LjI5IiB4Mj0iMCIgeTI9Ijc1LjI5IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMDA1ZmEwIi8+PHN0b3Agb2Zmc2V0PSIwLjI2IiBzdG9wLWNvbG9yPSIjMDA2NmE3Ii8+PHN0b3Agb2Zmc2V0PSIwLjYyIiBzdG9wLWNvbG9yPSIjMDA3OGI5Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDA5M2QzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHRpdGxlPkxvZ29fQ3lhbl9ncjwvdGl0bGU+PGcgaWQ9IkxheWVyXzIiIGRhdGEtbmFtZT0iTGF5ZXIgMiI+PGcgaWQ9IkxheWVyXzEtMiIgZGF0YS1uYW1lPSJMYXllciAxIj48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNzYuNjIsMEE3NSw3NSwwLDAsMCwxMjYsMTkuNiw3NS4yOSw3NS4yOSwwLDEsMCwxMjYsMTMxLDc1LjI5LDc1LjI5LDAsMSwwLDE3Ni42MiwwWiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTE1LjQxLDg0LjI0VjU5LjUzYzAtNy4zOCw0LjcxLTEyLjI5LDExLjY3LTEyLjI5LDYuNywwLDExLjI3LDUuMTIsMTEuNDcsMTMuMTFhLjc5Ljc5LDAsMCwxLS44OC44OEgzMy4zYS43OS43OSwwLDAsMS0uODktLjg4QzMyLjI3LDU1LjU3LDMwLjE2LDUzLDI3LDUzYy0zLjQyLDAtNS40LDIuMzItNS40LDYuMTVWODQuNThjMCwzLjgzLDIsNi4xNSw1LjQsNi4xNXM1LjU5LTIuOCw1LjczLTcuNzhhLjc5Ljc5LDAsMCwxLC44OS0uODlIMzhhLjg1Ljg1LDAsMCwxLC44OSwxYy0uMjgsOC4yNy00Ljg1LDEzLjUyLTExLjgyLDEzLjUyUzE1LjQxLDkxLjYyLDE1LjQxLDg0LjI0WiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTY1LjkzLDYyLjUzVjk5LjA2YzAsNi43Ni00LjIzLDExLjEzLTEwLjc5LDExLjEzLTYuMjEsMC0xMC4zNy00LjMtMTAuNzItMTFhLjguOCwwLDAsMSwuODktMWg0Yy41NSwwLC44Mi4yNy44OSwxLC4yLDMuNDEsMiw1LjM5LDQuOTEsNS4zOSwzLjE0LDAsNC45Mi0yLDQuOTItNS4zM1Y5Mi4zN2E3LjA5LDcuMDksMCwwLDEtNS4zOSwyLjQ2Yy02LDAtMTAuMzEtNC41OC0xMC4zMS0xMS4wNlY2Mi41M2EuODQuODQsMCwwLDEsMS0uODloNGEuODUuODUsMCwwLDEsMSwuODlWODRjMCwzLjE0LDEuODQsNS4zMyw0LjkxLDUuMzNzNC45Mi0yLjE5LDQuOTItNS4zM1Y2Mi41M2EuODUuODUsMCwwLDEsMS0uODloNEEuODguODgsMCwwLDEsNjUuOTMsNjIuNTNaIi8+PHBhdGggY2xhc3M9ImNscy0yIiBkPSJNNzIuMzUsODUuNDdjMC01LjY2LDQuMzctMTAsMTAuNzgtMTBoNS4xM1Y3MS42OGMwLTMuMDctMS44NS01LjE5LTQuOTItNS4xOS0yLjg3LDAtNC40NCwxLjkxLTQuNjQsNC43MS0uMDcuNjItLjM0LjgyLTEsLjgyaC00YS44OC44OCwwLDAsMS0uODktMWMuNDEtNS45NCw0LjQ0LTEwLjE4LDEwLjUyLTEwLjE4LDYuNDgsMCwxMC42NSw0LjY0LDEwLjY1LDExLjA2Vjg1LjY4YzAsNi4yOC00LjEsMTAuNzktMTAuNjUsMTAuNzlTNzIuMzUsOTEuODksNzIuMzUsODUuNDdabTE1LjkxLjIxdi01SDgzLjM0Yy0zLjIxLDAtNS4xMiwyLjEyLTUuMTIsNC43OCwwLDMuMjgsMS45MSw1LjQsNS4xMiw1LjRTODguMjYsODguODIsODguMjYsODUuNjhaIi8+PHBhdGggY2xhc3M9ImNscy0yIiBkPSJNMTAwLjYxLDk0LjgzVjcyYzAtNi40OSw0LjMtMTEuMTMsMTAuNjUtMTEuMTNTMTIxLjkxLDY1LjUzLDEyMS45MSw3MlY5NC44M2EuODYuODYsMCwwLDEtMSwxaC00YS44Ni44NiwwLDAsMS0xLTF2LTIzYzAtMy4yMS0xLjc3LTUuNC00Ljc4LTUuNHMtNC43OCwyLjE5LTQuNzgsNS40djIzYS44Ni44NiwwLDAsMS0xLDFoLTRBLjg2Ljg2LDAsMCwxLDEwMC42MSw5NC44M1oiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0xNTIuMjksNDguOTRsLTguMTIsNDQuNTlhMi43NSwyLjc1LDAsMCwxLTIuOTQsMi41M2gtMy43NWEyLjc1LDIuNzUsMCwwLDEtMi45NC0yLjUzbC04LjEyLTQ0LjU5YS43Ni43NiwwLDAsMSwuODItLjk1aDQuNDRhLjkzLjkzLDAsMCwxLDEsLjgybDYuNjksNDAsNi42OS00MGEuODYuODYsMCwwLDEsMS0uODJoNC40NEMxNTIuMDksNDgsMTUyLjQzLDQ4LjQsMTUyLjI5LDQ4Ljk0WiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTE1Ni44LDUzLjg2YTMuMzksMy4zOSwwLDAsMSwzLjQ4LTMuNTUsMy40OCwzLjQ4LDAsMCwxLDMuNTUsMy41NSwzLjU2LDMuNTYsMCwwLDEtMy41NSwzLjQ4QTMuMzcsMy4zNywwLDAsMSwxNTYuOCw1My44NlptLjU0LDQxVjYyLjUzYS44NS44NSwwLDAsMSwxLS44OWg0YS44NS44NSwwLDAsMSwxLC44OXYzMi4zYS44Ny44NywwLDAsMS0xLDFoLTRBLjg3Ljg3LDAsMCwxLDE1Ny4zNCw5NC44M1oiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0xNjkuNSw4NS4zNFY3MmMuMDctNi40OCw0LjMtMTEsMTAuODUtMTFhMTAuNCwxMC40LDAsMCwxLDEwLjkzLDEwLjc5YzAsNi00LjM3LDEwLjMxLTEwLjg2LDEwLjMxaC01djMuNTVjMCwzLjE0LDEuODQsNS4zMiw1LDUuMzIsMi44LDAsNC42NS0yLDQuODUtNS4wNWEuODguODgsMCwwLDEsMS0uODloNGEuODMuODMsMCwwLDEsLjg4Ljg5Yy0uMzQsNi4zNS00LjY0LDEwLjU5LTEwLjc4LDEwLjU5QzE3My44Nyw5Ni40NywxNjkuNSw5MiwxNjkuNSw4NS4zNFptMTAuOTItOC42MWMzLjE0LDAsNS0yLDUtNC44NCwwLTMuMjgtMS45Mi01LjQtNS4wNi01LjRzLTUsMi4xMi01LDUuNHY0Ljg0WiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTIxNSw5Mi4zN2E4Ljc1LDguNzUsMCwwLDEtNy4zOCw0LjE2Yy02LjIxLDAtMTAuMzEtNC42NC0xMC4zMS0xMS4xM1Y2Mi42YS44Ny44NywwLDAsMSwxLTFoMy44OWEuODcuODcsMCwwLDEsMSwxdjIzYzAsMy4yMSwxLjYzLDUuMzIsNC41LDUuMzJzNC40NC0yLjExLDQuNDQtNS4zMnYtMjNhLjg3Ljg3LDAsMCwxLDEtMWg0YS44NC44NCwwLDAsMSwuODgsMXYyM2MwLDMuMjEsMS42NCw1LjMyLDQuNTEsNS4zMnM0LjQ0LTIuMTEsNC40NC01LjMydi0yM2EuODYuODYsMCwwLDEsMS0xaDRhLjg1Ljg1LDAsMCwxLC44OSwxVjg1LjRjMCw2LjQ5LTQsMTEuMTMtMTAuMjQsMTEuMTNBOC42NSw4LjY1LDAsMCwxLDIxNSw5Mi4zN1oiLz48L2c+PC9nPjwvc3ZnPg==" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">Edit Chunk</h1>
+            <a href="/admin/chunks" class="back-link">&larr; Back to list</a>
+        </div>
+
+        <div id="alert" class="alert hidden"></div>
+
+        <div id="loadingState" class="loading">Loading chunk data...</div>
+
+        <div id="formContainer" class="hidden">
+            <div class="form-card">
+                <!-- Warning for text changes -->
+                <div class="warning-box" id="reembedWarning">
+                    <strong>Note:</strong> Changing the text content will trigger re-embedding using the Voyage AI API. This incurs API costs.
+                </div>
+
+                <form id="chunkForm">
+                    <!-- Read-only metadata section -->
+                    <div class="form-section">
+                        <h3 class="form-section-title">Chunk Information (Read-only)</h3>
+                        <div class="metadata-grid" id="metadataGrid">
+                            <!-- Filled by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Editable section -->
+                    <div class="form-section">
+                        <h3 class="form-section-title">Editable Fields</h3>
+
+                        <div class="form-group" id="titleGroup">
+                            <label class="form-label">Title</label>
+                            <input type="text" class="form-input" name="title" id="titleInput" placeholder="Document title">
+                        </div>
+
+                        <div class="form-group" id="subjectGroup" style="display: none;">
+                            <label class="form-label">Subject</label>
+                            <input type="text" class="form-input" name="subject" id="subjectInput" placeholder="Support case subject">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Text Content</label>
+                            <textarea class="form-textarea" name="text" id="textInput" placeholder="Chunk text content..."></textarea>
+                            <div class="char-count"><span id="charCount">0</span> characters</div>
+                            <div class="form-hint">Edit the text content of this chunk. Changes will be re-embedded for search.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="saveBtn">Save Changes</button>
+                        <a href="/admin/chunks" class="btn btn-secondary">Cancel</a>
+                        <button type="button" class="btn btn-danger" onclick="deleteChunk()">Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const collection = '{{ collection }}';
+        const chunkId = '{{ chunk_id }}';
+        let originalText = '';
+        let chunkData = null;
+
+        // Check session on load
+        async function checkSession() {
+            try {
+                const response = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch (error) {
+                window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+            }
+        }
+
+        async function loadChunk() {
+            try {
+                const response = await fetch(`/api/admin/chunks/${collection}/${chunkId}`, { credentials: 'include' });
+                if (!response.ok) {
+                    throw new Error('Failed to load chunk');
+                }
+
+                chunkData = await response.json();
+                originalText = chunkData.text || '';
+                renderChunk(chunkData);
+
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('formContainer').classList.remove('hidden');
+            } catch (error) {
+                document.getElementById('loadingState').innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function renderChunk(chunk) {
+            // Build metadata display
+            const metadataItems = [
+                { label: 'Chunk ID', value: chunk.id },
+                { label: 'Collection', value: chunk.collection === 'docusaurus_docs' ? 'Documentation' : 'Support Cases' },
+                { label: 'Source', value: chunk.source || '-' },
+                { label: 'Chunk Index', value: chunk.chunk_index !== null ? chunk.chunk_index : '-' },
+            ];
+
+            // Add collection-specific fields
+            if (chunk.collection === 'docusaurus_docs') {
+                if (chunk.url) {
+                    metadataItems.push({ label: 'URL', value: `<a href="${escapeHtml(chunk.url)}" target="_blank">${escapeHtml(chunk.url)}</a>`, isHtml: true });
+                }
+                if (chunk.lastmod) {
+                    metadataItems.push({ label: 'Last Modified', value: chunk.lastmod });
+                }
+                if (chunk.parent_id) {
+                    metadataItems.push({ label: 'Parent ID', value: chunk.parent_id });
+                }
+                // Show title field
+                document.getElementById('titleGroup').style.display = 'block';
+                document.getElementById('subjectGroup').style.display = 'none';
+                document.getElementById('titleInput').value = chunk.title || '';
+            } else {
+                // Gmail cases
+                if (chunk.thread_id) {
+                    metadataItems.push({ label: 'Thread ID', value: chunk.thread_id });
+                }
+                if (chunk.parent_case_id) {
+                    metadataItems.push({ label: 'Parent Case ID', value: chunk.parent_case_id });
+                }
+                if (chunk.category) {
+                    metadataItems.push({ label: 'Category', value: chunk.category });
+                }
+                if (chunk.product) {
+                    metadataItems.push({ label: 'Product', value: chunk.product });
+                }
+                if (chunk.problem_summary) {
+                    metadataItems.push({ label: 'Problem', value: chunk.problem_summary });
+                }
+                if (chunk.solution_summary) {
+                    metadataItems.push({ label: 'Solution', value: chunk.solution_summary });
+                }
+                if (chunk.keywords && chunk.keywords.length > 0) {
+                    const keywordTags = chunk.keywords.map(k => `<span class="tag">${escapeHtml(k)}</span>`).join(' ');
+                    metadataItems.push({ label: 'Keywords', value: keywordTags, isHtml: true });
+                }
+                // Show subject field
+                document.getElementById('titleGroup').style.display = 'none';
+                document.getElementById('subjectGroup').style.display = 'block';
+                document.getElementById('subjectInput').value = chunk.subject || '';
+            }
+
+            const metadataGrid = document.getElementById('metadataGrid');
+            metadataGrid.innerHTML = metadataItems.map(item => `
+                <div class="metadata-item">
+                    <div class="metadata-label">${item.label}</div>
+                    <div class="metadata-value">${item.isHtml ? item.value : escapeHtml(String(item.value))}</div>
+                </div>
+            `).join('');
+
+            // Set text
+            document.getElementById('textInput').value = chunk.text || '';
+            updateCharCount();
+        }
+
+        function updateCharCount() {
+            const text = document.getElementById('textInput').value;
+            document.getElementById('charCount').textContent = text.length;
+
+            // Show warning if text changed
+            const warning = document.getElementById('reembedWarning');
+            if (text !== originalText) {
+                warning.classList.add('visible');
+            } else {
+                warning.classList.remove('visible');
+            }
+        }
+
+        document.getElementById('textInput').addEventListener('input', updateCharCount);
+
+        document.getElementById('chunkForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            const data = {};
+            const newText = document.getElementById('textInput').value;
+
+            if (newText !== originalText) {
+                data.text = newText;
+            }
+
+            // Add title or subject based on collection
+            if (chunkData.collection === 'docusaurus_docs') {
+                const newTitle = document.getElementById('titleInput').value;
+                if (newTitle !== (chunkData.title || '')) {
+                    data.title = newTitle || null;
+                }
+            } else {
+                const newSubject = document.getElementById('subjectInput').value;
+                if (newSubject !== (chunkData.subject || '')) {
+                    data.subject = newSubject || null;
+                }
+            }
+
+            // Check if there are any changes
+            if (Object.keys(data).length === 0) {
+                showAlert('No changes to save', 'error');
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Changes';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/chunks/${collection}/${chunkId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(data),
+                });
+
+                if (response.ok) {
+                    const updated = await response.json();
+                    originalText = updated.text || '';
+                    chunkData = updated;
+                    showAlert('Chunk saved successfully!', 'success');
+                    document.getElementById('reembedWarning').classList.remove('visible');
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to save chunk', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Changes';
+        });
+
+        async function deleteChunk() {
+            if (!confirm('Are you sure you want to delete this chunk? This cannot be undone.')) return;
+
+            try {
+                const response = await fetch(`/api/admin/chunks/${collection}/${chunkId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    showAlert('Chunk deleted!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/admin/chunks';
+                    }, 1000);
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to delete chunk', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        function showAlert(message, type) {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.className = `alert alert-${type}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        checkSession().then(() => {
+            loadChunk();
+        });
+    </script>
+</body>
+</html>
