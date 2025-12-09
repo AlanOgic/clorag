@@ -414,6 +414,7 @@
                     <li class="docs-nav__item"><a href="#search-system" class="docs-nav__link">Search System</a></li>
                     <li class="docs-nav__item"><a href="#data-ingestion" class="docs-nav__link">Data Ingestion</a></li>
                     <li class="docs-nav__item"><a href="#conversations" class="docs-nav__link">Conversations</a></li>
+                    <li class="docs-nav__item"><a href="#draft-management" class="docs-nav__link">Draft Management</a></li>
                     <li class="docs-nav__item"><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
                     <li class="docs-nav__item"><a href="#authentication" class="docs-nav__link">Authentication</a></li>
                     <li class="docs-nav__item"><a href="#api-reference" class="docs-nav__link">API Reference</a></li>
@@ -756,6 +757,84 @@ uv run ingest-curated --offset 600 --max-threads 300</code></pre>
                     <li><strong>New conversation</strong> - Floating button resets session and clears history</li>
                 </ul>
 
+                <h2 id="draft-management">Draft Auto-Reply System</h2>
+
+                <h3>Overview</h3>
+                <p>The draft system automatically generates email replies for unanswered support threads using RAG search and Claude AI synthesis.</p>
+
+                <h3>Pipeline Flow</h3>
+                <pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                    DRAFT CREATION PIPELINE                          │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│    GMAIL      │     │   ANALYZE     │     │    FILTER     │
+│    FETCH      │────▶│   THREADS     │────▶│   PENDING     │
+│  via API      │     │ ThreadAnalyzer│     │ no cyanview   │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│ CHECK DRAFTS  │     │  RAG SEARCH   │     │    CLAUDE     │
+│  in Gmail     │────▶│ docs + cases  │────▶│   SYNTHESIS   │
+│ skip existing │     │ hybrid query  │     │ draft content │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐
+│ CREATE DRAFT  │
+│  in Gmail     │
+│ In-Reply-To   │
+└───────────────┘</code></pre>
+
+                <h3>Key Components</h3>
+                <table>
+                    <tr><th>Component</th><th>Description</th></tr>
+                    <tr><td><code>GmailDraftService</code></td><td>Gmail API wrapper with compose scope for creating draft replies</td></tr>
+                    <tr><td><code>DraftResponseGenerator</code></td><td>RAG search + Claude synthesis for contextual email content</td></tr>
+                    <tr><td><code>DraftCreationPipeline</code></td><td>Orchestrates the full process: fetch → analyze → filter → generate → create</td></tr>
+                </table>
+
+                <h3>Admin Interface</h3>
+                <p>Access the draft management UI at <a href="/admin/drafts">/admin/drafts</a>:</p>
+                <ul>
+                    <li><strong>Pending Threads</strong> - List of unanswered threads with expandable message history</li>
+                    <li><strong>Thread Timeline</strong> - Visual timeline showing all messages with Cyanview badges</li>
+                    <li><strong>Gmail Links</strong> - Direct links to open threads in Gmail</li>
+                    <li><strong>Preview Draft</strong> - View AI-generated response before creating</li>
+                    <li><strong>Create Draft</strong> - Create the draft reply in Gmail</li>
+                    <li><strong>Run Pipeline</strong> - Batch process all pending threads</li>
+                </ul>
+
+                <h3>CLI Command</h3>
+                <pre><code># Process all unanswered threads (max 10)
+uv run draft-support
+
+# Preview drafts without creating
+uv run draft-support --preview
+
+# Process specific thread
+uv run draft-support --thread THREAD_ID
+
+# Increase limit
+uv run draft-support --max 20</code></pre>
+
+                <h3>Google Groups Handling</h3>
+                <p>The system correctly handles messages arriving via Google Groups:</p>
+                <ul>
+                    <li>Parses <code>X-Original-Sender</code> header for actual customer email</li>
+                    <li>Falls back to <code>Reply-To</code> header when available</li>
+                    <li>Strips "via Group" suffix from display names</li>
+                    <li>Correctly identifies Cyanview vs customer messages</li>
+                </ul>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">OAuth Scope</div>
+                    <p>Draft creation requires <code>gmail.compose</code> scope. If using existing OAuth token, delete <code>token_draft.json</code> to re-authenticate with new scopes.</p>
+                </div>
+
                 <h2 id="camera-database">Camera Database</h2>
 
                 <h3>Schema</h3>
@@ -881,6 +960,59 @@ uv run ingest-curated --offset 600 --max-threads 300</code></pre>
                     <span class="endpoint__path">/api/admin/search/{id}</span>
                 </div>
                 <p>Get stored search details including response and chunks. Requires authentication.</p>
+
+                <h3>Draft Endpoints</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/drafts/status</span>
+                </div>
+                <p>Get draft system status including pending count and last run time. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/drafts/pending</span>
+                </div>
+                <p>List unanswered threads that need draft replies. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/drafts/thread/{thread_id}</span>
+                </div>
+                <p>Get full thread details with all messages for preview. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/drafts/preview/{thread_id}</span>
+                </div>
+                <p>Generate AI draft preview without creating in Gmail. Requires authentication.</p>
+                <pre><code>Response:
+{
+  "thread_id": "...",
+  "subject": "Re: ...",
+  "to_address": "customer@example.com",
+  "content": "AI-generated draft content...",
+  "sources": ["doc_url_1", "doc_url_2"]
+}</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/drafts/create/{thread_id}</span>
+                </div>
+                <p>Create draft in Gmail for the specified thread. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/drafts/run</span>
+                </div>
+                <p>Run the full draft pipeline for all pending threads. Requires authentication.</p>
+                <pre><code>Response:
+{
+  "total_processed": 5,
+  "drafts_created": 3,
+  "errors": 0,
+  "results": [...]
+}</code></pre>
 
                 <h3>Auth Endpoints</h3>
 

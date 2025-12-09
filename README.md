@@ -11,6 +11,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 - **Search Analytics** - Track popular queries, response times, and usage patterns
 - **Session-Based Admin** - Secure login with signed cookies for all admin features
 - **Streaming Responses** - Real-time answer streaming for better UX
+- **Draft Auto-Reply System** - AI-powered draft creation for unanswered support threads
 
 ## Architecture
 
@@ -242,6 +243,22 @@ uv run ingest-curated --max-threads 300
 uv run ingest-curated --offset 300 --max-threads 300
 ```
 
+### Draft Auto-Reply
+
+```bash
+# Process all unanswered threads (max 10)
+uv run draft-support
+
+# Preview drafts without creating
+uv run draft-support --preview
+
+# Process specific thread
+uv run draft-support --thread THREAD_ID
+
+# Increase limit
+uv run draft-support --max 20
+```
+
 ### Web Interface
 
 ```bash
@@ -265,6 +282,7 @@ uv run rag-web
 | `/admin` | Admin dashboard with links to all features |
 | `/admin/cameras` | Camera CRUD management |
 | `/admin/analytics` | Search analytics and statistics |
+| `/admin/drafts` | Draft auto-reply management |
 | `/admin/search-debug` | Debug RAG: view chunks, prompts, timing |
 | `/admin/docs` | Technical documentation |
 
@@ -315,6 +333,17 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 | GET | `/api/admin/search-stats?days=30` | Search statistics |
 | GET | `/api/admin/search/{id}` | Get stored search details |
 
+### Drafts (Admin)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/drafts/status` | Draft system status |
+| GET | `/api/admin/drafts/pending` | List unanswered threads |
+| GET | `/api/admin/drafts/thread/{id}` | Get thread with messages |
+| POST | `/api/admin/drafts/preview/{id}` | Preview AI-generated draft |
+| POST | `/api/admin/drafts/create/{id}` | Create draft in Gmail |
+| POST | `/api/admin/drafts/run` | Run draft pipeline |
+
 ### Authentication
 
 | Method | Endpoint | Description |
@@ -357,6 +386,11 @@ clorag/
       models/
          support_case.py   # Data models
          camera.py         # Camera models
+      drafts/
+         gmail_service.py      # Gmail API with draft creation
+         draft_generator.py    # RAG-based response generator
+         draft_pipeline.py     # Draft creation orchestration
+         models.py             # Draft data models
       ingestion/
          docusaurus.py     # Pipeline Docusaurus
          gmail.py          # Pipeline Gmail
@@ -372,6 +406,7 @@ clorag/
             admin_login.html     # Admin login
             admin_cameras.html   # Camera management
             admin_analytics.html # Analytics dashboard
+            admin_drafts.html    # Draft management
             admin_search_debug.html  # Search debug
             admin_docs.html      # Technical documentation
             camera_edit.html     # Camera edit form
@@ -380,6 +415,7 @@ clorag/
          ingest_docs.py    # CLI ingestion docs
          ingest_gmail.py   # CLI ingestion Gmail
          ingest_curated.py # CLI ingestion curated
+         draft_support.py  # CLI draft creation
          run_web.py        # CLI run web server
    tests/
    data/

@@ -2,6 +2,35 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.4] - 2025-12-09
+
+### Added
+- **Draft Auto-Reply System**
+  - New `drafts/` module for automated draft creation in Gmail
+  - `GmailDraftService` with `gmail.compose` scope for creating draft replies
+  - `DraftResponseGenerator` uses RAG search + Claude to generate contextual responses
+  - `DraftCreationPipeline` orchestrates: fetch pending → generate response → create draft
+  - Admin UI at `/admin/drafts` with pending threads list, preview, and draft creation
+  - CLI command `uv run draft-support` for manual/batch draft processing
+  - Toggle-based thread view with expandable message history timeline
+  - Direct Gmail links to open threads in a new tab
+  - Session storage caching (5-min TTL) to avoid reloading data on page revisits
+
+- **Google Groups Support**
+  - Parse `X-Original-Sender` and `Reply-To` headers to show actual customer email
+  - Handle "Name via Group" format to display clean sender names
+  - Correctly identify Cyanview vs customer messages in thread timeline
+
+### API Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/drafts/status` | Draft system status |
+| GET | `/api/admin/drafts/pending` | List unanswered threads |
+| GET | `/api/admin/drafts/thread/{id}` | Get thread with all messages |
+| POST | `/api/admin/drafts/preview/{id}` | Preview AI-generated draft |
+| POST | `/api/admin/drafts/create/{id}` | Create draft in Gmail |
+| POST | `/api/admin/drafts/run` | Run draft pipeline |
+
 ## [0.3.3] - 2025-12-05
 
 ### Added

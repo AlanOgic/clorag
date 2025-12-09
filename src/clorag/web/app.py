@@ -7,6 +7,7 @@ import time
 import uuid
 import zipfile
 from collections import OrderedDict
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -16,6 +17,7 @@ from typing import Annotated
 import anthropic
 import anyio
 import structlog
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Body, Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -62,8 +64,50 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"detail": "Request timeout"}, status_code=504)
 
 
-# Initialize FastAPI app
-app = FastAPI(title="Cyanview AI Search", version="1.0.0")
+# =============================================================================
+# Background Scheduler for Draft Creation
+# =============================================================================
+
+_scheduler: AsyncIOScheduler | None = None
+
+
+def get_scheduler() -> AsyncIOScheduler | None:
+    """Get the background scheduler instance."""
+    return _scheduler
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan with background scheduler for draft creation."""
+    global _scheduler
+    settings = get_settings()
+
+    if settings.draft_polling_enabled:
+        from clorag.drafts import check_and_create_drafts
+
+        _scheduler = AsyncIOScheduler()
+        _scheduler.add_job(
+            check_and_create_drafts,
+            "interval",
+            minutes=settings.draft_poll_interval_minutes,
+            id="draft_creation",
+            replace_existing=True,
+        )
+        _scheduler.start()
+        logger.info(
+            "Draft creation scheduler started",
+            interval_minutes=settings.draft_poll_interval_minutes,
+        )
+
+    yield
+
+    if _scheduler:
+        _scheduler.shutdown()
+        logger.info("Draft creation scheduler stopped")
+
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(title="Cyanview AI Search", version="1.0.0", lifespan=lifespan)
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -1179,6 +1223,125 @@ async def api_get_conversations(
 
 
 # =============================================================================
+# Draft Creation Routes (Admin)
+# =============================================================================
+
+
+@app.get("/admin/drafts", response_class=HTMLResponse)
+async def admin_drafts(request: Request):
+    """Admin draft management page."""
+    return templates.TemplateResponse("admin_drafts.html", {"request": request})
+
+
+@app.get("/api/admin/drafts/status", tags=["Drafts"])
+async def api_drafts_status(_: bool = Depends(verify_admin)):
+    """Get draft creation system status."""
+    settings = get_settings()
+    scheduler = get_scheduler()
+
+    scheduler_running = scheduler is not None and scheduler.running if scheduler else False
+    next_run = None
+
+    if scheduler_running and scheduler:
+        job = scheduler.get_job("draft_creation")
+        if job and job.next_run_time:
+            next_run = job.next_run_time.isoformat()
+
+    return {
+        "scheduler_running": scheduler_running,
+        "next_run": next_run,
+        "poll_interval_minutes": settings.draft_poll_interval_minutes,
+        "polling_enabled": settings.draft_polling_enabled,
+    }
+
+
+@app.get("/api/admin/drafts/pending", tags=["Drafts"])
+async def api_pending_threads(
+    limit: int = 20,
+    _: bool = Depends(verify_admin),
+):
+    """Get threads pending draft creation."""
+    from clorag.drafts import DraftCreationPipeline
+
+    pipeline = DraftCreationPipeline()
+    pending = await pipeline.get_pending_threads(limit=limit)
+
+    return [t.to_dict() for t in pending]
+
+
+@app.get("/api/admin/drafts/thread/{thread_id}", tags=["Drafts"])
+async def api_thread_detail(
+    thread_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Get full thread details with all messages."""
+    from clorag.drafts import GmailDraftService
+
+    gmail = GmailDraftService()
+    thread = await gmail.get_thread(thread_id)
+
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found")
+
+    detail = gmail.extract_thread_detail(thread)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Could not extract thread details")
+
+    return detail.to_dict()
+
+
+@app.post("/api/admin/drafts/preview/{thread_id}", tags=["Drafts"])
+async def api_preview_draft(
+    thread_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Preview draft for a specific thread without creating it."""
+    from clorag.drafts import DraftCreationPipeline, DraftPreview
+
+    pipeline = DraftCreationPipeline()
+    result = await pipeline.process_single_thread(thread_id, preview_only=True)
+
+    if not result or not isinstance(result, DraftPreview):
+        raise HTTPException(status_code=404, detail="Thread not found or not eligible")
+
+    return result.to_dict()
+
+
+@app.post("/api/admin/drafts/create/{thread_id}", tags=["Drafts"])
+async def api_create_draft(
+    thread_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Create draft for a specific thread."""
+    from clorag.drafts import DraftCreationPipeline, DraftResult
+
+    pipeline = DraftCreationPipeline()
+    result = await pipeline.process_single_thread(thread_id, preview_only=False)
+
+    if not result or not isinstance(result, DraftResult):
+        raise HTTPException(status_code=404, detail="Thread not found or draft creation failed")
+
+    return {
+        "success": True,
+        **result.to_dict(),
+    }
+
+
+@app.post("/api/admin/drafts/run", tags=["Drafts"])
+async def api_run_draft_pipeline(
+    max_drafts: int = 5,
+    _: bool = Depends(verify_admin),
+):
+    """Manually trigger the draft creation pipeline."""
+    from clorag.drafts import DraftCreationPipeline
+
+    pipeline = DraftCreationPipeline()
+    result = await pipeline.run(max_drafts=max_drafts)
+
+    return result.to_dict()
+
+
+# =============================================================================
 # Search Debug Routes (Admin)
 # =============================================================================
 
@@ -1303,7 +1466,7 @@ def get_admin_openapi_schema() -> dict:
     full_schema["paths"] = admin_paths
 
     # Filter tags to include only admin-related tags
-    admin_tags = ["Authentication", "Backup", "Cameras", "Analytics", "Debug"]
+    admin_tags = ["Authentication", "Backup", "Cameras", "Analytics", "Drafts", "Debug"]
     full_schema["tags"] = [
         {"name": tag, "description": f"{tag} operations"}
         for tag in admin_tags

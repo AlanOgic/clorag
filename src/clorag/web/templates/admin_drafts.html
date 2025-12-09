@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Draft Management - Admin - Cyanview</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo { height: 32px; }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover { color: var(--cyan-blue); }
+        .navbar__link--active { color: var(--cyan-blue); font-weight: 600; }
+
+        .hero {
+            background: var(--hero-bg);
+            padding: 2rem;
+            text-align: center;
+            color: white;
+        }
+
+        .hero__title { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .hero__subtitle { font-size: 1rem; opacity: 0.9; }
+
+        .main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .auth-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            font-size: 1.1rem;
+            color: #666;
+        }
+
+        .auth-loading.hidden { display: none; }
+
+        .btn-logout {
+            background: transparent;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: #f5f5f5;
+            border-color: #ccc;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-card__value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--cyan-dark);
+        }
+
+        .stat-card__value.active { color: #22c55e; }
+        .stat-card__value.inactive { color: #ef4444; }
+
+        .stat-card__label {
+            font-size: 0.9rem;
+            color: #606770;
+            margin-top: 0.5rem;
+        }
+
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        .section__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .section__title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--cyan-dark);
+            color: white;
+        }
+
+        .btn-primary:hover { background: var(--cyan-blue); }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover { background: #e5e5e5; }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-small {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        /* Thread list styles */
+        .thread-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .thread-item {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            overflow: hidden;
+        }
+
+        .thread-header {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            gap: 1rem;
+            cursor: pointer;
+            background: #fafafa;
+            transition: background 0.2s;
+        }
+
+        .thread-header:hover {
+            background: #f0f0f0;
+        }
+
+        .thread-toggle {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            color: #666;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+
+        .thread-item.expanded .thread-toggle {
+            transform: rotate(90deg);
+        }
+
+        .thread-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .thread-subject {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.25rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .thread-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+            color: #606770;
+        }
+
+        .thread-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .thread-content {
+            display: none;
+            border-top: 1px solid #eee;
+            background: white;
+        }
+
+        .thread-item.expanded .thread-content {
+            display: block;
+        }
+
+        .thread-links {
+            padding: 0.75rem 1rem;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .thread-links a {
+            color: var(--cyan-dark);
+            text-decoration: none;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .thread-links a:hover {
+            text-decoration: underline;
+        }
+
+        .thread-loading {
+            padding: 2rem;
+            text-align: center;
+            color: #666;
+        }
+
+        /* Message history styles */
+        .message-list {
+            padding: 0.5rem 1rem 1rem;
+        }
+
+        .message-item {
+            position: relative;
+            padding: 0.75rem 0 0.75rem 1.5rem;
+            border-left: 2px solid #e0e0e0;
+            margin-left: 0.5rem;
+        }
+
+        .message-item:last-child {
+            border-left-color: transparent;
+        }
+
+        .message-item::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 1rem;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            border: 2px solid white;
+        }
+
+        .message-item.is-cyanview::before {
+            background: var(--cyan-blue);
+        }
+
+        .message-item.is-cyanview {
+            border-left-color: var(--cyan-blue);
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .message-from {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .message-from.is-cyanview {
+            color: var(--cyan-dark);
+        }
+
+        .message-from .email {
+            font-weight: normal;
+            color: #666;
+            font-size: 0.85rem;
+        }
+
+        .message-date {
+            color: #888;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        .message-snippet {
+            color: #555;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .message-snippet.expanded {
+            max-height: none;
+        }
+
+        .message-expand {
+            font-size: 0.8rem;
+            color: var(--cyan-dark);
+            cursor: pointer;
+            margin-top: 0.5rem;
+            display: inline-block;
+        }
+
+        .message-expand:hover {
+            text-decoration: underline;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.hidden { display: none; }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal__header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal__title { font-size: 1.2rem; font-weight: 600; color: var(--cyanview-navy); }
+
+        .modal__close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0.25rem;
+        }
+
+        .modal__body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal__footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        .preview-section { margin-bottom: 1.5rem; }
+        .preview-section__title {
+            font-weight: 600;
+            color: #606770;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .preview-content {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: inherit;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .preview-meta {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .preview-meta dt { color: #606770; }
+        .preview-meta dd { font-weight: 500; }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .confidence-high { background: #dcfce7; color: #166534; }
+        .confidence-medium { background: #fef3c7; color: #92400e; }
+        .confidence-low { background: #fee2e2; color: #991b1b; }
+
+        .sources-list {
+            list-style: none;
+            font-size: 0.9rem;
+        }
+
+        .sources-list li {
+            padding: 0.25rem 0;
+        }
+
+        .sources-list a {
+            color: var(--cyan-dark);
+            text-decoration: none;
+        }
+
+        .sources-list a:hover { text-decoration: underline; }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--cyan-dark);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #606770;
+        }
+
+        .empty-state__icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success { background: #dcfce7; color: #166534; }
+        .alert-error { background: #fee2e2; color: #991b1b; }
+
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-cyan {
+            background: #e0f7fa;
+            color: var(--cyan-dark);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="/admin" class="navbar__link">Admin</a>
+            <a href="/admin/drafts" class="navbar__link navbar__link--active">Drafts</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Auth loading overlay -->
+    <div id="authLoading" class="auth-loading">
+        <span>Checking authentication...</span>
+    </div>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero__title">Draft Management</h1>
+        <p class="hero__subtitle">Create AI-powered draft replies for support threads</p>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Alert area -->
+        <div id="alertArea"></div>
+
+        <!-- Status Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-card__value" id="schedulerStatus">-</div>
+                <div class="stat-card__label">Scheduler Status</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__value" id="nextRun">-</div>
+                <div class="stat-card__label">Next Run</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__value" id="pollInterval">-</div>
+                <div class="stat-card__label">Poll Interval (min)</div>
+            </div>
+        </div>
+
+        <!-- Pending Threads -->
+        <div class="section">
+            <div class="section__header">
+                <h3 class="section__title">Pending Threads</h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-secondary" onclick="loadPendingThreads()">
+                        Refresh
+                    </button>
+                    <button class="btn btn-primary" id="runPipelineBtn" onclick="runPipeline()">
+                        Run Pipeline
+                    </button>
+                </div>
+            </div>
+            <div id="pendingThreads">
+                <div class="empty-state">
+                    <div class="empty-state__icon">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal__header">
+                <h3 class="modal__title">Draft Preview</h3>
+                <button class="modal__close" onclick="closePreviewModal()">&times;</button>
+            </div>
+            <div class="modal__body">
+                <div class="preview-section">
+                    <div class="preview-section__title">Email Details</div>
+                    <dl class="preview-meta">
+                        <dt>To:</dt>
+                        <dd id="previewTo">-</dd>
+                        <dt>Subject:</dt>
+                        <dd id="previewSubject">-</dd>
+                        <dt>Confidence:</dt>
+                        <dd><span class="confidence-badge" id="previewConfidence">-</span></dd>
+                    </dl>
+                </div>
+                <div class="preview-section">
+                    <div class="preview-section__title">Problem Summary</div>
+                    <div class="preview-content" id="previewProblem">-</div>
+                </div>
+                <div class="preview-section">
+                    <div class="preview-section__title">Draft Content</div>
+                    <div class="preview-content" id="previewContent">-</div>
+                </div>
+                <div class="preview-section">
+                    <div class="preview-section__title">Sources</div>
+                    <ul class="sources-list" id="previewSources"></ul>
+                </div>
+            </div>
+            <div class="modal__footer">
+                <button class="btn btn-secondary" onclick="closePreviewModal()">Cancel</button>
+                <button class="btn btn-primary" id="createDraftBtn" onclick="createDraft()">
+                    Create Draft in Gmail
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentThreadId = null;
+        const CACHE_KEY = 'drafts_cache';
+        const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+        // Session storage cache with TTL
+        const cache = {
+            get(key) {
+                try {
+                    const stored = sessionStorage.getItem(`${CACHE_KEY}_${key}`);
+                    if (!stored) return null;
+                    const { data, timestamp } = JSON.parse(stored);
+                    if (Date.now() - timestamp > CACHE_TTL) {
+                        sessionStorage.removeItem(`${CACHE_KEY}_${key}`);
+                        return null;
+                    }
+                    return data;
+                } catch (e) {
+                    return null;
+                }
+            },
+            set(key, data) {
+                try {
+                    sessionStorage.setItem(`${CACHE_KEY}_${key}`, JSON.stringify({
+                        data,
+                        timestamp: Date.now()
+                    }));
+                } catch (e) {
+                    console.warn('Cache write failed:', e);
+                }
+            },
+            remove(key) {
+                sessionStorage.removeItem(`${CACHE_KEY}_${key}`);
+            },
+            clear() {
+                // Clear all drafts cache entries
+                Object.keys(sessionStorage)
+                    .filter(k => k.startsWith(CACHE_KEY))
+                    .forEach(k => sessionStorage.removeItem(k));
+            }
+        };
+
+        // Auth check
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
+
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+
+                document.getElementById('authLoading').classList.add('hidden');
+                document.getElementById('logoutBtn').style.display = 'block';
+                loadStatus();
+                loadPendingThreads(false); // Don't force refresh on page load
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                window.location.href = '/admin/login';
+            }
+        }
+        checkAuth();
+
+        // Logout handler
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/login';
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
+
+        async function loadStatus() {
+            try {
+                const res = await fetch('/api/admin/drafts/status');
+                if (!res.ok) throw new Error('Failed to load status');
+                const data = await res.json();
+
+                const statusEl = document.getElementById('schedulerStatus');
+                if (data.polling_enabled && data.scheduler_running) {
+                    statusEl.textContent = 'Active';
+                    statusEl.className = 'stat-card__value active';
+                } else if (data.polling_enabled) {
+                    statusEl.textContent = 'Starting';
+                    statusEl.className = 'stat-card__value';
+                } else {
+                    statusEl.textContent = 'Disabled';
+                    statusEl.className = 'stat-card__value inactive';
+                }
+
+                document.getElementById('pollInterval').textContent = data.poll_interval_minutes || '-';
+
+                if (data.next_run) {
+                    const nextRun = new Date(data.next_run);
+                    document.getElementById('nextRun').textContent = nextRun.toLocaleTimeString();
+                } else {
+                    document.getElementById('nextRun').textContent = '-';
+                }
+            } catch (e) {
+                console.error('Failed to load status:', e);
+            }
+        }
+
+        async function loadPendingThreads(forceRefresh = true) {
+            const container = document.getElementById('pendingThreads');
+
+            // Check cache first (unless forcing refresh)
+            if (!forceRefresh) {
+                const cached = cache.get('pending_threads');
+                if (cached) {
+                    console.log('Using cached pending threads');
+                    renderPendingThreads(cached);
+                    return;
+                }
+            }
+
+            container.innerHTML = '<div class="empty-state"><div class="loading-spinner"></div> Loading...</div>';
+
+            try {
+                const res = await fetch('/api/admin/drafts/pending?limit=20');
+                if (!res.ok) throw new Error('Failed to load threads');
+                const threads = await res.json();
+
+                // Cache the results
+                cache.set('pending_threads', threads);
+                renderPendingThreads(threads);
+            } catch (e) {
+                console.error('Failed to load threads:', e);
+                container.innerHTML = '<div class="empty-state">Failed to load pending threads</div>';
+            }
+        }
+
+        function renderPendingThreads(threads) {
+            const container = document.getElementById('pendingThreads');
+
+            if (threads.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state__icon">&#x2714;</div>
+                        <p>No pending threads! All support threads have been handled.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `<div class="thread-list">${threads.map(t => renderThreadItem(t)).join('')}</div>`;
+        }
+
+        function renderThreadItem(t) {
+            return `
+                <div class="thread-item" data-thread-id="${t.thread_id}">
+                    <div class="thread-header" onclick="toggleThread('${t.thread_id}')">
+                        <div class="thread-toggle">&#x25B6;</div>
+                        <div class="thread-info">
+                            <div class="thread-subject" title="${escapeHtml(t.subject)}">${escapeHtml(t.subject)}</div>
+                            <div class="thread-meta">
+                                <span>${escapeHtml(t.from_address)}</span>
+                                <span>${t.message_count} message${t.message_count !== 1 ? 's' : ''}</span>
+                                <span>${t.received_at ? formatDate(t.received_at) : '-'}</span>
+                            </div>
+                        </div>
+                        <div class="thread-actions" onclick="event.stopPropagation()">
+                            <button class="btn btn-secondary btn-small" onclick="previewDraft('${t.thread_id}')">
+                                Preview Draft
+                            </button>
+                        </div>
+                    </div>
+                    <div class="thread-content" id="thread-content-${t.thread_id}">
+                        <div class="thread-loading">
+                            <span class="loading-spinner"></span> Loading thread...
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function toggleThread(threadId) {
+            const item = document.querySelector(`.thread-item[data-thread-id="${threadId}"]`);
+            const isExpanded = item.classList.contains('expanded');
+
+            // Collapse if already expanded
+            if (isExpanded) {
+                item.classList.remove('expanded');
+                return;
+            }
+
+            // Expand
+            item.classList.add('expanded');
+
+            // Check session storage cache first
+            const cached = cache.get(`thread_${threadId}`);
+            if (cached) {
+                console.log('Using cached thread details for', threadId);
+                renderThreadContent(threadId, cached);
+                return;
+            }
+
+            // Fetch thread details
+            const contentEl = document.getElementById(`thread-content-${threadId}`);
+            contentEl.innerHTML = '<div class="thread-loading"><span class="loading-spinner"></span> Loading thread...</div>';
+
+            try {
+                const res = await fetch(`/api/admin/drafts/thread/${threadId}`);
+                if (!res.ok) throw new Error('Failed to load thread');
+                const data = await res.json();
+
+                // Cache in session storage
+                cache.set(`thread_${threadId}`, data);
+                renderThreadContent(threadId, data);
+            } catch (e) {
+                console.error('Failed to load thread:', e);
+                contentEl.innerHTML = '<div class="thread-loading">Failed to load thread details</div>';
+            }
+        }
+
+        function renderThreadContent(threadId, data) {
+            const contentEl = document.getElementById(`thread-content-${threadId}`);
+
+            const messagesHtml = data.messages.map((m, i) => {
+                const isCyanview = m.is_cyanview;
+                const fromDisplay = m.from_name
+                    ? `${escapeHtml(m.from_name)} <span class="email">&lt;${escapeHtml(m.from_address)}&gt;</span>`
+                    : escapeHtml(m.from_address);
+
+                return `
+                    <div class="message-item ${isCyanview ? 'is-cyanview' : ''}">
+                        <div class="message-header">
+                            <div class="message-from ${isCyanview ? 'is-cyanview' : ''}">
+                                ${fromDisplay}
+                                ${isCyanview ? '<span class="badge badge-cyan">Cyanview</span>' : ''}
+                            </div>
+                            <div class="message-date">${m.date ? formatDateTime(m.date) : ''}</div>
+                        </div>
+                        <div class="message-snippet" id="msg-${threadId}-${i}">${escapeHtml(m.snippet || m.body.substring(0, 200))}</div>
+                        ${m.body.length > 200 ? `<span class="message-expand" onclick="toggleMessage('${threadId}', ${i}, \`${escapeHtml(m.body).replace(/`/g, '\\`')}\`)">Show full message</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            contentEl.innerHTML = `
+                <div class="thread-links">
+                    <a href="${data.gmail_link}" target="_blank">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                        Open in Gmail
+                    </a>
+                    <span style="color: #999; font-size: 0.85rem;">Thread ID: ${data.thread_id}</span>
+                </div>
+                <div class="message-list">
+                    ${messagesHtml}
+                </div>
+            `;
+        }
+
+        function toggleMessage(threadId, msgIndex, fullBody) {
+            const snippetEl = document.getElementById(`msg-${threadId}-${msgIndex}`);
+            const expandEl = snippetEl.nextElementSibling;
+
+            if (snippetEl.classList.contains('expanded')) {
+                snippetEl.classList.remove('expanded');
+                snippetEl.textContent = fullBody.substring(0, 200) + '...';
+                expandEl.textContent = 'Show full message';
+            } else {
+                snippetEl.classList.add('expanded');
+                snippetEl.textContent = fullBody;
+                expandEl.textContent = 'Show less';
+            }
+        }
+
+        async function previewDraft(threadId) {
+            currentThreadId = threadId;
+            const modal = document.getElementById('previewModal');
+            const createBtn = document.getElementById('createDraftBtn');
+
+            modal.classList.remove('hidden');
+            document.getElementById('previewTo').textContent = 'Loading...';
+            document.getElementById('previewSubject').textContent = 'Loading...';
+            document.getElementById('previewConfidence').textContent = 'Loading...';
+            document.getElementById('previewProblem').textContent = 'Loading...';
+            document.getElementById('previewContent').textContent = 'Loading...';
+            document.getElementById('previewSources').innerHTML = '<li>Loading...</li>';
+            createBtn.disabled = true;
+
+            try {
+                const res = await fetch(`/api/admin/drafts/preview/${threadId}`, { method: 'POST' });
+                if (!res.ok) throw new Error('Failed to generate preview');
+                const data = await res.json();
+
+                document.getElementById('previewTo').textContent = data.to_address;
+                document.getElementById('previewSubject').textContent = 'Re: ' + data.subject;
+                document.getElementById('previewProblem').textContent = data.problem_summary;
+                document.getElementById('previewContent').textContent = data.content;
+
+                const confEl = document.getElementById('previewConfidence');
+                const conf = Math.round(data.confidence * 100);
+                confEl.textContent = conf + '%';
+                confEl.className = 'confidence-badge ' + (conf >= 70 ? 'confidence-high' : conf >= 40 ? 'confidence-medium' : 'confidence-low');
+
+                const sourcesEl = document.getElementById('previewSources');
+                if (data.sources && data.sources.length > 0) {
+                    sourcesEl.innerHTML = data.sources.map(s => {
+                        if (s.url) {
+                            return `<li><a href="${s.url}" target="_blank">${escapeHtml(s.title)}</a></li>`;
+                        }
+                        return `<li>${escapeHtml(s.title)} (support case)</li>`;
+                    }).join('');
+                } else {
+                    sourcesEl.innerHTML = '<li>No sources found</li>';
+                }
+
+                createBtn.disabled = false;
+            } catch (e) {
+                console.error('Failed to preview draft:', e);
+                document.getElementById('previewContent').textContent = 'Failed to generate preview: ' + e.message;
+            }
+        }
+
+        async function createDraft() {
+            if (!currentThreadId) return;
+
+            const createBtn = document.getElementById('createDraftBtn');
+            createBtn.disabled = true;
+            createBtn.innerHTML = '<span class="loading-spinner"></span> Creating...';
+
+            try {
+                const res = await fetch(`/api/admin/drafts/create/${currentThreadId}`, { method: 'POST' });
+                if (!res.ok) throw new Error('Failed to create draft');
+                const data = await res.json();
+
+                showAlert('Draft created successfully! Draft ID: ' + data.draft_id, 'success');
+                closePreviewModal();
+                // Clear cache and force refresh since data changed
+                cache.clear();
+                loadPendingThreads(true);
+            } catch (e) {
+                console.error('Failed to create draft:', e);
+                showAlert('Failed to create draft: ' + e.message, 'error');
+            } finally {
+                createBtn.disabled = false;
+                createBtn.innerHTML = 'Create Draft in Gmail';
+            }
+        }
+
+        async function runPipeline() {
+            const btn = document.getElementById('runPipelineBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span> Running...';
+
+            try {
+                const res = await fetch('/api/admin/drafts/run?max_drafts=5', { method: 'POST' });
+                if (!res.ok) throw new Error('Failed to run pipeline');
+                const data = await res.json();
+
+                showAlert(`Pipeline completed! Checked: ${data.threads_checked}, Created: ${data.drafts_created}, Skipped: ${data.skipped}`, 'success');
+                // Clear cache and force refresh since data changed
+                cache.clear();
+                loadPendingThreads(true);
+            } catch (e) {
+                console.error('Failed to run pipeline:', e);
+                showAlert('Failed to run pipeline: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Run Pipeline';
+            }
+        }
+
+        function closePreviewModal() {
+            document.getElementById('previewModal').classList.add('hidden');
+            currentThreadId = null;
+        }
+
+        function showAlert(message, type) {
+            const alertArea = document.getElementById('alertArea');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertArea.appendChild(alert);
+
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString();
+        }
+
+        function formatDateTime(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closePreviewModal();
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('previewModal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) closePreviewModal();
+        });
+    </script>
+</body>
+</html>

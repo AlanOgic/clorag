@@ -46,6 +46,9 @@ dependencies = [
     "jinja2>=3.1.0",
     "slowapi>=0.1.9",
     "itsdangerous>=2.2.0",  # Signed cookies for admin sessions
+
+    # Background Scheduling
+    "apscheduler>=3.10.0",  # Draft creation polling
 ]
 
 [project.optional-dependencies]
@@ -63,6 +66,7 @@ ingest-gmail = "clorag.scripts.ingest_gmail:main"
 ingest-curated = "clorag.scripts.ingest_curated:main"
 rag-web = "clorag.scripts.run_web:main"
 enrich-cameras = "clorag.scripts.enrich_model_codes:main"
+draft-support = "clorag.scripts.draft_support:main"
 
 [build-system]
 requires = ["hatchling"]

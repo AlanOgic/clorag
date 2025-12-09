@@ -82,6 +82,28 @@ class Settings(BaseSettings):
         description="SearXNG instance URL for web searches",
     )
 
+    # Draft Creation Settings
+    draft_polling_enabled: bool = Field(
+        default=False,
+        description="Enable automatic draft creation polling",
+    )
+    draft_poll_interval_minutes: int = Field(
+        default=10,
+        description="Interval in minutes for polling Gmail for new threads",
+    )
+    draft_from_email: str = Field(
+        default="support@cyanview.com",
+        description="From address for draft emails",
+    )
+    draft_max_per_run: int = Field(
+        default=5,
+        description="Maximum drafts to create per scheduled run",
+    )
+    draft_token_path: Path = Field(
+        default=Path("token_drafts.json"),
+        description="OAuth token file for draft creation (with compose scope)",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
