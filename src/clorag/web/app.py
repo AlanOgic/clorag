@@ -454,7 +454,7 @@ async def synthesize_answer(
     messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
 
     response = await get_anthropic().messages.create(
-        model=settings.haiku_model,
+        model=settings.sonnet_model,
         max_tokens=1500,
         system=SYNTHESIS_SYSTEM_PROMPT,
         messages=messages,
@@ -488,7 +488,7 @@ async def synthesize_answer_stream(
     messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
 
     async with get_anthropic().messages.stream(
-        model=settings.haiku_model,
+        model=settings.sonnet_model,
         max_tokens=1500,
         system=SYNTHESIS_SYSTEM_PROMPT,
         messages=messages,
@@ -1682,7 +1682,7 @@ async def api_search_debug(
         llm_response = "No relevant information found for your query."
     else:
         response = await get_anthropic().messages.create(
-            model=settings.haiku_model,
+            model=settings.sonnet_model,
             max_tokens=1500,
             system=SYNTHESIS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],

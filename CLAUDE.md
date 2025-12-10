@@ -8,7 +8,7 @@ CLORAG is a Multi-RAG (Retrieval-Augmented Generation) agent for Cyanview suppor
 - **Docusaurus documentation** from the support site
 - **Gmail support threads** (curated and anonymized)
 
-Uses hybrid search (dense + sparse vectors with RRF fusion) for optimal retrieval of technical product information.
+Uses hybrid search (dense + sparse vectors with RRF fusion) for optimal retrieval of technical product information. Answer synthesis uses Claude Sonnet 4.5 for high-quality responses.
 
 ## Development Commands
 

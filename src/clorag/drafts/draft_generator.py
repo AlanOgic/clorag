@@ -82,7 +82,7 @@ class DraftResponseGenerator:
         self._client = anthropic.AsyncAnthropic(
             api_key=settings.anthropic_api_key.get_secret_value()
         )
-        self._model = settings.haiku_model
+        self._model = settings.sonnet_model
 
     async def generate_draft(
         self,

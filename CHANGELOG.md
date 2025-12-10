@@ -2,6 +2,14 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.6] - 2025-12-10
+
+### Changed
+- **Upgraded LLM to Claude Sonnet 4.5** for RAG search synthesis and draft generation
+  - Improved answer quality and accuracy for support queries
+  - Better contextual understanding and response generation
+  - Applies to: search API, streaming responses, search debug, and draft auto-replies
+
 ## [0.3.5] - 2025-12-09
 
 ### Added
