@@ -187,6 +187,71 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
+        /* Info Section */
+        .info-section {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1rem 1rem;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+        }
+
+        .info-card h3 {
+            font-size: 1rem;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .info-card h3 svg {
+            width: 20px;
+            height: 20px;
+            color: var(--cyan-dark);
+        }
+
+        .info-card p {
+            font-size: 0.9rem;
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 0.75rem;
+        }
+
+        .info-card p:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-disclaimer {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin-top: 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .info-disclaimer svg {
+            width: 20px;
+            height: 20px;
+            color: #856404;
+            flex-shrink: 0;
+            margin-top: 0.1rem;
+        }
+
+        .info-disclaimer p {
+            font-size: 0.85rem;
+            color: #856404;
+            margin: 0;
+        }
+
         /* Results Section */
         .results-section {
             max-width: 900px;
@@ -450,14 +515,24 @@
             opacity: 0.5;
         }
 
-        /* Footer */
+        /* Footer - Sticky */
         .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             text-align: center;
-            padding: 2rem;
+            padding: 0.75rem 1rem;
             background: #f6f6f6;
             color: #606770;
-            font-size: 0.9rem;
-            margin-top: 3rem;
+            font-size: 0.85rem;
+            border-top: 1px solid #e0e0e0;
+            z-index: 50;
+        }
+
+        /* Add padding to body to prevent content from being hidden behind sticky footer */
+        body {
+            padding-bottom: 50px;
         }
 
         .footer a {
@@ -839,6 +914,32 @@
                         <span>Support Cases</span>
                     </label>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Info Section -->
+    <section class="info-section">
+        <div class="info-card">
+            <h3>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                How does this work?
+            </h3>
+            <p>
+                This AI search uses <strong>RAG (Retrieval-Augmented Generation)</strong> technology. When you ask a question, the system searches through Cyanview's official documentation and anonymized support cases to find relevant information, then uses AI to synthesize a helpful answer based on those sources.
+            </p>
+            <p>
+                The knowledge base includes product manuals, configuration guides, and real-world troubleshooting solutions from our support team's experience with broadcast and production environments.
+            </p>
+            <div class="info-disclaimer">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p>
+                    <strong>Disclaimer:</strong> Answers are AI-generated and may contain inaccuracies. Always verify critical information against official documentation or contact Cyanview support for production-critical configurations.
+                </p>
             </div>
         </div>
     </section>
