@@ -19,6 +19,9 @@ services:
       - ANALYTICS_DATABASE_PATH=${ANALYTICS_DATABASE_PATH:-data/analytics.db}
     volumes:
       - ./data:/app/data
+      - ./credentials.json:/app/credentials.json:ro
+      - ./token.json:/app/token.json
+      - ./token_drafts.json:/app/token_drafts.json
     networks:
       - clorag-network
 
