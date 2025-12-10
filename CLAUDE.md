@@ -7,8 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 CLORAG is a Multi-RAG (Retrieval-Augmented Generation) agent for Cyanview support that combines:
 - **Docusaurus documentation** from the support site
 - **Gmail support threads** (curated and anonymized)
+- **Custom knowledge documents** (manually added via admin UI)
 
-Uses hybrid search (dense + sparse vectors with RRF fusion) for optimal retrieval of technical product information. Answer synthesis uses Claude Sonnet 4.5 for high-quality responses.
+Uses hybrid search (dense + sparse vectors with RRF fusion) for optimal retrieval of technical product information. Answer synthesis uses Claude Sonnet 4.5 for high-quality responses with automatic Mermaid diagram generation for integration scenarios.
 
 ## Development Commands
 
@@ -44,9 +45,9 @@ uv run pytest
 
 ### Data Flow
 ```
-Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claude Haiku synthesis → Response
+Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claude Sonnet 4.5 synthesis → Response
            ↓                                       ↓
-   SparseEmbeddingsClient (BM25)            Hybrid RRF fusion
+   SparseEmbeddingsClient (BM25)            Hybrid RRF fusion (3 collections)
 ```
 
 ### Key Components
@@ -67,21 +68,29 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 - `quality_controller.py` - Claude Sonnet for QC refinement of resolved cases
 - `camera_extractor.py` - LLM-based camera info extraction from docs/support cases
 
+**Services Layer** (`src/clorag/services/`):
+- `custom_docs.py` - `CustomDocumentService` for CRUD operations on custom knowledge documents (chunking, embedding, Qdrant storage)
+
 **Web Layer** (`src/clorag/web/`):
-- `app.py` - FastAPI with streaming responses, hybrid RRF search across both collections
+- `app.py` - FastAPI with streaming responses, hybrid RRF search across all 3 collections
 - Camera management routes: public `/cameras`, admin `/admin/cameras`
+- Knowledge base management: `/admin/knowledge` for custom documents
 - Analytics dashboard: `/admin/analytics` with search stats and history
+- Draft management: `/admin/drafts` for auto-reply system
 - REST API for cameras: `GET/POST/PUT/DELETE /api/cameras`
+- REST API for knowledge: `GET/POST/PUT/DELETE /api/admin/knowledge`
 - REST API for analytics: `GET /api/admin/search-stats`
 
 **Models Layer** (`src/clorag/models/`):
 - `camera.py` - Camera Pydantic models with CameraSource enum for tracking data origin
+- `custom_document.py` - Custom document models with DocumentCategory enum, full metadata support
 
 ### Vector Collections
 
-Two Qdrant collections with named vectors:
+Three Qdrant collections with named vectors:
 - `docusaurus_docs` - Documentation chunks
 - `gmail_cases` - Anonymized support cases
+- `custom_docs` - Custom knowledge documents (admin-managed)
 
 Each collection uses:
 - `dense` - 1024-dim voyage-context-3 embeddings
@@ -107,7 +116,7 @@ Settings loaded via `clorag.config.get_settings()` (cached singleton).
 VectorStore uses `AsyncQdrantClient`. All search methods are async and use `asyncio.gather()` for parallel dual-collection search.
 
 ### Hybrid Search
-Search endpoints generate both dense and sparse query vectors, then use RRF (Reciprocal Rank Fusion) to combine semantic and keyword results.
+Search endpoints generate both dense and sparse query vectors, then use RRF (Reciprocal Rank Fusion) to combine semantic and keyword results across all three collections (docs, cases, custom_docs).
 
 ### Contextualized Embeddings
 Documents are embedded using `voyage-context-3`'s `contextualized_embed()` which encodes chunk content with full document context for improved retrieval.
@@ -119,7 +128,16 @@ Gmail threads are anonymized before LLM analysis using placeholder tokens (`[SER
 During ingestion, camera information is automatically extracted from documentation and support cases using Claude Haiku. Data is merged using upsert pattern to combine info from multiple sources.
 
 ### Admin Authentication
-Camera admin routes are protected by `X-Admin-Password` header. Set `ADMIN_PASSWORD` env var to enable admin access.
+Admin routes are protected by session-based authentication. Set `ADMIN_PASSWORD` env var to enable admin access. Login at `/admin/login`.
+
+### Mermaid Diagram Generation
+Claude automatically generates Mermaid.js diagrams when explaining camera connections, network topology, or signal flows. Diagrams are rendered client-side using Mermaid.js v11 ESM modules with Cyanview color theming.
+
+### Custom Knowledge Documents
+Admin-managed documents stored in `custom_docs` Qdrant collection. Features:
+- 9 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, internal, other
+- Full metadata: title, tags, URL reference, expiration date, notes
+- Chunked, embedded, and included in hybrid RAG search
 
 ## Deployment
 

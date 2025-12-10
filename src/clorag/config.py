@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     qdrant_cases_collection: str = Field(
         default="gmail_cases", description="Collection for Gmail cases"
     )
+    qdrant_custom_docs_collection: str = Field(
+        default="custom_docs", description="Collection for custom knowledge documents"
+    )
 
     # Voyage AI
     voyage_model: str = Field(default="voyage-context-3", description="Voyage embedding model")

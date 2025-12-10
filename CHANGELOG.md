@@ -2,6 +2,43 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.7] - 2025-12-10
+
+### Added
+- **Mermaid Diagram Generation**
+  - Claude now autonomously generates Mermaid.js diagrams when explaining camera connections, network topology, or signal flows
+  - Updated `SYNTHESIS_SYSTEM_PROMPT` with diagram instructions for integration scenarios
+  - Added Mermaid.js v11 (ESM module) with Cyanview color theming
+  - Diagrams render automatically after streaming completes using `renderMermaidDiagrams()` async function
+
+- **Custom Knowledge Base**
+  - New `custom_docs` Qdrant collection for manually added knowledge documents
+  - Full metadata support: title, tags, category, URL reference, expiration date, notes
+  - 9 document categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, internal, other
+  - Admin UI at `/admin/knowledge` with Add/Browse tabs, edit modal, and filtering
+  - Custom documents are chunked, embedded, and included in hybrid RAG search alongside docs and support cases
+
+### New Files
+- `src/clorag/models/custom_document.py` - Pydantic models for custom documents
+- `src/clorag/services/custom_docs.py` - `CustomDocumentService` with CRUD and embedding
+- `src/clorag/web/templates/admin_knowledge.html` - Admin UI for knowledge management
+
+### API Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/knowledge` | List custom documents |
+| GET | `/api/admin/knowledge/categories` | Get available categories |
+| GET | `/api/admin/knowledge/{id}` | Get document by ID |
+| POST | `/api/admin/knowledge` | Create new document |
+| PUT | `/api/admin/knowledge/{id}` | Update document |
+| DELETE | `/api/admin/knowledge/{id}` | Delete document |
+
+### Changed
+- `VectorStore.hybrid_search_rrf()` now searches all 3 collections (docs, cases, custom_docs)
+- `_build_context()` handles custom_docs source type for Claude synthesis
+- Added `ChunkCollection.CUSTOM` enum value for chunk editor
+- Admin dashboard now includes Knowledge Base card
+
 ## [0.3.6] - 2025-12-10
 
 ### Changed

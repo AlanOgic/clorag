@@ -413,6 +413,7 @@
                     <li class="docs-nav__item"><a href="#architecture" class="docs-nav__link">Architecture</a></li>
                     <li class="docs-nav__item"><a href="#search-system" class="docs-nav__link">Search System</a></li>
                     <li class="docs-nav__item"><a href="#data-ingestion" class="docs-nav__link">Data Ingestion</a></li>
+                    <li class="docs-nav__item"><a href="#knowledge-base" class="docs-nav__link">Knowledge Base</a></li>
                     <li class="docs-nav__item"><a href="#conversations" class="docs-nav__link">Conversations</a></li>
                     <li class="docs-nav__item"><a href="#draft-management" class="docs-nav__link">Draft Management</a></li>
                     <li class="docs-nav__item"><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
@@ -437,6 +438,7 @@
                 <ul>
                     <li><strong>Documentation</strong> - Official Docusaurus support documentation</li>
                     <li><strong>Support Cases</strong> - Curated and anonymized Gmail support threads</li>
+                    <li><strong>Custom Knowledge</strong> - Admin-managed documents with full metadata</li>
                     <li><strong>Camera Database</strong> - Structured camera compatibility information</li>
                 </ul>
 
@@ -445,11 +447,11 @@
     ↓
 Embeddings Generation (Voyage AI voyage-context-3)
     ↓
-Hybrid Search (Dense + Sparse vectors)
+Hybrid Search (Dense + Sparse vectors across 3 collections)
     ↓
 RRF Fusion (Reciprocal Rank Fusion)
     ↓
-Claude Haiku 4.5 Synthesis
+Claude Sonnet 4.5 Synthesis + Mermaid Diagrams
     ↓
 Streaming Response</code></pre>
 
@@ -459,7 +461,8 @@ Streaming Response</code></pre>
                     <tr><td>Vector Database</td><td>Qdrant</td></tr>
                     <tr><td>Dense Embeddings</td><td>Voyage AI (voyage-context-3)</td></tr>
                     <tr><td>Sparse Embeddings</td><td>FastEmbed BM25</td></tr>
-                    <tr><td>LLM Synthesis</td><td>Claude Haiku 4.5</td></tr>
+                    <tr><td>LLM Synthesis</td><td>Claude Sonnet 4.5</td></tr>
+                    <tr><td>Diagram Rendering</td><td>Mermaid.js v11 (ESM)</td></tr>
                     <tr><td>Web Framework</td><td>FastAPI + Jinja2</td></tr>
                     <tr><td>Database</td><td>SQLite (cameras + analytics)</td></tr>
                     <tr><td>Session Management</td><td>itsdangerous (signed cookies)</td></tr>
@@ -476,11 +479,12 @@ Streaming Response</code></pre>
                 </ul>
 
                 <h3>Collections</h3>
-                <p>Two Qdrant collections store the indexed data:</p>
+                <p>Three Qdrant collections store the indexed data:</p>
                 <table>
                     <tr><th>Collection</th><th>Content</th><th>Vectors</th></tr>
                     <tr><td><code>docusaurus_docs</code></td><td>Documentation pages</td><td>dense + sparse</td></tr>
                     <tr><td><code>gmail_cases</code></td><td>Anonymized support cases</td><td>dense + sparse</td></tr>
+                    <tr><td><code>custom_docs</code></td><td>Admin-managed knowledge</td><td>dense + sparse</td></tr>
                 </table>
 
                 <h3>Retrieval Settings</h3>
@@ -489,6 +493,16 @@ Streaming Response</code></pre>
                     <li>Used for synthesis: 8 top chunks</li>
                     <li>Max chunk size: 2000 characters</li>
                 </ul>
+
+                <h3>Mermaid Diagram Generation</h3>
+                <p>Claude autonomously generates Mermaid.js diagrams when explaining integration scenarios:</p>
+                <ul>
+                    <li><strong>Camera connections</strong> - How to connect cameras to RIO/RCP/CI0/VP4</li>
+                    <li><strong>Network topology</strong> - IP setup and network architecture</li>
+                    <li><strong>Signal flow</strong> - Video, control, and tally routing</li>
+                    <li><strong>Multi-device setups</strong> - Complex integration scenarios</li>
+                </ul>
+                <p>Diagrams are rendered client-side using Mermaid.js v11 ESM modules with Cyanview color theming (navy blue nodes, cyan connections).</p>
 
                 <h2 id="data-ingestion">Data Ingestion Pipelines</h2>
 
@@ -741,6 +755,57 @@ uv run ingest-curated --offset 600 --max-threads 300</code></pre>
                     </tr>
                 </table>
 
+                <h2 id="knowledge-base">Custom Knowledge Base</h2>
+
+                <h3>Overview</h3>
+                <p>The Knowledge Base allows administrators to add custom documents that are included in RAG search alongside documentation and support cases. This is useful for:</p>
+                <ul>
+                    <li>Internal technical notes not published to documentation</li>
+                    <li>Firmware release notes and known issues</li>
+                    <li>Troubleshooting guides from field experience</li>
+                    <li>Temporary information with expiration dates</li>
+                    <li>FAQ entries and best practices</li>
+                </ul>
+
+                <h3>Document Categories</h3>
+                <table>
+                    <tr><th>Category</th><th>Description</th></tr>
+                    <tr><td>product_info</td><td>Product specifications, features, capabilities</td></tr>
+                    <tr><td>troubleshooting</td><td>Problem-solution guides</td></tr>
+                    <tr><td>configuration</td><td>Setup and configuration instructions</td></tr>
+                    <tr><td>firmware</td><td>Firmware updates, release notes</td></tr>
+                    <tr><td>release_notes</td><td>Software/hardware release documentation</td></tr>
+                    <tr><td>faq</td><td>Frequently asked questions</td></tr>
+                    <tr><td>best_practices</td><td>Recommended approaches and tips</td></tr>
+                    <tr><td>internal</td><td>Internal team knowledge</td></tr>
+                    <tr><td>other</td><td>Uncategorized content</td></tr>
+                </table>
+
+                <h3>Document Metadata</h3>
+                <ul>
+                    <li><strong>Title</strong> - Display name for the document</li>
+                    <li><strong>Content</strong> - Full text content (auto-chunked for embedding)</li>
+                    <li><strong>Category</strong> - One of the 9 categories above</li>
+                    <li><strong>Tags</strong> - Comma-separated keywords for filtering</li>
+                    <li><strong>URL Reference</strong> - Optional link to source or related page</li>
+                    <li><strong>Expiration Date</strong> - Optional date when document should be excluded from search</li>
+                    <li><strong>Notes</strong> - Internal admin notes (not included in search)</li>
+                </ul>
+
+                <h3>Admin Interface</h3>
+                <p>Access the Knowledge Base manager at <a href="/admin/knowledge">/admin/knowledge</a>:</p>
+                <ul>
+                    <li><strong>Add Document</strong> - Create new documents with full metadata</li>
+                    <li><strong>Browse Documents</strong> - List all documents with filtering by category and expired status</li>
+                    <li><strong>Edit Document</strong> - Update content and metadata (triggers re-embedding)</li>
+                    <li><strong>Delete Document</strong> - Remove document and all its chunks from the vector store</li>
+                </ul>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Chunking and Embedding</div>
+                    <p>Documents are automatically split into 1000-character chunks with 100-character overlap, then embedded using voyage-context-3 (dense) and BM25 (sparse). All chunks from a document share the same metadata and parent_doc_id for grouping.</p>
+                </div>
+
                 <h3 id="conversations">Conversation Sessions</h3>
                 <p>The search system supports follow-up conversations with context retention:</p>
                 <ul>
@@ -946,6 +1011,53 @@ uv run draft-support --max 20</code></pre>
                     <span class="endpoint__path">/api/admin/cameras/{id}</span>
                 </div>
                 <p>Delete a camera entry. Requires authentication.</p>
+
+                <h3>Knowledge Base Endpoints</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/knowledge</span>
+                </div>
+                <p>List all custom documents with optional filters: <code>category</code>, <code>include_expired</code>. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/knowledge/categories</span>
+                </div>
+                <p>Get list of available document categories. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/knowledge/{id}</span>
+                </div>
+                <p>Get a single custom document by ID. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/knowledge</span>
+                </div>
+                <p>Create a new custom document. Chunks, embeds, and stores in Qdrant. Requires authentication.</p>
+                <pre><code>{
+  "title": "RIO v2.5.0 Release Notes",
+  "content": "Full document content here...",
+  "category": "firmware",
+  "tags": ["rio", "firmware", "v2.5.0"],
+  "url_reference": "https://...",
+  "expires_at": "2025-12-31",
+  "notes": "Internal admin notes"
+}</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--put">PUT</span>
+                    <span class="endpoint__path">/api/admin/knowledge/{id}</span>
+                </div>
+                <p>Update a custom document. If content changes, re-embeds all chunks. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--delete">DELETE</span>
+                    <span class="endpoint__path">/api/admin/knowledge/{id}</span>
+                </div>
+                <p>Delete a custom document and all its chunks from Qdrant. Requires authentication.</p>
 
                 <h3>Analytics Endpoints</h3>
 

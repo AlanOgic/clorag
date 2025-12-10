@@ -40,6 +40,14 @@ from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import VectorStore
 from clorag.models.camera import Camera, CameraCreate, CameraSource, CameraUpdate
+from clorag.models.custom_document import (
+    CustomDocument,
+    CustomDocumentCreate,
+    CustomDocumentListItem,
+    CustomDocumentUpdate,
+    DocumentCategory,
+)
+from clorag.services.custom_docs import CustomDocumentService
 
 # Initialize logger
 logger = structlog.get_logger()
@@ -81,6 +89,14 @@ async def lifespan(app: FastAPI):
     """Application lifespan with background scheduler for draft creation."""
     global _scheduler
     settings = get_settings()
+
+    # Ensure all Qdrant collections exist (including custom_docs)
+    try:
+        vs = get_vectorstore()
+        await vs.ensure_collections(hybrid=True)
+        logger.info("Qdrant collections ensured")
+    except Exception as e:
+        logger.warning("Failed to ensure Qdrant collections", error=str(e))
 
     if settings.draft_polling_enabled:
         from clorag.drafts import check_and_create_drafts
@@ -143,6 +159,23 @@ FORMAT RULES:
 - Code blocks for IP addresses, commands, config values
 - Length adapts to complexity - brief for simple, detailed for complex
 
+DIAGRAMS (Mermaid):
+When explaining integration setups, camera connections, or signal flows, include a Mermaid diagram to visualize the architecture. Use this format:
+
+```mermaid
+graph LR
+    A[Camera] -->|Protocol| B[RIO]
+    B -->|Ethernet| C[RCP]
+```
+
+Include diagrams when:
+- Explaining how to connect cameras to RIO/RCP/CI0/VP4
+- Describing network topology or IP setup
+- Showing signal flow (video, control, tally)
+- Multi-device integration scenarios
+
+Keep diagrams simple and focused. Use `graph LR` for signal flows, `graph TB` for hierarchies.
+
 CONTENT RULES:
 - Use ONLY the provided context - never invent
 - Sound natural - avoid "based on the context" or "according to the documentation"
@@ -167,6 +200,7 @@ _embeddings: EmbeddingsClient | None = None
 _sparse_embeddings: SparseEmbeddingsClient | None = None
 _anthropic: anthropic.AsyncAnthropic | None = None
 _analytics_db: AnalyticsDatabase | None = None
+_custom_docs_service: CustomDocumentService | None = None
 
 
 def get_vectorstore() -> VectorStore:
@@ -209,6 +243,14 @@ def get_analytics_db() -> AnalyticsDatabase:
         settings = get_settings()
         _analytics_db = AnalyticsDatabase(settings.analytics_database_path)
     return _analytics_db
+
+
+def get_custom_docs_service() -> CustomDocumentService:
+    """Get or create CustomDocumentService instance."""
+    global _custom_docs_service
+    if _custom_docs_service is None:
+        _custom_docs_service = CustomDocumentService()
+    return _custom_docs_service
 
 
 # =============================================================================
@@ -322,8 +364,12 @@ def _build_context(chunks: list[dict], max_chunks: int = 8) -> str:
     parts = []
     for i, chunk in enumerate(chunks[:max_chunks], 1):
         text = chunk.get("text", "")[:2000]
-        if chunk.get("source_type") == "documentation":
+        source_type = chunk.get("source_type")
+        if source_type == "documentation":
             parts.append(f"[{i} Doc: {chunk.get('url', '')}]\n{text}")
+        elif source_type == "custom_docs":
+            url = chunk.get("url") or "Custom Knowledge"
+            parts.append(f"[{i} Knowledge: {url}]\n{text}")
         else:
             parts.append(f"[{i} Case: {chunk.get('subject', 'Support')}]\n{text}")
     return "\n---\n".join(parts)
@@ -559,7 +605,7 @@ async def _perform_search(req: SearchRequest) -> tuple[list[SearchResult], list[
             })
 
     else:
-        # Hybrid RRF search across both collections
+        # Hybrid RRF search across all collections (docs, cases, custom_docs)
         hybrid = await vs.hybrid_search_rrf(dense_vector, sparse_vector, limit=req.limit)
         for item in hybrid:
             source_type = item.payload.get("_source", "unknown")
@@ -579,6 +625,23 @@ async def _perform_search(req: SearchRequest) -> tuple[list[SearchResult], list[
                     "source_type": "documentation",
                     "url": item.payload.get("url"),
                     "title": item.payload.get("title", "Untitled"),
+                })
+            elif source_type == "custom_docs":
+                results.append(
+                    SearchResult(
+                        score=item.score,
+                        source="custom_docs",
+                        title=item.payload.get("title", "Custom Knowledge"),
+                        url=item.payload.get("url_reference"),
+                        snippet=_truncate(item.payload.get("text", ""), 300),
+                        metadata=item.payload,
+                    )
+                )
+                chunks_for_synthesis.append({
+                    "text": item.payload.get("text", ""),
+                    "source_type": "custom_docs",
+                    "url": item.payload.get("url_reference"),
+                    "title": item.payload.get("title", "Custom Knowledge"),
                 })
             else:
                 results.append(
@@ -1232,6 +1295,7 @@ class ChunkCollection(str, Enum):
 
     DOCS = "docusaurus_docs"
     CASES = "gmail_cases"
+    CUSTOM = "custom_docs"
 
 
 class ChunkListItem(BaseModel):
@@ -1507,6 +1571,114 @@ async def api_chunk_delete(
     logger.info("Deleted chunk", chunk_id=chunk_id, collection=collection)
 
     return {"status": "deleted", "id": chunk_id, "collection": collection}
+
+
+# =============================================================================
+# Custom Knowledge Document Routes (Admin)
+# =============================================================================
+
+
+@app.get("/admin/knowledge", response_class=HTMLResponse)
+async def admin_knowledge(request: Request):
+    """Admin custom knowledge management page."""
+    return templates.TemplateResponse("admin_knowledge.html", {"request": request})
+
+
+@app.get(
+    "/api/admin/knowledge",
+    response_model=list[CustomDocumentListItem],
+    tags=["Knowledge"],
+)
+async def api_knowledge_list(
+    category: str | None = None,
+    include_expired: bool = False,
+    limit: int = 50,
+    _: bool = Depends(verify_admin),
+):
+    """List all custom documents."""
+    service = get_custom_docs_service()
+    return await service.list_documents(
+        limit=limit,
+        category=category,
+        include_expired=include_expired,
+    )
+
+
+@app.get(
+    "/api/admin/knowledge/categories",
+    tags=["Knowledge"],
+)
+async def api_knowledge_categories(_: bool = Depends(verify_admin)):
+    """Get available document categories."""
+    service = get_custom_docs_service()
+    return await service.get_categories()
+
+
+@app.get(
+    "/api/admin/knowledge/{doc_id}",
+    response_model=CustomDocument,
+    tags=["Knowledge"],
+)
+async def api_knowledge_get(
+    doc_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Get a custom document by ID."""
+    service = get_custom_docs_service()
+    doc = await service.get_document(doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
+
+
+@app.post(
+    "/api/admin/knowledge",
+    response_model=CustomDocument,
+    tags=["Knowledge"],
+)
+@limiter.limit("10/minute")
+async def api_knowledge_create(
+    request: Request,
+    doc: Annotated[CustomDocumentCreate, Body()],
+    _: bool = Depends(verify_admin),
+):
+    """Create a new custom document."""
+    service = get_custom_docs_service()
+    return await service.create_document(doc, created_by="admin")
+
+
+@app.put(
+    "/api/admin/knowledge/{doc_id}",
+    response_model=CustomDocument,
+    tags=["Knowledge"],
+)
+@limiter.limit("10/minute")
+async def api_knowledge_update(
+    request: Request,
+    doc_id: str,
+    updates: Annotated[CustomDocumentUpdate, Body()],
+    _: bool = Depends(verify_admin),
+):
+    """Update a custom document."""
+    service = get_custom_docs_service()
+    doc = await service.update_document(doc_id, updates)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
+
+
+@app.delete("/api/admin/knowledge/{doc_id}", tags=["Knowledge"])
+@limiter.limit("10/minute")
+async def api_knowledge_delete(
+    request: Request,
+    doc_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Delete a custom document."""
+    service = get_custom_docs_service()
+    if not await service.delete_document(doc_id):
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"status": "deleted", "id": doc_id}
 
 
 # =============================================================================

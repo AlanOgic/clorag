@@ -57,6 +57,7 @@ class VectorStore:
         self._dimensions = dimensions or settings.voyage_dimensions
         self._docs_collection = settings.qdrant_docs_collection
         self._cases_collection = settings.qdrant_cases_collection
+        self._custom_docs_collection = settings.qdrant_custom_docs_collection
 
         # Parse URL to extract host, port, https, and prefix for reverse proxy support
         parsed = urlparse(self._url)
@@ -85,13 +86,22 @@ class VectorStore:
         """Get cases collection name."""
         return self._cases_collection
 
+    @property
+    def custom_docs_collection(self) -> str:
+        """Get custom docs collection name."""
+        return self._custom_docs_collection
+
     async def ensure_collections(self, hybrid: bool = True) -> None:
-        """Ensure both collections exist with correct configuration.
+        """Ensure all collections exist with correct configuration.
 
         Args:
             hybrid: If True, create collections with dense + sparse vector support.
         """
-        for collection_name in [self._docs_collection, self._cases_collection]:
+        for collection_name in [
+            self._docs_collection,
+            self._cases_collection,
+            self._custom_docs_collection,
+        ]:
             if hybrid:
                 await self._ensure_collection_hybrid(collection_name)
             else:
@@ -490,36 +500,77 @@ class VectorStore:
             limit=limit,
         )
 
-    async def hybrid_search_rrf(
+    async def search_custom_docs_hybrid(
         self,
         dense_vector: list[float],
         sparse_vector: SparseVector,
         limit: int = 10,
     ) -> list[SearchResult]:
-        """Search across both collections with RRF hybrid search in parallel.
+        """Hybrid search in custom docs collection.
+
+        Args:
+            dense_vector: Dense embedding vector.
+            sparse_vector: Sparse BM25 vector.
+            limit: Max results.
+
+        Returns:
+            Search results from custom docs collection.
+        """
+        try:
+            return await self.search_hybrid_rrf(
+                collection=self._custom_docs_collection,
+                dense_vector=dense_vector,
+                sparse_vector=sparse_vector,
+                limit=limit,
+            )
+        except Exception:
+            # Collection might not exist yet - return empty results
+            return []
+
+    async def hybrid_search_rrf(
+        self,
+        dense_vector: list[float],
+        sparse_vector: SparseVector,
+        limit: int = 10,
+        include_custom_docs: bool = True,
+    ) -> list[SearchResult]:
+        """Search across all collections with RRF hybrid search in parallel.
 
         Args:
             dense_vector: Dense embedding vector.
             sparse_vector: Sparse BM25 vector.
             limit: Max results per collection.
+            include_custom_docs: Whether to include custom docs collection.
 
         Returns:
-            Merged and RRF-sorted results from both collections.
+            Merged and RRF-sorted results from all collections.
         """
-        # Search both collections in parallel for better performance
-        docs_results, cases_results = await asyncio.gather(
+        # Build list of search tasks
+        search_tasks = [
             self.search_docs_hybrid(dense_vector, sparse_vector, limit),
             self.search_cases_hybrid(dense_vector, sparse_vector, limit),
-        )
+        ]
+        if include_custom_docs:
+            search_tasks.append(
+                self.search_custom_docs_hybrid(dense_vector, sparse_vector, limit)
+            )
+
+        # Search collections in parallel for better performance
+        results = await asyncio.gather(*search_tasks)
+        docs_results = results[0]
+        cases_results = results[1]
+        custom_results = results[2] if include_custom_docs else []
 
         # Mark source in payload
         for r in docs_results:
             r.payload["_source"] = "documentation"
         for r in cases_results:
             r.payload["_source"] = "gmail_case"
+        for r in custom_results:
+            r.payload["_source"] = "custom_docs"
 
         # Merge and sort by RRF score
-        all_results = docs_results + cases_results
+        all_results = docs_results + cases_results + custom_results
         all_results.sort(key=lambda x: x.score, reverse=True)
 
         return all_results[:limit]

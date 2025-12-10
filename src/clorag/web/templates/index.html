@@ -8,6 +8,27 @@
     <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
     <!-- Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Mermaid diagram rendering (v11) -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#003366',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#0077b6',
+                lineColor: '#00a8e8',
+                secondaryColor: '#e8f4fc',
+                tertiaryColor: '#f8f9fa'
+            },
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            }
+        });
+        window.mermaid = mermaid;
+    </script>
     <style>
         :root {
             --ifm-color-primary: #2e8555;
@@ -375,6 +396,22 @@
             background: none;
             padding: 0;
             color: inherit;
+        }
+
+        /* Mermaid diagram containers */
+        .answer-content .mermaid-container {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+            overflow-x: auto;
+        }
+
+        .answer-content .mermaid-container svg {
+            max-width: 100%;
+            height: auto;
         }
 
         .results-header {
@@ -919,7 +956,7 @@
     </section>
 
     <!-- Info Section -->
-    <section class="info-section">
+    <section class="info-section" id="info-section">
         <div class="info-card">
             <h3>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1046,10 +1083,41 @@
         const sourceOptions = document.querySelectorAll('.source-option');
         const conversationContainer = document.getElementById('conversation-container');
         const newConversationBtn = document.getElementById('new-conversation-btn');
+        const infoSection = document.getElementById('info-section');
 
         // Session management for follow-up conversations
         let currentSessionId = null;
         let currentExchangeId = 0;
+        let mermaidCounter = 0;
+
+        // Render Mermaid diagrams in a container after streaming completes
+        async function renderMermaidDiagrams(container) {
+            if (!window.mermaid || !container) return;
+
+            // Find all mermaid code blocks (marked.js renders as <pre><code class="language-mermaid">)
+            const mermaidBlocks = container.querySelectorAll('pre code.language-mermaid');
+
+            for (const codeBlock of mermaidBlocks) {
+                const pre = codeBlock.parentElement;
+                const mermaidCode = codeBlock.textContent;
+
+                // Create container div for the diagram
+                const diagramDiv = document.createElement('div');
+                diagramDiv.className = 'mermaid-container';
+                const diagramId = `mermaid-diagram-${++mermaidCounter}`;
+
+                try {
+                    // Render the diagram
+                    const { svg } = await window.mermaid.render(diagramId, mermaidCode);
+                    diagramDiv.innerHTML = svg;
+                    pre.replaceWith(diagramDiv);
+                } catch (error) {
+                    console.error('Mermaid rendering error:', error);
+                    // Keep code block visible on error, add error styling
+                    pre.style.borderLeft = '3px solid #dc3545';
+                }
+            }
+        }
 
         // Help modal
         const helpLink = document.getElementById('help-link');
@@ -1110,9 +1178,13 @@
             conversationContainer.innerHTML = '';
             resultsSection.style.display = 'none';
             newConversationBtn.classList.add('hidden');
+            // Show info section again
+            if (infoSection) {
+                infoSection.style.display = 'block';
+            }
             searchInput.value = '';
+            setRandomPlaceholder();
             searchInput.focus();
-            searchInput.placeholder = 'How do I configure tally with TSL 5.0?';
         }
 
         // Create exchange HTML structure
@@ -1230,12 +1302,19 @@
                                     // Store session_id for follow-up questions
                                     currentSessionId = data.session_id;
                                 } else if (data.type === 'text') {
+                                    // Hide info section when streaming begins
+                                    if (fullText === '' && infoSection) {
+                                        infoSection.style.display = 'none';
+                                    }
                                     fullText += data.text;
                                     // Render markdown incrementally
                                     answerContentEl.innerHTML = marked.parse(fullText);
                                 } else if (data.type === 'done') {
                                     // Final render
                                     answerContentEl.innerHTML = marked.parse(fullText);
+
+                                    // Render Mermaid diagrams after streaming completes
+                                    await renderMermaidDiagrams(answerContentEl);
 
                                     // Show new conversation button
                                     newConversationBtn.classList.remove('hidden');
@@ -1299,7 +1378,25 @@
             }
         });
 
+        // Random placeholder examples
+        const placeholderExamples = [
+            "How do I configure tally with TSL 5.0?",
+            "How to connect a Sony FX6 to my RCP?",
+            "What protocol does the RIO use for camera control?",
+            "How do I set up VISCA over IP with the CI0?",
+            "Can the VP4 control multiple cameras simultaneously?",
+            "How to configure color matching across cameras?",
+            "What's the IP address setup for RIO Live?",
+        ];
+
+        // Set random placeholder on load
+        function setRandomPlaceholder() {
+            const randomIndex = Math.floor(Math.random() * placeholderExamples.length);
+            searchInput.placeholder = placeholderExamples[randomIndex];
+        }
+
         // Focus search input on load
+        setRandomPlaceholder();
         searchInput.focus();
 
         // Copy answer to clipboard
