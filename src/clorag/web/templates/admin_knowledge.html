@@ -371,6 +371,108 @@
             color: var(--danger);
         }
 
+        /* Input Method Toggle */
+        .input-method-toggle {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            overflow: hidden;
+            width: fit-content;
+        }
+
+        .input-method-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: #f8f9fa;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .input-method-btn:hover {
+            background: #e8e8e8;
+        }
+
+        .input-method-btn.active {
+            background: var(--cyan-dark);
+            color: white;
+        }
+
+        .input-content {
+            display: none;
+        }
+
+        .input-content.active {
+            display: block;
+        }
+
+        /* File Upload */
+        .file-drop-zone {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 1rem;
+        }
+
+        .file-drop-zone:hover,
+        .file-drop-zone.dragover {
+            border-color: var(--cyan-blue);
+            background: #e8f4fd;
+        }
+
+        .file-drop-zone__icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-drop-zone__text {
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-drop-zone__hint {
+            font-size: 0.85rem;
+            color: #999;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-selected {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: #e8f5e9;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .file-selected__name {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .file-selected__size {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .file-selected__remove {
+            background: none;
+            border: none;
+            color: var(--danger);
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
         /* Modal */
         .modal {
             display: none;
@@ -463,52 +565,118 @@
         <!-- Add Document Tab -->
         <div id="tab-add" class="tab-content active">
             <div class="form-card">
-                <form id="addDocForm">
-                    <div class="form-group">
-                        <label class="form-label">Title *</label>
-                        <input type="text" class="form-input" name="title" required placeholder="Document title">
-                    </div>
+                <!-- Input Method Toggle -->
+                <div class="input-method-toggle">
+                    <button type="button" class="input-method-btn active" data-method="text">Paste Text</button>
+                    <button type="button" class="input-method-btn" data-method="file">Upload File</button>
+                </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Content *</label>
-                        <textarea class="form-textarea" name="content" required placeholder="Paste your document content here..."></textarea>
-                        <div class="form-help">Minimum 10 characters. Content will be chunked and embedded for RAG retrieval.</div>
-                    </div>
-
-                    <div class="form-row">
+                <!-- Text Input Form -->
+                <div id="input-text" class="input-content active">
+                    <form id="addDocForm">
                         <div class="form-group">
-                            <label class="form-label">Category</label>
-                            <select class="form-select" name="category" id="addCategory"></select>
+                            <label class="form-label">Title *</label>
+                            <input type="text" class="form-input" name="title" required placeholder="Document title">
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">Tags</label>
-                            <input type="text" class="form-input" name="tags" placeholder="tag1, tag2, tag3">
-                            <div class="form-help">Comma-separated keywords</div>
+                            <label class="form-label">Content *</label>
+                            <textarea class="form-textarea" name="content" required placeholder="Paste your document content here..."></textarea>
+                            <div class="form-help">Minimum 10 characters. Content will be chunked and embedded for RAG retrieval.</div>
                         </div>
-                    </div>
 
-                    <div class="form-row">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Category</label>
+                                <select class="form-select" name="category" id="addCategory"></select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Tags</label>
+                                <input type="text" class="form-input" name="tags" placeholder="tag1, tag2, tag3">
+                                <div class="form-help">Comma-separated keywords</div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">URL Reference</label>
+                                <input type="url" class="form-input" name="url_reference" placeholder="https://...">
+                                <div class="form-help">Optional link to original source</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Expiration Date</label>
+                                <input type="date" class="form-input" name="expiration_date">
+                                <div class="form-help">Optional review/expiration date</div>
+                            </div>
+                        </div>
+
                         <div class="form-group">
-                            <label class="form-label">URL Reference</label>
-                            <input type="url" class="form-input" name="url_reference" placeholder="https://...">
-                            <div class="form-help">Optional link to original source</div>
+                            <label class="form-label">Internal Notes</label>
+                            <textarea class="form-textarea" name="notes" rows="2" placeholder="Notes about this document (not searchable)"></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Add Document</button>
+                    </form>
+                </div>
+
+                <!-- File Upload Form -->
+                <div id="input-file" class="input-content">
+                    <form id="uploadDocForm">
+                        <div class="form-group">
+                            <label class="form-label">Upload File *</label>
+                            <div class="file-drop-zone" id="dropZone">
+                                <div class="file-drop-zone__icon">📄</div>
+                                <div class="file-drop-zone__text">Drag & drop a file here, or click to browse</div>
+                                <div class="file-drop-zone__hint">Supported: .txt, .md, .pdf</div>
+                            </div>
+                            <input type="file" class="file-input" id="fileInput" accept=".txt,.md,.pdf">
+                            <div id="fileSelected" class="file-selected" style="display: none;">
+                                <span class="file-selected__name" id="fileName"></span>
+                                <span class="file-selected__size" id="fileSize"></span>
+                                <button type="button" class="file-selected__remove" onclick="clearFile()">&times;</button>
+                            </div>
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">Expiration Date</label>
-                            <input type="date" class="form-input" name="expiration_date">
-                            <div class="form-help">Optional review/expiration date</div>
+                            <label class="form-label">Title</label>
+                            <input type="text" class="form-input" name="title" id="uploadTitle" placeholder="Leave blank to use filename">
                         </div>
-                    </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Internal Notes</label>
-                        <textarea class="form-textarea" name="notes" rows="2" placeholder="Notes about this document (not searchable)"></textarea>
-                    </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Category</label>
+                                <select class="form-select" name="category" id="uploadCategory"></select>
+                            </div>
 
-                    <button type="submit" class="btn btn-primary">Add Document</button>
-                </form>
+                            <div class="form-group">
+                                <label class="form-label">Tags</label>
+                                <input type="text" class="form-input" name="tags" id="uploadTags" placeholder="tag1, tag2, tag3">
+                                <div class="form-help">Comma-separated keywords</div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">URL Reference</label>
+                                <input type="url" class="form-input" name="url_reference" id="uploadUrl" placeholder="https://...">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Expiration Date</label>
+                                <input type="date" class="form-input" name="expiration_date" id="uploadExpiration">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Internal Notes</label>
+                            <textarea class="form-textarea" name="notes" id="uploadNotes" rows="2" placeholder="Notes about this document (not searchable)"></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" id="uploadBtn">Upload Document</button>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -595,6 +763,7 @@
 
     <script>
         let categories = [];
+        let selectedFile = null;
 
         // Tab switching
         document.querySelectorAll('.tab').forEach(tab => {
@@ -609,6 +778,81 @@
                 }
             });
         });
+
+        // Input method toggle (Paste Text vs Upload File)
+        document.querySelectorAll('.input-method-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const method = btn.dataset.method;
+                document.querySelectorAll('.input-method-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.input-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`input-${method}`).classList.add('active');
+            });
+        });
+
+        // File drop zone handling
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            const allowedTypes = ['.txt', '.md', '.pdf'];
+            const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+
+            if (!allowedTypes.includes(ext)) {
+                showAlert('Unsupported file type. Please upload .txt, .md, or .pdf files.', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileSelected').style.display = 'flex';
+            document.getElementById('dropZone').style.display = 'none';
+
+            // Auto-suggest title from filename
+            if (!document.getElementById('uploadTitle').value) {
+                const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+                document.getElementById('uploadTitle').value = nameWithoutExt;
+            }
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            document.getElementById('fileSelected').style.display = 'none';
+            document.getElementById('dropZone').style.display = 'block';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
 
         // Session check
         async function checkSession() {
@@ -629,9 +873,10 @@
                 const response = await fetch('/api/admin/knowledge/categories', { credentials: 'include' });
                 categories = await response.json();
 
-                const selects = ['addCategory', 'editCategory', 'filterCategory'];
+                const selects = ['addCategory', 'editCategory', 'filterCategory', 'uploadCategory'];
                 selects.forEach(id => {
                     const select = document.getElementById(id);
+                    if (!select) return;
                     if (id === 'filterCategory') {
                         select.innerHTML = '<option value="">All Categories</option>' +
                             categories.map(c => `<option value="${c.value}">${c.label}</option>`).join('');
@@ -684,7 +929,7 @@
             }
         }
 
-        // Add document form submission
+        // Add document form submission (text paste)
         document.getElementById('addDocForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const form = e.target;
@@ -717,6 +962,53 @@
                 }
             } catch (error) {
                 showAlert('Error: ' + error.message, 'error');
+            }
+        });
+
+        // File upload form submission
+        document.getElementById('uploadDocForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!selectedFile) {
+                showAlert('Please select a file to upload.', 'error');
+                return;
+            }
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            const originalText = uploadBtn.textContent;
+            uploadBtn.textContent = 'Uploading...';
+            uploadBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('title', document.getElementById('uploadTitle').value || '');
+            formData.append('category', document.getElementById('uploadCategory').value);
+            formData.append('tags', document.getElementById('uploadTags').value || '');
+            formData.append('url_reference', document.getElementById('uploadUrl').value || '');
+            formData.append('notes', document.getElementById('uploadNotes').value || '');
+
+            try {
+                const response = await fetch('/api/admin/knowledge/upload', {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    const doc = await response.json();
+                    showAlert(`Document "${doc.title}" uploaded successfully!`, 'success');
+                    // Reset the form
+                    document.getElementById('uploadDocForm').reset();
+                    clearFile();
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to upload document', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            } finally {
+                uploadBtn.textContent = originalText;
+                uploadBtn.disabled = false;
             }
         });
 

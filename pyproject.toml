@@ -1,6 +1,6 @@
 [project]
 name = "clorag"
-version = "0.3.8"
+version = "0.3.9"
 description = "Multi-RAG Agent with Claude Agent SDK - Docusaurus docs + Gmail support threads"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -52,6 +52,9 @@ dependencies = [
 
     # Security
     "cryptography>=44.0.0",  # Token encryption at rest
+
+    # Document Processing
+    "pypdf>=5.0.0",  # PDF text extraction for file uploads
 ]
 
 [project.optional-dependencies]

@@ -18,7 +18,18 @@ import anthropic
 import anyio
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import Body, Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import (
+    Body,
+    Cookie,
+    Depends,
+    FastAPI,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
@@ -1773,6 +1784,113 @@ async def api_knowledge_delete(
     if not await service.delete_document(doc_id):
         raise HTTPException(status_code=404, detail="Document not found")
     return {"status": "deleted", "id": doc_id}
+
+
+@app.post(
+    "/api/admin/knowledge/upload",
+    response_model=CustomDocument,
+    tags=["Knowledge"],
+)
+@limiter.limit("10/minute")
+async def api_knowledge_upload(
+    request: Request,
+    file: UploadFile,
+    title: Annotated[str, Form()] = "",
+    category: Annotated[str, Form()] = "other",
+    tags: Annotated[str, Form()] = "",
+    url_reference: Annotated[str, Form()] = "",
+    notes: Annotated[str, Form()] = "",
+    _: bool = Depends(verify_admin),
+):
+    """Upload a file (txt, md, pdf) as a custom document.
+
+    Extracts text content from the uploaded file and creates a new document.
+    Supported formats: .txt, .md, .pdf
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    # Validate file extension
+    filename = file.filename.lower()
+    if not filename.endswith((".txt", ".md", ".pdf")):
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Allowed: .txt, .md, .pdf",
+        )
+
+    # Read file content
+    content_bytes = await file.read()
+    content = ""
+
+    if filename.endswith((".txt", ".md")):
+        # Text/Markdown files - decode as UTF-8
+        try:
+            content = content_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            # Try latin-1 as fallback
+            try:
+                content = content_bytes.decode("latin-1")
+            except Exception:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Could not decode file. Please ensure it's a valid text file.",
+                )
+    elif filename.endswith(".pdf"):
+        # PDF files - extract text using pypdf
+        try:
+            from pypdf import PdfReader
+
+            pdf_file = io.BytesIO(content_bytes)
+            reader = PdfReader(pdf_file)
+            text_parts = []
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
+            content = "\n\n".join(text_parts)
+        except ImportError:
+            raise HTTPException(
+                status_code=500,
+                detail="PDF support not available. Install pypdf package.",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to extract text from PDF: {str(e)}",
+            )
+
+    # Validate content
+    content = content.strip()
+    if not content or len(content) < 10:
+        raise HTTPException(
+            status_code=400,
+            detail="File content is empty or too short (min 10 characters).",
+        )
+
+    # Use filename as title if not provided
+    doc_title = title.strip() if title.strip() else Path(file.filename).stem
+
+    # Parse tags from comma-separated string
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+
+    # Validate category
+    try:
+        doc_category = DocumentCategory(category)
+    except ValueError:
+        doc_category = DocumentCategory.OTHER
+
+    # Create document
+    doc_create = CustomDocumentCreate(
+        title=doc_title,
+        content=content,
+        tags=tag_list,
+        category=doc_category,
+        url_reference=url_reference.strip() if url_reference.strip() else None,
+        notes=notes.strip() if notes.strip() else None,
+    )
+
+    service = get_custom_docs_service()
+    return await service.create_document(doc_create, created_by="admin")
 
 
 # =============================================================================

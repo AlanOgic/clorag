@@ -78,7 +78,7 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 - Analytics dashboard: `/admin/analytics` with search stats and history
 - Draft management: `/admin/drafts` for auto-reply system
 - REST API for cameras: `GET/POST/PUT/DELETE /api/cameras`
-- REST API for knowledge: `GET/POST/PUT/DELETE /api/admin/knowledge`
+- REST API for knowledge: `GET/POST/PUT/DELETE /api/admin/knowledge`, `POST /api/admin/knowledge/upload` (file upload)
 - REST API for analytics: `GET /api/admin/search-stats`
 
 **Models Layer** (`src/clorag/models/`):
@@ -147,9 +147,12 @@ Claude automatically generates Mermaid.js diagrams when explaining camera connec
 
 ### Custom Knowledge Documents
 Admin-managed documents stored in `custom_docs` Qdrant collection. Features:
+- **File upload**: Support for .txt, .md, .pdf files with drag-and-drop UI
+- **PDF extraction**: Text extracted using pypdf library
 - 9 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, internal, other
 - Full metadata: title, tags, URL reference, expiration date, notes
 - Chunked, embedded, and included in hybrid RAG search
+- Admin UI at `/admin/knowledge` with "Paste Text" and "Upload File" modes
 
 ## Deployment
 

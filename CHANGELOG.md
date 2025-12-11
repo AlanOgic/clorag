@@ -2,6 +2,20 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.9] - 2025-12-11
+
+### Added
+- **File Upload for Custom Knowledge Documents**
+  - Upload .txt, .md, and .pdf files directly to the knowledge base
+  - Drag-and-drop file zone with visual feedback
+  - PDF text extraction using pypdf library
+  - Auto-suggests document title from filename
+  - Toggle between "Paste Text" and "Upload File" input modes
+  - New API endpoint: `POST /api/admin/knowledge/upload`
+
+### Dependencies
+- Added `pypdf>=5.0.0` for PDF text extraction
+
 ## [0.3.8] - 2025-12-11
 
 ### Security

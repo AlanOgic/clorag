@@ -7,6 +7,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 - **AI-Powered Search** - Natural language queries with Claude Sonnet 4.5 synthesis
 - **Follow-up Conversations** - Ask follow-up questions with context from last 3 exchanges
 - **Hybrid RAG Search** - Combines semantic (Voyage AI) and keyword (BM25) matching with RRF fusion
+- **Custom Knowledge Base** - Upload .txt, .md, .pdf files or paste text to add custom documents
 - **Camera Compatibility Database** - Structured camera info with automatic extraction from docs/support
 - **Search Analytics** - Track popular queries, response times, and usage patterns
 - **Session-Based Admin** - Secure login with signed cookies for all admin features
@@ -143,6 +144,7 @@ Two data ingestion pipelines populate the vector database:
 |--------|-------------|-------------------|
 | Documentation | Docusaurus support site pages | `docusaurus_docs` |
 | Support Cases | Curated, anonymized Gmail threads | `gmail_cases` |
+| Custom Knowledge | Admin-uploaded documents (.txt, .md, .pdf) | `custom_docs` |
 | Camera Database | Structured camera compatibility data | SQLite (relational) |
 
 ## Stack Technique
@@ -281,6 +283,7 @@ uv run rag-web
 | `/admin/login` | Admin login page |
 | `/admin` | Admin dashboard with links to all features |
 | `/admin/cameras` | Camera CRUD management |
+| `/admin/knowledge` | Custom knowledge base: upload files or paste text |
 | `/admin/analytics` | Search analytics and statistics |
 | `/admin/drafts` | Draft auto-reply management |
 | `/admin/search-debug` | Debug RAG: view chunks, prompts, timing |
@@ -354,6 +357,18 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 | PUT | `/api/admin/chunks/{collection}/{id}` | Update chunk (re-embeds if text changed) |
 | DELETE | `/api/admin/chunks/{collection}/{id}` | Delete chunk |
 
+### Knowledge Base (Admin)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/knowledge` | List custom documents |
+| GET | `/api/admin/knowledge/categories` | Get available categories |
+| GET | `/api/admin/knowledge/{id}` | Get document by ID |
+| POST | `/api/admin/knowledge` | Create document (JSON body) |
+| POST | `/api/admin/knowledge/upload` | Upload file (.txt, .md, .pdf) |
+| PUT | `/api/admin/knowledge/{id}` | Update document |
+| DELETE | `/api/admin/knowledge/{id}` | Delete document |
+
 ### Authentication
 
 | Method | Endpoint | Description |
@@ -415,6 +430,7 @@ clorag/
             admin_index.html     # Admin dashboard
             admin_login.html     # Admin login
             admin_cameras.html   # Camera management
+            admin_knowledge.html # Knowledge base (file upload)
             admin_analytics.html # Analytics dashboard
             admin_drafts.html    # Draft management
             admin_search_debug.html  # Search debug
