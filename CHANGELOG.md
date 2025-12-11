@@ -2,6 +2,50 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.3.8] - 2025-12-11
+
+### Security
+- **Brute Force Protection**
+  - Track failed login attempts per IP address
+  - 5 failed attempts triggers 5-minute lockout
+  - Logging for failed attempts and lockout events
+  - `LoginAttemptTracker` class in `app.py`
+
+- **XSS Protection with DOMPurify**
+  - Added DOMPurify CDN for HTML sanitization
+  - Custom `safeMarkdown()` function with SVG allowlist for Mermaid diagrams
+  - Prevents script injection through markdown rendering
+
+- **OAuth Token Encryption at Rest**
+  - New `utils/token_encryption.py` module
+  - Fernet symmetric encryption with PBKDF2 key derivation (480K iterations)
+  - Admin password used as encryption key source
+  - Backward compatible: reads unencrypted tokens, encrypts on save
+  - Atomic file writes with restrictive permissions (chmod 600)
+
+- **Secure Cookie Configuration**
+  - New `SECURE_COOKIES` environment variable (default: `true`)
+  - Set to `false` for local development without HTTPS
+  - Applied to session cookies in login/logout endpoints
+
+- **Removed localStorage Password Storage**
+  - Admin pages now use session-based authentication exclusively
+  - Removed client-side password storage from camera management pages
+  - Added `checkAuth()` function with redirect to login
+
+### Added
+- **Admin Documentation Enhancements**
+  - New API Connection Guide section (`/admin/docs#api-connection`)
+  - New Security Information section (`/admin/docs#security`)
+  - Security architecture diagram with session flow
+  - Complete security checklist for deployments
+
+### New Files
+- `src/clorag/utils/token_encryption.py` - Encrypted OAuth token storage utilities
+
+### Dependencies
+- Added `cryptography>=44.0.0` for Fernet encryption
+
 ## [0.3.7] - 2025-12-10
 
 ### Added

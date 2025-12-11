@@ -814,6 +814,73 @@ def _truncate(text: str, max_length: int) -> str:
 ADMIN_SESSION_COOKIE = "admin_session"
 ADMIN_SESSION_MAX_AGE = 24 * 60 * 60  # 24 hours
 
+# Brute force protection settings
+LOGIN_LOCKOUT_THRESHOLD = 5  # Failed attempts before lockout
+LOGIN_LOCKOUT_DURATION = 300  # 5 minutes lockout
+
+
+class LoginAttemptTracker:
+    """Track failed login attempts per IP for brute force protection."""
+
+    def __init__(self) -> None:
+        self._attempts: dict[str, list[float]] = {}  # IP -> list of attempt timestamps
+        self._lockouts: dict[str, float] = {}  # IP -> lockout expiry timestamp
+
+    def is_locked_out(self, ip: str) -> bool:
+        """Check if IP is currently locked out."""
+        if ip in self._lockouts:
+            if time.time() < self._lockouts[ip]:
+                return True
+            # Lockout expired, remove it
+            del self._lockouts[ip]
+            if ip in self._attempts:
+                del self._attempts[ip]
+        return False
+
+    def get_lockout_remaining(self, ip: str) -> int:
+        """Get seconds remaining in lockout, or 0 if not locked out."""
+        if ip in self._lockouts:
+            remaining = int(self._lockouts[ip] - time.time())
+            return max(0, remaining)
+        return 0
+
+    def record_failed_attempt(self, ip: str) -> bool:
+        """Record a failed login attempt. Returns True if now locked out."""
+        now = time.time()
+
+        # Clean old attempts (older than lockout duration)
+        if ip in self._attempts:
+            self._attempts[ip] = [t for t in self._attempts[ip] if now - t < LOGIN_LOCKOUT_DURATION]
+        else:
+            self._attempts[ip] = []
+
+        self._attempts[ip].append(now)
+
+        # Check if should be locked out
+        if len(self._attempts[ip]) >= LOGIN_LOCKOUT_THRESHOLD:
+            self._lockouts[ip] = now + LOGIN_LOCKOUT_DURATION
+            return True
+        return False
+
+    def clear_attempts(self, ip: str) -> None:
+        """Clear attempts on successful login."""
+        if ip in self._attempts:
+            del self._attempts[ip]
+        if ip in self._lockouts:
+            del self._lockouts[ip]
+
+
+# Global login attempt tracker
+_login_tracker: LoginAttemptTracker | None = None
+
+
+def get_login_tracker() -> LoginAttemptTracker:
+    """Get or create login attempt tracker singleton."""
+    global _login_tracker
+    if _login_tracker is None:
+        _login_tracker = LoginAttemptTracker()
+    return _login_tracker
+
 
 def get_session_serializer() -> URLSafeTimedSerializer:
     """Get session serializer using admin password as secret key."""
@@ -981,7 +1048,7 @@ class LoginResponse(BaseModel):
 
 
 @app.post("/api/admin/login", tags=["Authentication"])
-@limiter.limit("5/minute")
+@limiter.limit("10/minute")
 async def api_admin_login(
     request: Request,
     login_req: LoginRequest,
@@ -990,42 +1057,69 @@ async def api_admin_login(
     """Login and set session cookie.
 
     Returns success status and sets httponly cookie on success.
+    Implements brute force protection with lockout after 5 failed attempts.
     """
     settings = get_settings()
     if not settings.admin_password:
         raise HTTPException(status_code=503, detail="Admin access not configured")
+
+    # Get client IP for brute force tracking
+    client_ip = get_remote_address(request)
+    tracker = get_login_tracker()
+
+    # Check if IP is locked out
+    if tracker.is_locked_out(client_ip):
+        remaining = tracker.get_lockout_remaining(client_ip)
+        logger.warning("Login attempt from locked out IP", ip=client_ip, remaining=remaining)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many failed attempts. Try again in {remaining} seconds."
+        )
 
     # Verify password with timing-safe comparison
     if not secrets.compare_digest(
         login_req.password.encode('utf-8'),
         settings.admin_password.get_secret_value().encode('utf-8')
     ):
+        # Record failed attempt
+        locked_out = tracker.record_failed_attempt(client_ip)
+        logger.warning("Failed login attempt", ip=client_ip, locked_out=locked_out)
+        if locked_out:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many failed attempts. Try again in {LOGIN_LOCKOUT_DURATION} seconds."
+            )
         raise HTTPException(status_code=401, detail="Invalid password")
+
+    # Successful login - clear any failed attempts
+    tracker.clear_attempts(client_ip)
 
     # Create signed session token
     serializer = get_session_serializer()
     token = serializer.dumps({"authenticated": True, "ts": time.time()})
 
-    # Set httponly cookie (secure in production)
+    # Set httponly cookie (secure based on config)
     response.set_cookie(
         key=ADMIN_SESSION_COOKIE,
         value=token,
         max_age=ADMIN_SESSION_MAX_AGE,
         httponly=True,
-        secure=True,  # HTTPS only
+        secure=settings.secure_cookies,
         samesite="strict",
     )
 
+    logger.info("Successful admin login", ip=client_ip)
     return LoginResponse(success=True, message="Login successful")
 
 
 @app.post("/api/admin/logout", tags=["Authentication"])
 async def api_admin_logout(response: Response):
     """Logout and clear session cookie."""
+    settings = get_settings()
     response.delete_cookie(
         key=ADMIN_SESSION_COOKIE,
         httponly=True,
-        secure=True,
+        secure=settings.secure_cookies,
         samesite="strict",
     )
     return {"success": True, "message": "Logged out"}

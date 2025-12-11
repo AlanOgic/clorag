@@ -85,6 +85,10 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 - `camera.py` - Camera Pydantic models with CameraSource enum for tracking data origin
 - `custom_document.py` - Custom document models with DocumentCategory enum, full metadata support
 
+**Utils Layer** (`src/clorag/utils/`):
+- `token_encryption.py` - Fernet encryption for OAuth tokens at rest (PBKDF2 key derivation)
+- `logger.py` - Structured logging with structlog
+
 ### Vector Collections
 
 Three Qdrant collections with named vectors:
@@ -105,8 +109,9 @@ All settings via environment variables (see `.env.example`):
 - `GMAIL_LABEL` - Gmail label for support threads
 - `DATABASE_PATH` - SQLite database for camera data (default: `data/clorag.db`)
 - `ANALYTICS_DATABASE_PATH` - SQLite database for search analytics (default: `data/analytics.db`)
-- `ADMIN_PASSWORD` - Admin authentication for camera management and analytics
+- `ADMIN_PASSWORD` - Admin authentication for camera management and analytics (also used for OAuth token encryption)
 - `SEARXNG_URL` - SearXNG instance URL for web searches (default: `https://search.sapti.me`)
+- `SECURE_COOKIES` - Enable secure cookies for HTTPS (default: `true`, set `false` for local development)
 
 Settings loaded via `clorag.config.get_settings()` (cached singleton).
 
@@ -128,7 +133,14 @@ Gmail threads are anonymized before LLM analysis using placeholder tokens (`[SER
 During ingestion, camera information is automatically extracted from documentation and support cases using Claude Haiku. Data is merged using upsert pattern to combine info from multiple sources.
 
 ### Admin Authentication
-Admin routes are protected by session-based authentication. Set `ADMIN_PASSWORD` env var to enable admin access. Login at `/admin/login`.
+Admin routes are protected by session-based authentication with brute force protection (5 failed attempts triggers 5-minute lockout per IP). Set `ADMIN_PASSWORD` env var to enable admin access. Login at `/admin/login`.
+
+### Security Features
+- **Brute force protection** - `LoginAttemptTracker` in `app.py` limits login attempts per IP
+- **XSS protection** - DOMPurify sanitizes markdown rendering with SVG allowlist for Mermaid
+- **OAuth token encryption** - `utils/token_encryption.py` uses Fernet encryption with PBKDF2 (480K iterations)
+- **Secure cookies** - Session cookies use `secure=True` in production (controlled by `SECURE_COOKIES` env var)
+- **PII anonymization** - Customer data anonymized before LLM processing
 
 ### Mermaid Diagram Generation
 Claude automatically generates Mermaid.js diagrams when explaining camera connections, network topology, or signal flows. Diagrams are rendered client-side using Mermaid.js v11 ESM modules with Cyanview color theming.

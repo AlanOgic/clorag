@@ -8,6 +8,8 @@
     <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
     <!-- Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify for XSS protection -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.2/dist/purify.min.js"></script>
     <!-- Mermaid diagram rendering (v11) -->
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -1307,11 +1309,11 @@
                                         infoSection.style.display = 'none';
                                     }
                                     fullText += data.text;
-                                    // Render markdown incrementally
-                                    answerContentEl.innerHTML = marked.parse(fullText);
+                                    // Render markdown incrementally with XSS protection
+                                    answerContentEl.innerHTML = safeMarkdown(fullText);
                                 } else if (data.type === 'done') {
-                                    // Final render
-                                    answerContentEl.innerHTML = marked.parse(fullText);
+                                    // Final render with XSS protection
+                                    answerContentEl.innerHTML = safeMarkdown(fullText);
 
                                     // Render Mermaid diagrams after streaming completes
                                     await renderMermaidDiagrams(answerContentEl);
@@ -1367,6 +1369,17 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Safe markdown rendering with DOMPurify sanitization
+        function safeMarkdown(text) {
+            // Parse markdown then sanitize to prevent XSS
+            const rawHtml = marked.parse(text);
+            return DOMPurify.sanitize(rawHtml, {
+                ADD_TAGS: ['svg', 'path', 'g', 'defs', 'marker', 'polygon', 'polyline', 'line', 'rect', 'circle', 'ellipse', 'text', 'tspan', 'foreignObject'],
+                ADD_ATTR: ['viewBox', 'fill', 'stroke', 'stroke-width', 'd', 'points', 'transform', 'x', 'y', 'cx', 'cy', 'r', 'rx', 'ry', 'width', 'height', 'marker-end', 'marker-start', 'class', 'id', 'style', 'dominant-baseline', 'text-anchor', 'font-size', 'font-weight', 'font-family'],
+                ALLOW_DATA_ATTR: false
+            });
         }
 
         // Form submit handler

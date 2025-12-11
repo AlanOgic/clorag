@@ -437,11 +437,20 @@
     </main>
 
     <script>
-        const adminPassword = localStorage.getItem('adminPassword') || prompt('Enter admin password:');
-
-        if (adminPassword) {
-            localStorage.setItem('adminPassword', adminPassword);
+        // Check authentication status on page load
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
+            }
         }
+        checkAuth();
 
         function filterTable() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -468,9 +477,7 @@
             try {
                 const response = await fetch(`/api/admin/cameras/${id}`, {
                     method: 'DELETE',
-                    headers: {
-                        'X-Admin-Password': adminPassword,
-                    },
+                    credentials: 'include',
                 });
 
                 if (response.ok) {

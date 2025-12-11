@@ -498,11 +498,17 @@ ADMIN_PASSWORD=...  # Strong password for admin access
 ## Security Features
 
 - **Session-based authentication** with signed cookies (itsdangerous)
-- **Rate limiting** on login (5/min) and admin API endpoints
-- **XSS protection** with HTML escaping and URL validation
+- **Brute force protection** - 5 failed attempts triggers 5-minute lockout per IP
+- **Rate limiting** on login (10/min) and admin API endpoints
+- **XSS protection** with DOMPurify sanitization and HTML escaping
 - **Open redirect prevention** on login redirects
 - **HTTPS-only cookies** in production (Secure, HttpOnly, SameSite=Strict)
 - **Timing-safe password comparison** to prevent timing attacks
+- **OAuth token encryption** - Fernet encryption with PBKDF2 key derivation (480K iterations)
+- **PII anonymization** - Customer data anonymized before LLM processing
+- **SQL injection prevention** - Parameterized queries with column whitelist
+
+For detailed security documentation, see [Admin Docs](/admin/docs#security) after authentication.
 
 ## Licence
 

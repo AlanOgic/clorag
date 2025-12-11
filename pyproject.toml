@@ -1,6 +1,6 @@
 [project]
 name = "clorag"
-version = "0.3.7"
+version = "0.3.8"
 description = "Multi-RAG Agent with Claude Agent SDK - Docusaurus docs + Gmail support threads"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -49,6 +49,9 @@ dependencies = [
 
     # Background Scheduling
     "apscheduler>=3.10.0",  # Draft creation polling
+
+    # Security
+    "cryptography>=44.0.0",  # Token encryption at rest
 ]
 
 [project.optional-dependencies]

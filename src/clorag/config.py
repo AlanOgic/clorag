@@ -85,6 +85,12 @@ class Settings(BaseSettings):
         description="SearXNG instance URL for web searches",
     )
 
+    # Security Settings
+    secure_cookies: bool = Field(
+        default=True,
+        description="Use secure cookies (HTTPS only). Set to False for local development.",
+    )
+
     # Draft Creation Settings
     draft_polling_enabled: bool = Field(
         default=False,

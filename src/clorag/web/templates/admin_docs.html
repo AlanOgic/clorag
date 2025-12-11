@@ -417,6 +417,8 @@
                     <li class="docs-nav__item"><a href="#conversations" class="docs-nav__link">Conversations</a></li>
                     <li class="docs-nav__item"><a href="#draft-management" class="docs-nav__link">Draft Management</a></li>
                     <li class="docs-nav__item"><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
+                    <li class="docs-nav__item"><a href="#api-connection" class="docs-nav__link">API Connection</a></li>
+                    <li class="docs-nav__item"><a href="#security" class="docs-nav__link">Security</a></li>
                     <li class="docs-nav__item"><a href="#authentication" class="docs-nav__link">Authentication</a></li>
                     <li class="docs-nav__item"><a href="#api-reference" class="docs-nav__link">API Reference</a></li>
                     <li class="docs-nav__item"><a href="#analytics" class="docs-nav__link">Analytics</a></li>
@@ -926,6 +928,282 @@ uv run draft-support --max 20</code></pre>
                     <li><strong>Support Cases</strong> - Extraction from resolved support threads</li>
                     <li><strong>Manual Entry</strong> - Admin interface for manual additions</li>
                 </ul>
+
+                <h2 id="api-connection">API Connection Guide</h2>
+
+                <h3>Quick Start</h3>
+                <p>Connect to the CLORAG API using any HTTP client. All responses are JSON.</p>
+
+                <h3>Base URL</h3>
+                <pre><code>Production: https://cyanview.cloud
+Local Dev:  http://localhost:8080</code></pre>
+
+                <h3>Authentication Methods</h3>
+
+                <h4>1. Session Cookie (Recommended for Browser)</h4>
+                <p>Login via the web form or API to receive a signed session cookie:</p>
+                <pre><code># Login
+curl -X POST https://cyanview.cloud/api/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{"password": "your_admin_password"}' \
+  -c cookies.txt
+
+# Use cookie for subsequent requests
+curl https://cyanview.cloud/api/admin/search-stats \
+  -b cookies.txt</code></pre>
+
+                <h4>2. X-Admin-Password Header (For Scripts)</h4>
+                <p>Include the admin password in the header for programmatic access:</p>
+                <pre><code>curl -X POST https://cyanview.cloud/api/admin/cameras \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Password: your_admin_password" \
+  -d '{"name": "Canon C70", "manufacturer": "Canon"}'</code></pre>
+
+                <h3>Public Endpoints (No Auth Required)</h3>
+                <table>
+                    <tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
+                    <tr><td><code>/api/search</code></td><td>POST</td><td>RAG search with Claude synthesis</td></tr>
+                    <tr><td><code>/api/search/stream</code></td><td>POST</td><td>Streaming RAG search (SSE)</td></tr>
+                    <tr><td><code>/api/cameras</code></td><td>GET</td><td>List all cameras</td></tr>
+                    <tr><td><code>/api/cameras/{id}</code></td><td>GET</td><td>Get camera by ID</td></tr>
+                    <tr><td><code>/api/cameras/search</code></td><td>GET</td><td>Search cameras by name</td></tr>
+                </table>
+
+                <h3>Admin Endpoints (Auth Required)</h3>
+                <table>
+                    <tr><th>Category</th><th>Endpoints</th></tr>
+                    <tr><td>Cameras</td><td><code>POST/PUT/DELETE /api/admin/cameras</code></td></tr>
+                    <tr><td>Knowledge Base</td><td><code>GET/POST/PUT/DELETE /api/admin/knowledge</code></td></tr>
+                    <tr><td>Analytics</td><td><code>GET /api/admin/search-stats</code>, <code>/api/admin/search/{id}</code></td></tr>
+                    <tr><td>Drafts</td><td><code>GET/POST /api/admin/drafts/*</code></td></tr>
+                    <tr><td>Session</td><td><code>POST /api/admin/login</code>, <code>/api/admin/logout</code></td></tr>
+                </table>
+
+                <h3>Example: Search API</h3>
+                <pre><code># Basic search
+curl -X POST https://cyanview.cloud/api/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I configure the RIO IP address?",
+    "source": "both",
+    "limit": 10
+  }'
+
+# Follow-up question (include session_id from previous response)
+curl -X POST https://cyanview.cloud/api/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What ports does it use?",
+    "source": "both",
+    "session_id": "uuid-from-previous-response"
+  }'</code></pre>
+
+                <h3>Example: Knowledge Base Management</h3>
+                <pre><code># List documents
+curl https://cyanview.cloud/api/admin/knowledge \
+  -H "X-Admin-Password: your_password"
+
+# Create document
+curl -X POST https://cyanview.cloud/api/admin/knowledge \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Password: your_password" \
+  -d '{
+    "title": "RIO v2.5.0 Known Issues",
+    "content": "Full content here...",
+    "category": "firmware",
+    "tags": ["rio", "v2.5.0", "bugs"],
+    "expires_at": "2025-06-01"
+  }'
+
+# Update document
+curl -X PUT https://cyanview.cloud/api/admin/knowledge/123 \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Password: your_password" \
+  -d '{"content": "Updated content..."}'
+
+# Delete document
+curl -X DELETE https://cyanview.cloud/api/admin/knowledge/123 \
+  -H "X-Admin-Password: your_password"</code></pre>
+
+                <h3>Error Handling</h3>
+                <table>
+                    <tr><th>Status</th><th>Meaning</th><th>Action</th></tr>
+                    <tr><td>200</td><td>Success</td><td>Process response</td></tr>
+                    <tr><td>401</td><td>Unauthorized</td><td>Check password/session</td></tr>
+                    <tr><td>404</td><td>Not Found</td><td>Check resource ID</td></tr>
+                    <tr><td>429</td><td>Rate Limited</td><td>Wait and retry (see Retry-After)</td></tr>
+                    <tr><td>500</td><td>Server Error</td><td>Check server logs</td></tr>
+                    <tr><td>503</td><td>Admin Not Configured</td><td>Set ADMIN_PASSWORD env var</td></tr>
+                </table>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Rate Limiting</div>
+                    <p>API endpoints are rate-limited. Login attempts: 10/minute. Camera mutations: 5/minute. General API: no explicit limit but abuse may be blocked.</p>
+                </div>
+
+                <h2 id="security">Security Information</h2>
+
+                <h3>Security Architecture</h3>
+                <p>CLORAG implements defense-in-depth security with multiple layers:</p>
+
+                <pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                        SECURITY LAYERS                              │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│   TRANSPORT   │     │     AUTH      │     │   RUNTIME     │
+│    LAYER      │     │    LAYER      │     │   PROTECTION  │
+├───────────────┤     ├───────────────┤     ├───────────────┤
+│ HTTPS (TLS)   │     │ Session Auth  │     │ Rate Limiting │
+│ Secure Cookie │     │ Signed Tokens │     │ Brute Force   │
+│ SameSite      │     │ Password Hash │     │ XSS Sanitize  │
+└───────────────┘     └───────────────┘     └───────────────┘
+        │                     │                     │
+        └─────────────────────┴─────────────────────┘
+                              │
+                              ▼
+                    ┌───────────────────┐
+                    │   DATA SECURITY   │
+                    ├───────────────────┤
+                    │ OAuth Encryption  │
+                    │ PII Anonymization │
+                    │ SQL Param Binding │
+                    └───────────────────┘</code></pre>
+
+                <h3>Session Security</h3>
+                <table>
+                    <tr><th>Feature</th><th>Implementation</th><th>Purpose</th></tr>
+                    <tr>
+                        <td>Signed Cookies</td>
+                        <td><code>itsdangerous.URLSafeTimedSerializer</code></td>
+                        <td>Prevent tampering and forgery</td>
+                    </tr>
+                    <tr>
+                        <td>HttpOnly Flag</td>
+                        <td><code>httponly=True</code></td>
+                        <td>Prevent JavaScript access (XSS protection)</td>
+                    </tr>
+                    <tr>
+                        <td>Secure Flag</td>
+                        <td><code>secure=True</code> (production)</td>
+                        <td>HTTPS-only cookie transmission</td>
+                    </tr>
+                    <tr>
+                        <td>SameSite Strict</td>
+                        <td><code>samesite="strict"</code></td>
+                        <td>Prevent CSRF attacks</td>
+                    </tr>
+                    <tr>
+                        <td>Session Expiry</td>
+                        <td>24 hours</td>
+                        <td>Limit exposure window</td>
+                    </tr>
+                </table>
+
+                <h3>Brute Force Protection</h3>
+                <p>Login attempts are protected with automatic lockout:</p>
+                <ul>
+                    <li><strong>Threshold</strong>: 5 failed attempts per IP</li>
+                    <li><strong>Lockout Duration</strong>: 5 minutes</li>
+                    <li><strong>Rate Limit</strong>: 10 requests/minute to login endpoint</li>
+                    <li><strong>Timing-Safe Compare</strong>: Prevents timing attacks on password verification</li>
+                </ul>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Lockout Recovery</div>
+                    <p>If locked out, wait 5 minutes. The lockout is per-IP and tracked server-side. Restarting the server will clear the lockout tracker.</p>
+                </div>
+
+                <h3>XSS Protection</h3>
+                <p>User-generated content is sanitized before rendering:</p>
+                <ul>
+                    <li><strong>DOMPurify</strong>: All markdown→HTML conversions are sanitized with DOMPurify</li>
+                    <li><strong>escapeHtml()</strong>: Raw text is HTML-escaped before DOM insertion</li>
+                    <li><strong>SVG Allowlist</strong>: Mermaid diagrams use whitelisted SVG elements</li>
+                    <li><strong>No inline scripts</strong>: Content Security Policy considerations</li>
+                </ul>
+
+                <h3>Data Anonymization</h3>
+                <p>Customer data in Gmail threads is anonymized before LLM processing:</p>
+                <table>
+                    <tr><th>Data Type</th><th>Replacement</th><th>Example</th></tr>
+                    <tr>
+                        <td>Serial Numbers</td>
+                        <td><code>[SERIAL:XXX-N]</code></td>
+                        <td>SN12345 → [SERIAL:XXX-1]</td>
+                    </tr>
+                    <tr>
+                        <td>Email Addresses</td>
+                        <td><code>[EMAIL-N]</code></td>
+                        <td>john@example.com → [EMAIL-1]</td>
+                    </tr>
+                    <tr>
+                        <td>Phone Numbers</td>
+                        <td><code>[PHONE-N]</code></td>
+                        <td>+1-555-1234 → [PHONE-1]</td>
+                    </tr>
+                    <tr>
+                        <td>IP Addresses</td>
+                        <td><code>[IP-N]</code></td>
+                        <td>192.168.1.100 → [IP-1]</td>
+                    </tr>
+                </table>
+
+                <h3>OAuth Token Security</h3>
+                <p>Gmail OAuth tokens are encrypted at rest:</p>
+                <ul>
+                    <li><strong>Encryption</strong>: Fernet symmetric encryption (AES-128-CBC)</li>
+                    <li><strong>Key Derivation</strong>: PBKDF2-HMAC-SHA256 with 480,000 iterations</li>
+                    <li><strong>Salt</strong>: Random 16-byte salt stored in <code>data/.token_salt</code></li>
+                    <li><strong>Key Source</strong>: Derived from <code>ADMIN_PASSWORD</code> environment variable</li>
+                    <li><strong>File Permissions</strong>: Token files are chmod 600 (owner read/write only)</li>
+                </ul>
+
+                <div class="info-box info-box--success">
+                    <div class="info-box__title">Backward Compatibility</div>
+                    <p>The system automatically migrates unencrypted tokens. On first load after upgrade, plain JSON tokens are read and re-saved with encryption.</p>
+                </div>
+
+                <h3>SQL Injection Prevention</h3>
+                <ul>
+                    <li><strong>Parameterized Queries</strong>: All SQL uses <code>?</code> placeholders with separate values</li>
+                    <li><strong>Column Whitelist</strong>: Dynamic UPDATE queries validate columns against an allowlist</li>
+                    <li><strong>No String Concatenation</strong>: User input never concatenated into SQL strings</li>
+                </ul>
+
+                <h3>API Key Security</h3>
+                <p>API keys are handled securely:</p>
+                <ul>
+                    <li><strong>SecretStr Type</strong>: Pydantic's SecretStr prevents accidental logging</li>
+                    <li><strong>Environment Variables</strong>: Keys loaded from env vars, not config files</li>
+                    <li><strong>.env in .gitignore</strong>: Local env files excluded from version control</li>
+                </ul>
+
+                <h3>Security Configuration</h3>
+                <pre><code># .env file settings
+ADMIN_PASSWORD=strong_random_password_here    # Required, 16+ chars recommended
+SECURE_COOKIES=true                           # Set false for local HTTP dev
+QDRANT_API_KEY=your_qdrant_key               # Secures vector database</code></pre>
+
+                <h3>Security Checklist</h3>
+                <table>
+                    <tr><th>Check</th><th>Status</th><th>Notes</th></tr>
+                    <tr><td>HTTPS enabled</td><td>✅</td><td>Via reverse proxy (nginx/caddy)</td></tr>
+                    <tr><td>Strong admin password</td><td>⚠️</td><td>User responsibility</td></tr>
+                    <tr><td>Secure cookies</td><td>✅</td><td>Enabled by default</td></tr>
+                    <tr><td>XSS protection</td><td>✅</td><td>DOMPurify sanitization</td></tr>
+                    <tr><td>CSRF protection</td><td>✅</td><td>SameSite cookies</td></tr>
+                    <tr><td>Brute force protection</td><td>✅</td><td>5 attempts → 5 min lockout</td></tr>
+                    <tr><td>Token encryption</td><td>✅</td><td>Fernet with PBKDF2</td></tr>
+                    <tr><td>SQL injection prevention</td><td>✅</td><td>Parameterized queries</td></tr>
+                    <tr><td>PII anonymization</td><td>✅</td><td>Before LLM processing</td></tr>
+                    <tr><td>Rate limiting</td><td>✅</td><td>slowapi integration</td></tr>
+                </table>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Security Best Practices</div>
+                    <p>1. Rotate API keys periodically. 2. Use strong admin password (16+ chars, mixed case, numbers, symbols). 3. Monitor access logs for suspicious activity. 4. Keep dependencies updated. 5. Back up token salt file with encrypted tokens.</p>
+                </div>
 
                 <h2 id="authentication">Authentication</h2>
 

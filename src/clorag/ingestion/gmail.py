@@ -20,6 +20,7 @@ from clorag.core.vectorstore import VectorStore
 from clorag.ingestion.base import BaseIngestionPipeline, Document
 from clorag.ingestion.chunker import TextChunker
 from clorag.utils.logger import get_logger
+from clorag.utils.token_encryption import load_encrypted_token, save_encrypted_token
 
 logger = get_logger(__name__)
 
@@ -98,14 +99,17 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
     def _get_credentials(self) -> Credentials:
         """Get or refresh OAuth credentials.
 
+        Uses encrypted token storage for security.
+
         Returns:
             Valid credentials for Gmail API.
         """
         creds = None
 
-        # Load existing token
-        if self._token_path.exists():
-            creds = Credentials.from_authorized_user_file(str(self._token_path), SCOPES)
+        # Load existing token (with encryption support)
+        token_data = load_encrypted_token(self._token_path)
+        if token_data:
+            creds = Credentials.from_authorized_user_info(token_data, SCOPES)
 
         # Refresh or get new credentials
         if not creds or not creds.valid:
@@ -122,9 +126,10 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
                 )
                 creds = flow.run_local_server(port=0)
 
-            # Save token for next run
-            with open(self._token_path, "w") as token:
-                token.write(creds.to_json())
+            # Save token with encryption
+            import json
+            token_data = json.loads(creds.to_json())
+            save_encrypted_token(self._token_path, token_data)
 
         return creds
 

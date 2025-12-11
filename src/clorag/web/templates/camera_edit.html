@@ -401,11 +401,22 @@
 
     <script>
         const cameraId = {{ camera.id if camera else 'null' }};
-        const adminPassword = localStorage.getItem('adminPassword') || prompt('Enter admin password:');
 
-        if (adminPassword) {
-            localStorage.setItem('adminPassword', adminPassword);
+        // Check authentication status on page load
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    // Redirect to login page with return URL
+                    window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
+            }
         }
+        checkAuth();
 
         function addRow(containerId, name, placeholder) {
             const container = document.getElementById(containerId);
@@ -463,9 +474,9 @@
 
                 const response = await fetch(url, {
                     method: method,
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Admin-Password': adminPassword,
                     },
                     body: JSON.stringify(data),
                 });
@@ -490,9 +501,7 @@
             try {
                 const response = await fetch(`/api/admin/cameras/${cameraId}`, {
                     method: 'DELETE',
-                    headers: {
-                        'X-Admin-Password': adminPassword,
-                    },
+                    credentials: 'include',
                 });
 
                 if (response.ok) {
