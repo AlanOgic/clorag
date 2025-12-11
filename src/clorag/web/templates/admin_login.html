@@ -166,9 +166,26 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* Animated geometric background */
+        #geometricBg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 1;
+        }
     </style>
 </head>
 <body>
+    <canvas id="geometricBg"></canvas>
     <div class="login-container">
         <div class="login-header">
             <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="login-logo">
@@ -268,6 +285,198 @@
                 submitBtn.innerHTML = 'Sign In';
             }
         });
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Animated Geometric Background
+        // ═══════════════════════════════════════════════════════════════════
+        (function() {
+            const canvas = document.getElementById('geometricBg');
+            const ctx = canvas.getContext('2d');
+
+            // Configuration
+            const CONFIG = {
+                shapeCount: 30,
+                connectionDistance: 150,
+                speed: { min: 0.15, max: 0.4 },
+                rotationSpeed: { min: 0.001, max: 0.003 },
+                sizeRange: { min: 15, max: 55 },
+                colors: {
+                    cyan: { r: 0, g: 168, b: 232 },
+                    white: { r: 255, g: 255, b: 255 }
+                }
+            };
+
+            let shapes = [];
+            let animationId;
+
+            // Shape types
+            const TYPES = ['hexagon', 'pentagon', 'triangle', 'circle'];
+
+            // Shape class
+            class Shape {
+                constructor() {
+                    this.reset(true);
+                }
+
+                reset(initial = false) {
+                    this.x = initial ? Math.random() * canvas.width : Math.random() * canvas.width;
+                    this.y = initial ? Math.random() * canvas.height : Math.random() * canvas.height;
+                    this.size = CONFIG.sizeRange.min + Math.random() * (CONFIG.sizeRange.max - CONFIG.sizeRange.min);
+                    this.type = TYPES[Math.floor(Math.random() * TYPES.length)];
+                    this.rotation = Math.random() * Math.PI * 2;
+                    this.rotationSpeed = (CONFIG.rotationSpeed.min + Math.random() * (CONFIG.rotationSpeed.max - CONFIG.rotationSpeed.min)) * (Math.random() > 0.5 ? 1 : -1);
+
+                    const speed = CONFIG.speed.min + Math.random() * (CONFIG.speed.max - CONFIG.speed.min);
+                    const angle = Math.random() * Math.PI * 2;
+                    this.vx = Math.cos(angle) * speed;
+                    this.vy = Math.sin(angle) * speed;
+
+                    // Visual properties
+                    this.isCyan = Math.random() > 0.3; // 70% cyan, 30% white
+                    this.baseOpacity = 0.1 + Math.random() * 0.2;
+                    this.pulseOffset = Math.random() * Math.PI * 2;
+                    this.pulseSpeed = 0.01 + Math.random() * 0.02;
+                }
+
+                update(time) {
+                    // Movement
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.rotation += this.rotationSpeed;
+
+                    // Wrap around edges with padding
+                    const padding = this.size;
+                    if (this.x < -padding) this.x = canvas.width + padding;
+                    if (this.x > canvas.width + padding) this.x = -padding;
+                    if (this.y < -padding) this.y = canvas.height + padding;
+                    if (this.y > canvas.height + padding) this.y = -padding;
+
+                    // Calculate current opacity with pulse
+                    this.currentOpacity = this.baseOpacity + Math.sin(time * this.pulseSpeed + this.pulseOffset) * 0.1;
+                }
+
+                draw(ctx) {
+                    const color = this.isCyan ? CONFIG.colors.cyan : CONFIG.colors.white;
+
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.rotation);
+
+                    // Fill
+                    ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${this.currentOpacity * 0.5})`;
+                    // Stroke
+                    ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${this.currentOpacity + 0.2})`;
+                    ctx.lineWidth = 1.5;
+
+                    ctx.beginPath();
+
+                    if (this.type === 'circle') {
+                        ctx.arc(0, 0, this.size / 2, 0, Math.PI * 2);
+                    } else {
+                        const sides = this.type === 'triangle' ? 3 : this.type === 'pentagon' ? 5 : 6;
+                        this.drawPolygon(ctx, sides);
+                    }
+
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                drawPolygon(ctx, sides) {
+                    const radius = this.size / 2;
+                    for (let i = 0; i < sides; i++) {
+                        const angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
+                        const x = Math.cos(angle) * radius;
+                        const y = Math.sin(angle) * radius;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                }
+            }
+
+            // Draw connections between nearby shapes
+            function drawConnections(time) {
+                ctx.lineWidth = 0.5;
+
+                for (let i = 0; i < shapes.length; i++) {
+                    for (let j = i + 1; j < shapes.length; j++) {
+                        const dx = shapes[i].x - shapes[j].x;
+                        const dy = shapes[i].y - shapes[j].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < CONFIG.connectionDistance) {
+                            const opacity = (1 - distance / CONFIG.connectionDistance) * 0.15;
+                            ctx.strokeStyle = `rgba(0, 168, 232, ${opacity})`;
+                            ctx.beginPath();
+                            ctx.moveTo(shapes[i].x, shapes[i].y);
+                            ctx.lineTo(shapes[j].x, shapes[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            // Draw gradient background
+            function drawBackground() {
+                const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                gradient.addColorStop(0, '#003366');
+                gradient.addColorStop(1, '#0077b6');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Animation loop
+            function animate(time) {
+                drawBackground();
+
+                // Update and draw shapes
+                shapes.forEach(shape => {
+                    shape.update(time);
+                    shape.draw(ctx);
+                });
+
+                // Draw connections
+                drawConnections(time);
+
+                animationId = requestAnimationFrame(animate);
+            }
+
+            // Resize handler
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+
+            // Initialize
+            function init() {
+                resize();
+
+                // Create shapes
+                shapes = [];
+                for (let i = 0; i < CONFIG.shapeCount; i++) {
+                    shapes.push(new Shape());
+                }
+
+                // Start animation
+                animate(0);
+            }
+
+            // Event listeners
+            window.addEventListener('resize', () => {
+                resize();
+            });
+
+            // Start
+            init();
+
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', () => {
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+            });
+        })();
     </script>
 </body>
 </html>

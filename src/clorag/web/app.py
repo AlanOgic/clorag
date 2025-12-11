@@ -1027,6 +1027,12 @@ async def help_page(request: Request):
     return templates.TemplateResponse("help.html", {"request": request})
 
 
+@app.get("/video", response_class=HTMLResponse)
+async def video_page(request: Request):
+    """Public video showcase page."""
+    return templates.TemplateResponse("video.html", {"request": request})
+
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_index(request: Request):
     """Admin index page with links to all admin pages."""

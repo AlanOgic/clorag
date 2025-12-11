@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Cyanview - Broadcast Camera Control Solutions</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #000;
+        }
+
+        /* Animated geometric background */
+        #geometricBg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        /* Overlay for darkening background behind video */
+        .video-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 1;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 2rem;
+            background: rgba(0, 51, 102, 0.9);
+            backdrop-filter: blur(10px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+            filter: brightness(0) invert(1);
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover {
+            color: var(--cyan-blue);
+        }
+
+        .navbar__link--active {
+            color: var(--cyan-blue);
+            font-weight: 600;
+        }
+
+        /* Video Container */
+        .video-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            width: 90%;
+            max-width: 1200px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), 0 0 60px rgba(0, 168, 232, 0.3);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            background: #000;
+        }
+
+        .video-wrapper video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Video title overlay */
+        .video-title {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 2rem;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+            color: white;
+            z-index: 20;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .video-container:hover .video-title {
+            opacity: 1;
+        }
+
+        .video-title h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .video-title p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        /* CTA Buttons */
+        .cta-container {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .cta-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .cta-btn--primary {
+            background: var(--cyan-blue);
+            color: white;
+        }
+
+        .cta-btn--primary:hover {
+            background: var(--cyan-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 168, 232, 0.4);
+        }
+
+        .cta-btn--secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .cta-btn--secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .cta-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 0.5rem 1rem;
+            }
+
+            .navbar__links {
+                gap: 1rem;
+            }
+
+            .navbar__link {
+                font-size: 0.8rem;
+            }
+
+            .video-container {
+                width: 95%;
+            }
+
+            .cta-container {
+                bottom: 1rem;
+                padding: 0 1rem;
+            }
+
+            .cta-btn {
+                padding: 0.75rem 1.25rem;
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .navbar__brand span {
+                display: none;
+            }
+
+            .cta-container {
+                flex-direction: column;
+                width: calc(100% - 2rem);
+            }
+
+            .cta-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="geometricBg"></canvas>
+    <div class="video-overlay"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>Cyanview</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="https://support.cyanview.com/docs/" class="navbar__link" target="_blank">Docs</a>
+            <a href="https://cyanview.com" class="navbar__link" target="_blank">Cyanview.com</a>
+        </div>
+    </nav>
+
+    <!-- Video Container -->
+    <div class="video-container">
+        <div class="video-wrapper">
+            <video id="mainVideo" autoplay muted loop playsinline>
+                <source src="/static/vid/cyanview_teaser.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div class="video-title">
+            <h1>Professional Camera Control</h1>
+            <p>Unified control for any camera in broadcast and live production</p>
+        </div>
+    </div>
+
+    <!-- CTA Buttons -->
+    <div class="cta-container">
+        <a href="/" class="cta-btn cta-btn--primary">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            AI Search
+        </a>
+        <a href="/cameras" class="cta-btn cta-btn--secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            Camera Compatibility
+        </a>
+        <a href="https://cyanview.com" class="cta-btn cta-btn--secondary" target="_blank">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            Visit Website
+        </a>
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════════════
+        // Animated Geometric Background
+        // ═══════════════════════════════════════════════════════════════════
+        (function() {
+            const canvas = document.getElementById('geometricBg');
+            const ctx = canvas.getContext('2d');
+
+            // Configuration
+            const CONFIG = {
+                shapeCount: 35,
+                connectionDistance: 180,
+                speed: { min: 0.1, max: 0.35 },
+                rotationSpeed: { min: 0.0008, max: 0.002 },
+                sizeRange: { min: 20, max: 70 },
+                colors: {
+                    cyan: { r: 0, g: 168, b: 232 },
+                    white: { r: 255, g: 255, b: 255 }
+                }
+            };
+
+            let shapes = [];
+            let animationId;
+
+            // Shape types
+            const TYPES = ['hexagon', 'pentagon', 'triangle', 'circle'];
+
+            // Shape class
+            class Shape {
+                constructor() {
+                    this.reset(true);
+                }
+
+                reset(initial = false) {
+                    this.x = initial ? Math.random() * canvas.width : Math.random() * canvas.width;
+                    this.y = initial ? Math.random() * canvas.height : Math.random() * canvas.height;
+                    this.size = CONFIG.sizeRange.min + Math.random() * (CONFIG.sizeRange.max - CONFIG.sizeRange.min);
+                    this.type = TYPES[Math.floor(Math.random() * TYPES.length)];
+                    this.rotation = Math.random() * Math.PI * 2;
+                    this.rotationSpeed = (CONFIG.rotationSpeed.min + Math.random() * (CONFIG.rotationSpeed.max - CONFIG.rotationSpeed.min)) * (Math.random() > 0.5 ? 1 : -1);
+
+                    const speed = CONFIG.speed.min + Math.random() * (CONFIG.speed.max - CONFIG.speed.min);
+                    const angle = Math.random() * Math.PI * 2;
+                    this.vx = Math.cos(angle) * speed;
+                    this.vy = Math.sin(angle) * speed;
+
+                    // Visual properties
+                    this.isCyan = Math.random() > 0.25; // 75% cyan, 25% white
+                    this.baseOpacity = 0.08 + Math.random() * 0.15;
+                    this.pulseOffset = Math.random() * Math.PI * 2;
+                    this.pulseSpeed = 0.008 + Math.random() * 0.015;
+                }
+
+                update(time) {
+                    // Movement
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.rotation += this.rotationSpeed;
+
+                    // Wrap around edges with padding
+                    const padding = this.size;
+                    if (this.x < -padding) this.x = canvas.width + padding;
+                    if (this.x > canvas.width + padding) this.x = -padding;
+                    if (this.y < -padding) this.y = canvas.height + padding;
+                    if (this.y > canvas.height + padding) this.y = -padding;
+
+                    // Calculate current opacity with pulse
+                    this.currentOpacity = this.baseOpacity + Math.sin(time * this.pulseSpeed + this.pulseOffset) * 0.08;
+                }
+
+                draw(ctx) {
+                    const color = this.isCyan ? CONFIG.colors.cyan : CONFIG.colors.white;
+
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.rotation);
+
+                    // Fill
+                    ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${this.currentOpacity * 0.4})`;
+                    // Stroke
+                    ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${this.currentOpacity + 0.15})`;
+                    ctx.lineWidth = 1.5;
+
+                    ctx.beginPath();
+
+                    if (this.type === 'circle') {
+                        ctx.arc(0, 0, this.size / 2, 0, Math.PI * 2);
+                    } else {
+                        const sides = this.type === 'triangle' ? 3 : this.type === 'pentagon' ? 5 : 6;
+                        this.drawPolygon(ctx, sides);
+                    }
+
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                drawPolygon(ctx, sides) {
+                    const radius = this.size / 2;
+                    for (let i = 0; i < sides; i++) {
+                        const angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
+                        const x = Math.cos(angle) * radius;
+                        const y = Math.sin(angle) * radius;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                }
+            }
+
+            // Draw connections between nearby shapes
+            function drawConnections(time) {
+                ctx.lineWidth = 0.5;
+
+                for (let i = 0; i < shapes.length; i++) {
+                    for (let j = i + 1; j < shapes.length; j++) {
+                        const dx = shapes[i].x - shapes[j].x;
+                        const dy = shapes[i].y - shapes[j].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < CONFIG.connectionDistance) {
+                            const opacity = (1 - distance / CONFIG.connectionDistance) * 0.1;
+                            ctx.strokeStyle = `rgba(0, 168, 232, ${opacity})`;
+                            ctx.beginPath();
+                            ctx.moveTo(shapes[i].x, shapes[i].y);
+                            ctx.lineTo(shapes[j].x, shapes[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            // Draw gradient background
+            function drawBackground() {
+                const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                gradient.addColorStop(0, '#001a33');
+                gradient.addColorStop(0.5, '#003366');
+                gradient.addColorStop(1, '#0077b6');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Animation loop
+            function animate(time) {
+                drawBackground();
+
+                // Update and draw shapes
+                shapes.forEach(shape => {
+                    shape.update(time);
+                    shape.draw(ctx);
+                });
+
+                // Draw connections
+                drawConnections(time);
+
+                animationId = requestAnimationFrame(animate);
+            }
+
+            // Resize handler
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+
+            // Initialize
+            function init() {
+                resize();
+
+                // Create shapes
+                shapes = [];
+                for (let i = 0; i < CONFIG.shapeCount; i++) {
+                    shapes.push(new Shape());
+                }
+
+                // Start animation
+                animate(0);
+            }
+
+            // Event listeners
+            window.addEventListener('resize', () => {
+                resize();
+            });
+
+            // Start
+            init();
+
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', () => {
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+            });
+        })();
+
+        // Video autoplay handling
+        const video = document.getElementById('mainVideo');
+        video.play().catch(function(error) {
+            console.log('Autoplay prevented:', error);
+        });
+    </script>
+</body>
+</html>
