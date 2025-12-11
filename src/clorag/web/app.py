@@ -153,7 +153,7 @@ STRUCTURE:
 3. End conversationally - brief closing, then relevant doc links
 
 FORMAT RULES:
-- **Bold** product names (RCP, RIO, CI0, VP4, CVP)
+- **Bold** product names (RCP, RIO, CI0, VP4)
 - Bullet points for specs, features, options
 - Numbered steps for procedures
 - Code blocks for IP addresses, commands, config values
@@ -171,7 +171,7 @@ graph LR
 Include diagrams when:
 - Explaining how to connect cameras to RIO/RCP/CI0/VP4
 - Describing network topology or IP setup
-- Showing signal flow (video, control, tally)
+- Showing signal flow (control, tally)
 - Multi-device integration scenarios
 
 Keep diagrams simple and focused. Use `graph LR` for signal flows, `graph TB` for hierarchies.
