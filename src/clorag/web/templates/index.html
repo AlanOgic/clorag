@@ -502,8 +502,8 @@
             stroke-width: 2px !important;
         }
 
-        /* Signal path - orange dotted stroke */
-        .answer-content .mermaid-container svg .edgePath.signal path {
+        /* Control signal path (RCP to camera) - orange dotted stroke */
+        .answer-content .mermaid-container svg .edgePath.control path {
             stroke: #F57C00 !important;
             stroke-width: 2px !important;
             stroke-dasharray: 5, 5 !important;
@@ -1290,10 +1290,11 @@
             const edges = svg.querySelectorAll('.edgePath path');
             const edgeLabels = svg.querySelectorAll('.edgeLabel');
 
-            // Network keywords
+            // Connection type keywords
             const networkKeywords = ['ethernet', 'ip', 'network', 'lan', 'rj45', 'tcp', 'udp', 'poe'];
             const serialKeywords = ['serial', 'rs-485', 'rs-232', 'rs485', 'rs232', 'lanc', 'visca'];
-            const signalKeywords = ['signal', 'video', 'sdi', 'hdmi', 'ndi', 'srt'];
+            // Control signal path: RCP to camera control commands (not video stream)
+            const controlSignalKeywords = ['control', 'signal', 'command', 'ctrl', 'rcp'];
 
             edgeLabels.forEach((edgeLabel, index) => {
                 const labelText = edgeLabel.textContent.toLowerCase();
@@ -1302,7 +1303,7 @@
 
                 const isNetwork = networkKeywords.some(kw => labelText.includes(kw));
                 const isSerial = serialKeywords.some(kw => labelText.includes(kw));
-                const isSignal = signalKeywords.some(kw => labelText.includes(kw));
+                const isControlSignal = controlSignalKeywords.some(kw => labelText.includes(kw));
 
                 if (isNetwork) {
                     // Network wires: blue solid
@@ -1312,8 +1313,8 @@
                     // Serial wires: orange solid
                     edge.setAttribute('stroke', '#F57C00');
                     edge.setAttribute('stroke-width', '2');
-                } else if (isSignal) {
-                    // Signal path: orange dotted
+                } else if (isControlSignal) {
+                    // Control signal path (RCP to camera): orange dotted
                     edge.setAttribute('stroke', '#F57C00');
                     edge.setAttribute('stroke-width', '2');
                     edge.setAttribute('stroke-dasharray', '5, 5');
