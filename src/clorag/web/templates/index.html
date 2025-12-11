@@ -17,16 +17,26 @@
             startOnLoad: false,
             theme: 'base',
             themeVariables: {
+                // Cyanview devices: Blue background with white text (default)
                 primaryColor: '#003366',
                 primaryTextColor: '#fff',
                 primaryBorderColor: '#0077b6',
-                lineColor: '#00a8e8',
+                // Network wires in blue
+                lineColor: '#0077b6',
+                // Secondary/tertiary colors
                 secondaryColor: '#e8f4fc',
-                tertiaryColor: '#f8f9fa'
+                tertiaryColor: '#f8f9fa',
+                // Text colors
+                textColor: '#1c1e21',
+                // Edge/link colors
+                edgeLabelBackground: '#fff'
             },
             flowchart: {
                 useMaxWidth: true,
-                htmlLabels: true
+                htmlLabels: true,
+                curve: 'basis',
+                nodeSpacing: 50,
+                rankSpacing: 50
             }
         });
         window.mermaid = mermaid;
@@ -402,10 +412,12 @@
 
         /* Mermaid diagram containers */
         .answer-content .mermaid-container {
+            position: relative;
             background: #f8f9fa;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             padding: 1rem;
+            padding-top: 2.5rem;
             margin: 1rem 0;
             text-align: center;
             overflow-x: auto;
@@ -414,6 +426,87 @@
         .answer-content .mermaid-container svg {
             max-width: 100%;
             height: auto;
+        }
+
+        /* Mermaid copy button */
+        .mermaid-copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.35rem 0.7rem;
+            background: white;
+            border: 1px solid #d0d0d0;
+            border-radius: 5px;
+            color: #606770;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        .mermaid-copy-btn:hover {
+            background: #e8f4fc;
+            border-color: var(--cyan-dark);
+            color: var(--cyan-dark);
+        }
+
+        .mermaid-copy-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .mermaid-copy-btn.copied {
+            background: #e8f5e9;
+            border-color: #4caf50;
+            color: #2e7d32;
+        }
+
+        /* Mermaid diagram custom styling - Cameras (orange, rounded) */
+        .answer-content .mermaid-container svg .node.camera rect,
+        .answer-content .mermaid-container svg .node.camera polygon {
+            fill: #FFE0B2 !important;
+            stroke: #F57C00 !important;
+            rx: 10px;
+            ry: 10px;
+        }
+
+        .answer-content .mermaid-container svg .node.camera .nodeLabel {
+            color: #1c1e21 !important;
+            fill: #1c1e21 !important;
+        }
+
+        /* Cyanview devices (blue, default) - ensure white text */
+        .answer-content .mermaid-container svg .node.cyanview rect,
+        .answer-content .mermaid-container svg .node.cyanview polygon {
+            fill: #003366 !important;
+            stroke: #0077b6 !important;
+        }
+
+        .answer-content .mermaid-container svg .node.cyanview .nodeLabel {
+            color: #fff !important;
+            fill: #fff !important;
+        }
+
+        /* Network wires - blue solid stroke */
+        .answer-content .mermaid-container svg .edgePath.network path {
+            stroke: #0077b6 !important;
+            stroke-width: 2px !important;
+        }
+
+        /* Serial wires - orange solid stroke */
+        .answer-content .mermaid-container svg .edgePath.serial path {
+            stroke: #F57C00 !important;
+            stroke-width: 2px !important;
+        }
+
+        /* Signal path - orange dotted stroke */
+        .answer-content .mermaid-container svg .edgePath.signal path {
+            stroke: #F57C00 !important;
+            stroke-width: 2px !important;
+            stroke-dasharray: 5, 5 !important;
         }
 
         .results-header {
@@ -1108,16 +1201,151 @@
                 diagramDiv.className = 'mermaid-container';
                 const diagramId = `mermaid-diagram-${++mermaidCounter}`;
 
+                // Store original mermaid code for copy functionality
+                diagramDiv.dataset.mermaidCode = mermaidCode;
+
                 try {
+                    // Create copy button
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'mermaid-copy-btn';
+                    copyBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copy code</span>
+                    `;
+                    copyBtn.onclick = () => copyMermaidCode(copyBtn, mermaidCode);
+
                     // Render the diagram
                     const { svg } = await window.mermaid.render(diagramId, mermaidCode);
-                    diagramDiv.innerHTML = svg;
+
+                    // Apply custom styling based on node types
+                    const styledSvg = applyMermaidStyles(svg);
+
+                    diagramDiv.appendChild(copyBtn);
+                    diagramDiv.insertAdjacentHTML('beforeend', styledSvg);
                     pre.replaceWith(diagramDiv);
                 } catch (error) {
                     console.error('Mermaid rendering error:', error);
                     // Keep code block visible on error, add error styling
                     pre.style.borderLeft = '3px solid #dc3545';
                 }
+            }
+        }
+
+        // Apply custom styles to Mermaid SVG based on node content
+        function applyMermaidStyles(svgString) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgString, 'image/svg+xml');
+            const svg = doc.querySelector('svg');
+
+            if (!svg) return svgString;
+
+            // Camera keywords for detection
+            const cameraKeywords = ['camera', 'sony', 'canon', 'panasonic', 'blackmagic', 'red', 'arri',
+                                    'fx6', 'fx3', 'fx9', 'a7', 'c70', 'c300', 'c500', 'eva1', 'gh6', 'bmpcc',
+                                    'ptz', 'brc', 'aw-ue', 'cr-n'];
+            const cyanviewKeywords = ['rcp', 'rio', 'ci0', 'vp4', 'cyanview'];
+
+            // Process all nodes
+            const nodes = svg.querySelectorAll('.node');
+            nodes.forEach(node => {
+                const label = node.querySelector('.nodeLabel');
+                const labelText = label ? label.textContent.toLowerCase() : '';
+
+                // Check if it's a camera node
+                const isCamera = cameraKeywords.some(kw => labelText.includes(kw));
+                const isCyanview = cyanviewKeywords.some(kw => labelText.includes(kw));
+
+                if (isCamera && !isCyanview) {
+                    // Style as camera: light orange, black text, rounded
+                    const rect = node.querySelector('rect');
+                    if (rect) {
+                        rect.setAttribute('fill', '#FFE0B2');
+                        rect.setAttribute('stroke', '#F57C00');
+                        rect.setAttribute('stroke-width', '2');
+                        rect.setAttribute('rx', '10');
+                        rect.setAttribute('ry', '10');
+                    }
+                    if (label) {
+                        label.style.fill = '#1c1e21';
+                        label.style.color = '#1c1e21';
+                    }
+                } else if (isCyanview) {
+                    // Style as Cyanview device: blue, white text
+                    const rect = node.querySelector('rect');
+                    if (rect) {
+                        rect.setAttribute('fill', '#003366');
+                        rect.setAttribute('stroke', '#0077b6');
+                        rect.setAttribute('stroke-width', '2');
+                    }
+                    if (label) {
+                        label.style.fill = '#ffffff';
+                        label.style.color = '#ffffff';
+                    }
+                }
+            });
+
+            // Process all edges for link styling
+            const edges = svg.querySelectorAll('.edgePath path');
+            const edgeLabels = svg.querySelectorAll('.edgeLabel');
+
+            // Network keywords
+            const networkKeywords = ['ethernet', 'ip', 'network', 'lan', 'rj45', 'tcp', 'udp', 'poe'];
+            const serialKeywords = ['serial', 'rs-485', 'rs-232', 'rs485', 'rs232', 'lanc', 'visca'];
+            const signalKeywords = ['signal', 'video', 'sdi', 'hdmi', 'ndi', 'srt'];
+
+            edgeLabels.forEach((edgeLabel, index) => {
+                const labelText = edgeLabel.textContent.toLowerCase();
+                const edge = edges[index];
+                if (!edge) return;
+
+                const isNetwork = networkKeywords.some(kw => labelText.includes(kw));
+                const isSerial = serialKeywords.some(kw => labelText.includes(kw));
+                const isSignal = signalKeywords.some(kw => labelText.includes(kw));
+
+                if (isNetwork) {
+                    // Network wires: blue solid
+                    edge.setAttribute('stroke', '#0077b6');
+                    edge.setAttribute('stroke-width', '2');
+                } else if (isSerial) {
+                    // Serial wires: orange solid
+                    edge.setAttribute('stroke', '#F57C00');
+                    edge.setAttribute('stroke-width', '2');
+                } else if (isSignal) {
+                    // Signal path: orange dotted
+                    edge.setAttribute('stroke', '#F57C00');
+                    edge.setAttribute('stroke-width', '2');
+                    edge.setAttribute('stroke-dasharray', '5, 5');
+                }
+            });
+
+            return new XMLSerializer().serializeToString(svg);
+        }
+
+        // Copy mermaid code to clipboard
+        async function copyMermaidCode(button, code) {
+            try {
+                await navigator.clipboard.writeText(code);
+
+                // Visual feedback
+                const span = button.querySelector('span');
+                const originalText = span.textContent;
+                button.classList.add('copied');
+                span.textContent = 'Copied!';
+
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                    span.textContent = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('Copy failed:', err);
+                const span = button.querySelector('span');
+                span.textContent = 'Failed';
+                setTimeout(() => {
+                    span.textContent = 'Copy code';
+                }, 2000);
             }
         }
 
