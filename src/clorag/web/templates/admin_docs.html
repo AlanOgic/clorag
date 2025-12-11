@@ -797,10 +797,30 @@ uv run ingest-curated --offset 600 --max-threads 300</code></pre>
                 <h3>Admin Interface</h3>
                 <p>Access the Knowledge Base manager at <a href="/admin/knowledge">/admin/knowledge</a>:</p>
                 <ul>
-                    <li><strong>Add Document</strong> - Create new documents with full metadata</li>
+                    <li><strong>Add Document</strong> - Two input modes:
+                        <ul>
+                            <li><em>Paste Text</em> - Enter content directly in a textarea</li>
+                            <li><em>Upload File</em> - Drag-and-drop or browse for .txt, .md, or .pdf files</li>
+                        </ul>
+                    </li>
                     <li><strong>Browse Documents</strong> - List all documents with filtering by category and expired status</li>
                     <li><strong>Edit Document</strong> - Update content and metadata (triggers re-embedding)</li>
                     <li><strong>Delete Document</strong> - Remove document and all its chunks from the vector store</li>
+                </ul>
+
+                <h3>File Upload</h3>
+                <p>The file upload feature supports:</p>
+                <table>
+                    <tr><th>Format</th><th>Processing</th></tr>
+                    <tr><td>.txt</td><td>Plain text, UTF-8 with latin-1 fallback</td></tr>
+                    <tr><td>.md</td><td>Markdown text, UTF-8 with latin-1 fallback</td></tr>
+                    <tr><td>.pdf</td><td>Text extraction using pypdf library</td></tr>
+                </table>
+                <ul>
+                    <li>Maximum file size is determined by server configuration</li>
+                    <li>Minimum content length: 10 characters after extraction</li>
+                    <li>Title auto-populated from filename if not specified</li>
+                    <li>All other metadata (category, tags, etc.) can be set during upload</li>
                 </ul>
 
                 <div class="info-box info-box--info">
@@ -973,7 +993,7 @@ curl https://cyanview.cloud/api/admin/search-stats \
                 <table>
                     <tr><th>Category</th><th>Endpoints</th></tr>
                     <tr><td>Cameras</td><td><code>POST/PUT/DELETE /api/admin/cameras</code></td></tr>
-                    <tr><td>Knowledge Base</td><td><code>GET/POST/PUT/DELETE /api/admin/knowledge</code></td></tr>
+                    <tr><td>Knowledge Base</td><td><code>GET/POST/PUT/DELETE /api/admin/knowledge</code>, <code>POST /api/admin/knowledge/upload</code></td></tr>
                     <tr><td>Analytics</td><td><code>GET /api/admin/search-stats</code>, <code>/api/admin/search/{id}</code></td></tr>
                     <tr><td>Drafts</td><td><code>GET/POST /api/admin/drafts/*</code></td></tr>
                     <tr><td>Session</td><td><code>POST /api/admin/login</code>, <code>/api/admin/logout</code></td></tr>
@@ -1023,7 +1043,15 @@ curl -X PUT https://cyanview.cloud/api/admin/knowledge/123 \
 
 # Delete document
 curl -X DELETE https://cyanview.cloud/api/admin/knowledge/123 \
-  -H "X-Admin-Password: your_password"</code></pre>
+  -H "X-Admin-Password: your_password"
+
+# Upload file (PDF, TXT, or MD)
+curl -X POST https://cyanview.cloud/api/admin/knowledge/upload \
+  -H "X-Admin-Password: your_password" \
+  -F "file=@/path/to/document.pdf" \
+  -F "title=RIO Release Notes" \
+  -F "category=firmware" \
+  -F "tags=rio, v2.5.0"</code></pre>
 
                 <h3>Error Handling</h3>
                 <table>
@@ -1314,7 +1342,7 @@ QDRANT_API_KEY=your_qdrant_key               # Secures vector database</code></p
                     <span class="endpoint__method endpoint__method--post">POST</span>
                     <span class="endpoint__path">/api/admin/knowledge</span>
                 </div>
-                <p>Create a new custom document. Chunks, embeds, and stores in Qdrant. Requires authentication.</p>
+                <p>Create a new custom document from JSON. Chunks, embeds, and stores in Qdrant. Requires authentication.</p>
                 <pre><code>{
   "title": "RIO v2.5.0 Release Notes",
   "content": "Full document content here...",
@@ -1324,6 +1352,19 @@ QDRANT_API_KEY=your_qdrant_key               # Secures vector database</code></p
   "expires_at": "2025-12-31",
   "notes": "Internal admin notes"
 }</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/knowledge/upload</span>
+                </div>
+                <p>Upload a file (.txt, .md, .pdf) as a custom document. Uses multipart/form-data. Requires authentication.</p>
+                <pre><code>Form fields:
+  file: [binary file data]    // Required: .txt, .md, or .pdf
+  title: "Document Title"     // Optional: uses filename if empty
+  category: "firmware"        // Optional: default "other"
+  tags: "rio, v2.5.0"        // Optional: comma-separated
+  url_reference: "https://..." // Optional
+  notes: "Admin notes"        // Optional</code></pre>
 
                 <div class="endpoint">
                     <span class="endpoint__method endpoint__method--put">PUT</span>
