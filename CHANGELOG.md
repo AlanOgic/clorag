@@ -2,6 +2,38 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.4.0] - 2025-12-22
+
+### Added
+- **Query Embedding Cache**
+  - Thread-safe LRU cache for both dense (Voyage AI) and sparse (BM25) query embeddings
+  - Cache size: 200 unique queries per embedding type
+  - Reduces API costs and latency for repeated queries
+  - Hit rate statistics for monitoring (`cache.stats()`)
+
+- **Dynamic Score Thresholds**
+  - Adaptive filtering based on query characteristics
+  - Short queries (≤2 words): permissive threshold (0.15)
+  - Medium queries (3-5 words): moderate threshold (0.20)
+  - Long/specific queries (>5 words): strict threshold (0.25)
+  - Technical terms (rio, rcp, firmware, etc.) increase threshold by 0.05
+  - Always returns minimum 3 results regardless of threshold
+
+- **Paginated Document Listing**
+  - Knowledge base API now supports pagination with offset parameter
+  - Returns total count for pagination UI
+  - Incremental scrolling (batches of 100) instead of loading all chunks
+  - Early exit optimization when enough documents collected
+
+### Changed
+- Knowledge base list API response now includes `total`, `limit`, `offset` fields
+- Improved error handling for document upload with detailed logging
+
+### Documentation
+- Updated admin docs with Performance Optimizations section
+- Updated CLAUDE.md with new caching and threshold patterns
+- Updated README.md features list
+
 ## [0.3.9] - 2025-12-11
 
 ### Added

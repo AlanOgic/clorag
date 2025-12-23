@@ -33,12 +33,20 @@ uv run ingest-curated --max-threads 300
 # Incremental ingestion (skip first N threads)
 uv run ingest-curated --offset 300 --max-threads 300
 
+# Draft auto-reply for unanswered threads
+uv run draft-support
+uv run draft-support --preview  # Preview without creating
+
+# Enrich camera model codes from documentation
+uv run enrich-cameras
+
 # Linting and type checking
 uv run ruff check src/
 uv run mypy src/clorag --strict
 
 # Tests
 uv run pytest
+uv run pytest tests/test_file.py::test_name -v  # Single test
 ```
 
 ## Architecture
@@ -68,6 +76,11 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 - `quality_controller.py` - Claude Sonnet for QC refinement of resolved cases
 - `camera_extractor.py` - LLM-based camera info extraction from docs/support cases
 
+**Drafts Layer** (`src/clorag/drafts/`):
+- `gmail_service.py` - Gmail API with draft creation
+- `draft_generator.py` - RAG-based response generator
+- `draft_pipeline.py` - Draft creation orchestration
+
 **Services Layer** (`src/clorag/services/`):
 - `custom_docs.py` - `CustomDocumentService` for CRUD operations on custom knowledge documents (chunking, embedding, Qdrant storage)
 
@@ -77,9 +90,11 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 - Knowledge base management: `/admin/knowledge` for custom documents
 - Analytics dashboard: `/admin/analytics` with search stats and history
 - Draft management: `/admin/drafts` for auto-reply system
+- Chunk editor: `/admin/chunks` for browsing, searching, editing vector database chunks
 - REST API for cameras: `GET/POST/PUT/DELETE /api/cameras`
 - REST API for knowledge: `GET/POST/PUT/DELETE /api/admin/knowledge`, `POST /api/admin/knowledge/upload` (file upload)
 - REST API for analytics: `GET /api/admin/search-stats`
+- REST API for chunks: `GET/PUT/DELETE /api/admin/chunks`
 
 **Models Layer** (`src/clorag/models/`):
 - `camera.py` - Camera Pydantic models with CameraSource enum for tracking data origin
@@ -123,6 +138,17 @@ VectorStore uses `AsyncQdrantClient`. All search methods are async and use `asyn
 ### Hybrid Search
 Search endpoints generate both dense and sparse query vectors, then use RRF (Reciprocal Rank Fusion) to combine semantic and keyword results across all three collections (docs, cases, custom_docs).
 
+### Query Embedding Cache
+Both dense (Voyage AI) and sparse (BM25) query embeddings are cached using thread-safe LRU caches (200 entries each). Cache is keyed by query text + model + dimensions. Check `embeddings.py:get_query_cache()` and `sparse_embeddings.py:SparseQueryCache`.
+
+### Dynamic Score Thresholds
+Search results are filtered using adaptive thresholds in `app.py:_compute_dynamic_threshold()`:
+- Short queries (≤2 words): threshold 0.15 (permissive)
+- Medium queries (3-5 words): threshold 0.20
+- Long queries (>5 words): threshold 0.25 (strict)
+- Technical terms (rio, rcp, firmware): +0.05 boost
+- Always returns minimum 3 results regardless of threshold
+
 ### Contextualized Embeddings
 Documents are embedded using `voyage-context-3`'s `contextualized_embed()` which encodes chunk content with full document context for improved retrieval.
 
@@ -131,6 +157,9 @@ Gmail threads are anonymized before LLM analysis using placeholder tokens (`[SER
 
 ### Camera Extraction
 During ingestion, camera information is automatically extracted from documentation and support cases using Claude Haiku. Data is merged using upsert pattern to combine info from multiple sources.
+
+### Human-Modified Data Protection
+Chunks and cameras manually edited via admin UI must NOT be overwritten by automated processes (RAG ingestion, enrich-cameras). Check for human modification flags before updating existing records.
 
 ### Admin Authentication
 Admin routes are protected by session-based authentication with brute force protection (5 failed attempts triggers 5-minute lockout per IP). Set `ADMIN_PASSWORD` env var to enable admin access. Login at `/admin/login`.

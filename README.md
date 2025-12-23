@@ -13,6 +13,8 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 - **Session-Based Admin** - Secure login with signed cookies for all admin features
 - **Streaming Responses** - Real-time answer streaming for better UX
 - **Draft Auto-Reply System** - AI-powered draft creation for unanswered support threads
+- **Query Embedding Cache** - LRU cache reduces API calls for repeated queries
+- **Dynamic Score Thresholds** - Adaptive filtering based on query characteristics
 
 ## Architecture
 

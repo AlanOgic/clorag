@@ -193,38 +193,62 @@ class CustomDocumentService:
     async def list_documents(
         self,
         limit: int = 50,
+        offset: int = 0,
         category: str | None = None,
         include_expired: bool = False,
-    ) -> list[CustomDocumentListItem]:
-        """List all custom documents (unique by parent_doc_id).
+    ) -> tuple[list[CustomDocumentListItem], int]:
+        """List custom documents with pagination (unique by parent_doc_id).
+
+        Uses incremental scrolling to avoid loading all chunks at once.
 
         Args:
-            limit: Maximum number of documents to return.
+            limit: Maximum number of documents to return per page.
+            offset: Number of documents to skip (for pagination).
             category: Filter by category.
             include_expired: Include expired documents.
 
         Returns:
-            List of CustomDocumentListItem.
+            Tuple of (list of CustomDocumentListItem, total count).
         """
-        # Get all chunks and group by parent_doc_id
+        # Scroll through chunks incrementally to find unique documents
+        # Only fetch first chunks (chunk_index=0) to get document metadata
+        docs_map: dict[str, dict] = {}
+        scroll_offset: str | None = None
+        batch_size = 100  # Scroll in batches instead of loading all
+
         try:
-            all_chunks, _ = await self._vectorstore.scroll_chunks(
-                collection=self._vectorstore.custom_docs_collection,
-                limit=1000,  # Get all to group
-            )
+            while True:
+                chunks, next_offset = await self._vectorstore.scroll_chunks(
+                    collection=self._vectorstore.custom_docs_collection,
+                    limit=batch_size,
+                    offset=scroll_offset,
+                )
+
+                if not chunks:
+                    break
+
+                # Group by parent_doc_id, keep only first chunk (chunk_index=0)
+                for chunk in chunks:
+                    payload = chunk["payload"]
+                    parent_id = payload.get("parent_doc_id")
+                    if parent_id and payload.get("chunk_index", 0) == 0:
+                        if parent_id not in docs_map:
+                            docs_map[parent_id] = payload
+
+                # Stop if we've collected enough documents (with buffer for filtering)
+                # Only stop early if we have way more than needed
+                if len(docs_map) >= (limit + offset) * 3:
+                    break
+
+                scroll_offset = next_offset
+                if scroll_offset is None:
+                    break
+
         except Exception:
             # Collection might not exist yet - return empty list
-            return []
+            return [], 0
 
-        # Group by parent_doc_id, keep only first chunk (chunk_index=0)
-        docs_map: dict[str, dict] = {}
-        for chunk in all_chunks:
-            payload = chunk["payload"]
-            parent_id = payload.get("parent_doc_id")
-            if parent_id and payload.get("chunk_index", 0) == 0:
-                docs_map[parent_id] = payload
-
-        # Convert to list items
+        # Convert to list items with filtering
         now = datetime.utcnow()
         items = []
         for doc_id, payload in docs_map.items():
@@ -258,7 +282,12 @@ class CustomDocumentService:
 
         # Sort by created_at descending
         items.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
-        return items[:limit]
+
+        total_count = len(items)
+        # Apply pagination
+        paginated_items = items[offset : offset + limit]
+
+        return paginated_items, total_count
 
     async def update_document(
         self,

@@ -506,6 +506,36 @@ Streaming Response</code></pre>
                 </ul>
                 <p>Diagrams are rendered client-side using Mermaid.js v11 ESM modules with Cyanview color theming (navy blue nodes, cyan connections).</p>
 
+                <h3>Performance Optimizations</h3>
+                <p>The RAG system includes several optimizations for better performance and cost efficiency:</p>
+
+                <h4>Query Embedding Cache</h4>
+                <p>Both dense (Voyage AI) and sparse (BM25) query embeddings are cached using a thread-safe LRU cache:</p>
+                <ul>
+                    <li><strong>Cache size</strong>: 200 unique queries per embedding type</li>
+                    <li><strong>Benefits</strong>: Reduces Voyage AI API calls for repeated queries</li>
+                    <li><strong>Thread-safe</strong>: Safe for concurrent requests</li>
+                    <li><strong>Statistics</strong>: Hit rate tracking for monitoring</li>
+                </ul>
+
+                <h4>Dynamic Score Thresholds</h4>
+                <p>Search results are filtered using adaptive thresholds based on query characteristics:</p>
+                <table>
+                    <tr><th>Query Length</th><th>Base Threshold</th><th>Rationale</th></tr>
+                    <tr><td>≤2 words</td><td>0.15</td><td>Short queries need permissive matching</td></tr>
+                    <tr><td>3-5 words</td><td>0.20</td><td>Medium specificity</td></tr>
+                    <tr><td>&gt;5 words</td><td>0.25</td><td>Specific queries can be strict</td></tr>
+                </table>
+                <p>Technical terms (rio, rcp, firmware, etc.) add +0.05 to the threshold. The system always returns at least 3 results regardless of threshold.</p>
+
+                <h4>Paginated Document Listing</h4>
+                <p>Custom knowledge documents use cursor-based pagination:</p>
+                <ul>
+                    <li><strong>Incremental scrolling</strong>: Batches of 100 chunks instead of loading all</li>
+                    <li><strong>Early exit</strong>: Stops when enough documents collected</li>
+                    <li><strong>API response</strong>: Includes total count for pagination UI</li>
+                </ul>
+
                 <h2 id="data-ingestion">Data Ingestion Pipelines</h2>
 
                 <p>Two parallel ingestion pipelines populate the vector database with searchable content. Both use hybrid vectors (dense + sparse) for optimal retrieval.</p>

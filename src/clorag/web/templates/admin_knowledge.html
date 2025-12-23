@@ -1001,8 +1001,15 @@
                     document.getElementById('uploadDocForm').reset();
                     clearFile();
                 } else {
-                    const err = await response.json();
-                    showAlert(err.detail || 'Failed to upload document', 'error');
+                    let errorMsg = 'Failed to upload document';
+                    try {
+                        const err = await response.json();
+                        errorMsg = err.detail || errorMsg;
+                    } catch {
+                        const text = await response.text();
+                        errorMsg = `Server error (${response.status}): ${text || 'Unknown error'}`;
+                    }
+                    showAlert(errorMsg, 'error');
                 }
             } catch (error) {
                 showAlert('Error: ' + error.message, 'error');

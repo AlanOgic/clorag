@@ -1,6 +1,9 @@
 """Voyage AI embeddings client."""
 
+import hashlib
+from collections import OrderedDict
 from dataclasses import dataclass
+from threading import Lock
 from typing import Literal
 
 import structlog
@@ -10,6 +13,72 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from clorag.config import get_settings
 
 logger = structlog.get_logger(__name__)
+
+# Query embedding cache settings
+QUERY_CACHE_MAX_SIZE = 200  # Cache up to 200 unique queries
+
+
+class QueryEmbeddingCache:
+    """Thread-safe LRU cache for query embeddings to reduce API calls."""
+
+    def __init__(self, max_size: int = QUERY_CACHE_MAX_SIZE) -> None:
+        self._cache: OrderedDict[str, list[float]] = OrderedDict()
+        self._max_size = max_size
+        self._lock = Lock()
+        self._hits = 0
+        self._misses = 0
+
+    def _make_key(self, query: str, model: str, dimensions: int) -> str:
+        """Create cache key from query parameters."""
+        key_str = f"{query}:{model}:{dimensions}"
+        return hashlib.sha256(key_str.encode()).hexdigest()[:32]
+
+    def get(self, query: str, model: str, dimensions: int) -> list[float] | None:
+        """Get cached embedding or None if not found."""
+        key = self._make_key(query, model, dimensions)
+        with self._lock:
+            if key in self._cache:
+                # Move to end (most recently used)
+                self._cache.move_to_end(key)
+                self._hits += 1
+                return self._cache[key]
+            self._misses += 1
+            return None
+
+    def set(self, query: str, model: str, dimensions: int, embedding: list[float]) -> None:
+        """Cache an embedding, evicting oldest if at capacity."""
+        key = self._make_key(query, model, dimensions)
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+            else:
+                if len(self._cache) >= self._max_size:
+                    self._cache.popitem(last=False)  # Remove oldest
+                self._cache[key] = embedding
+
+    def stats(self) -> dict[str, int]:
+        """Get cache statistics."""
+        with self._lock:
+            total = self._hits + self._misses
+            hit_rate = (self._hits / total * 100) if total > 0 else 0
+            return {
+                "size": len(self._cache),
+                "hits": self._hits,
+                "misses": self._misses,
+                "hit_rate_percent": round(hit_rate, 1),
+            }
+
+
+# Global query cache instance
+_query_cache: QueryEmbeddingCache | None = None
+
+
+def get_query_cache() -> QueryEmbeddingCache:
+    """Get or create query embedding cache singleton."""
+    global _query_cache
+    if _query_cache is None:
+        _query_cache = QueryEmbeddingCache()
+    return _query_cache
 
 
 @dataclass
@@ -102,18 +171,27 @@ class EmbeddingsClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
     )
-    async def embed_query(self, text: str) -> list[float]:
-        """Generate embedding for a search query.
+    async def embed_query(self, text: str, use_cache: bool = True) -> list[float]:
+        """Generate embedding for a search query with LRU caching.
 
         Uses voyage-context-3 with contextualized_embed() for queries,
         matching the document embedding approach for consistent retrieval.
 
         Args:
             text: Query text to embed.
+            use_cache: Whether to use the query cache (default True).
 
         Returns:
             Embedding vector for the query.
         """
+        # Check cache first
+        if use_cache:
+            cache = get_query_cache()
+            cached = cache.get(text, self._model, self._dimensions)
+            if cached is not None:
+                logger.debug("Query embedding cache hit", query_len=len(text))
+                return cached
+
         # Use contextualized_embed for queries too - query as [[text]]
         result = self._client.contextualized_embed(
             inputs=[[text]],
@@ -123,7 +201,15 @@ class EmbeddingsClient:
         )
 
         # result.results[0].embeddings[0] = the query embedding
-        return result.results[0].embeddings[0]
+        embedding = result.results[0].embeddings[0]
+
+        # Cache the result
+        if use_cache:
+            cache = get_query_cache()
+            cache.set(text, self._model, self._dimensions, embedding)
+            logger.debug("Query embedding cached", query_len=len(text))
+
+        return embedding
 
     async def embed_batch(
         self,

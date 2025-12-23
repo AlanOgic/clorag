@@ -370,6 +370,85 @@ def get_session_store() -> SessionStore:
     return _session_store
 
 
+def _compute_dynamic_threshold(query: str, results: list) -> float:
+    """Compute a dynamic score threshold based on query and result characteristics.
+
+    Short/vague queries get lower thresholds to avoid over-filtering.
+    Specific queries (with model numbers, technical terms) get higher thresholds.
+
+    Args:
+        query: The search query.
+        results: List of search results with scores.
+
+    Returns:
+        Dynamic threshold value (0.0-1.0 for RRF scores).
+    """
+    if not results:
+        return 0.0
+
+    # Base threshold varies by query length (short queries = lower threshold)
+    query_words = len(query.split())
+    if query_words <= 2:
+        base_threshold = 0.15  # Very short queries - be permissive
+    elif query_words <= 5:
+        base_threshold = 0.20  # Medium queries
+    else:
+        base_threshold = 0.25  # Longer, more specific queries
+
+    # Check for specific technical terms that indicate precise intent
+    technical_indicators = [
+        "rio", "rcp", "ci0", "vp4", "firmware", "ip", "port", "error", "protocol"
+    ]
+    has_technical = any(term in query.lower() for term in technical_indicators)
+    if has_technical:
+        base_threshold += 0.05
+
+    # Compute score distribution to set adaptive cutoff
+    scores = [r.score for r in results]
+    if len(scores) >= 3:
+        mean_score = sum(scores) / len(scores)
+        # Don't filter below mean if most results are relevant
+        threshold = min(base_threshold, mean_score * 0.6)
+    else:
+        threshold = base_threshold
+
+    return threshold
+
+
+def _filter_by_dynamic_threshold(
+    results: list,
+    chunks: list[dict],
+    query: str,
+) -> tuple[list, list[dict]]:
+    """Filter results using dynamic threshold based on query characteristics.
+
+    Args:
+        results: Search results list.
+        chunks: Corresponding chunks for synthesis.
+        query: Original search query.
+
+    Returns:
+        Filtered (results, chunks) tuple.
+    """
+    if not results:
+        return results, chunks
+
+    threshold = _compute_dynamic_threshold(query, results)
+
+    filtered_results = []
+    filtered_chunks = []
+    for result, chunk in zip(results, chunks):
+        if result.score >= threshold:
+            filtered_results.append(result)
+            filtered_chunks.append(chunk)
+
+    # Always return at least top 3 results even if below threshold
+    if len(filtered_results) < 3 and len(results) >= 3:
+        return results[:3], chunks[:3]
+
+    return filtered_results, filtered_chunks
+
+
 def _build_context(chunks: list[dict], max_chunks: int = 8) -> str:
     """Build context string from chunks for Claude synthesis."""
     parts = []
@@ -670,6 +749,11 @@ async def _perform_search(req: SearchRequest) -> tuple[list[SearchResult], list[
                     "source_type": "gmail_case",
                     "subject": item.payload.get("subject", "Support Case"),
                 })
+
+    # Apply dynamic threshold filtering based on query characteristics
+    results, chunks_for_synthesis = _filter_by_dynamic_threshold(
+        results, chunks_for_synthesis, req.query
+    )
 
     return results, chunks_for_synthesis
 
@@ -1695,24 +1779,36 @@ async def admin_knowledge(request: Request):
     return templates.TemplateResponse("admin_knowledge.html", {"request": request})
 
 
+class KnowledgeListResponse(BaseModel):
+    """Paginated response for custom documents list."""
+
+    items: list[CustomDocumentListItem]
+    total: int
+    limit: int
+    offset: int
+
+
 @app.get(
     "/api/admin/knowledge",
-    response_model=list[CustomDocumentListItem],
+    response_model=KnowledgeListResponse,
     tags=["Knowledge"],
 )
 async def api_knowledge_list(
     category: str | None = None,
     include_expired: bool = False,
     limit: int = 50,
+    offset: int = 0,
     _: bool = Depends(verify_admin),
 ):
-    """List all custom documents."""
+    """List custom documents with pagination."""
     service = get_custom_docs_service()
-    return await service.list_documents(
+    items, total = await service.list_documents(
         limit=limit,
+        offset=offset,
         category=category,
         include_expired=include_expired,
     )
+    return KnowledgeListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
 @app.get(
@@ -1895,8 +1991,31 @@ async def api_knowledge_upload(
         notes=notes.strip() if notes.strip() else None,
     )
 
-    service = get_custom_docs_service()
-    return await service.create_document(doc_create, created_by="admin")
+    try:
+        logger.info(
+            "Creating custom document from upload",
+            title=doc_title,
+            category=doc_category.value,
+            content_length=len(content),
+            filename=file.filename,
+        )
+        service = get_custom_docs_service()
+        doc = await service.create_document(doc_create, created_by="admin")
+        logger.info("Custom document created successfully", doc_id=doc.id, title=doc.title)
+        return doc
+    except Exception as e:
+        logger.error(
+            "Failed to create custom document",
+            error=str(e),
+            error_type=type(e).__name__,
+            title=doc_title,
+            content_length=len(content),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create document: {str(e)}",
+        )
 
 
 # =============================================================================
