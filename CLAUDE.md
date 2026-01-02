@@ -40,6 +40,11 @@ uv run draft-support --preview  # Preview without creating
 # Enrich camera model codes from documentation
 uv run enrich-cameras
 
+# Populate Neo4j knowledge graph from Qdrant chunks
+uv run populate-graph
+uv run populate-graph --collections docusaurus_docs gmail_cases
+uv run populate-graph --max-chunks 100  # Limit for testing
+
 # Linting and type checking
 uv run ruff check src/
 uv run mypy src/clorag --strict
@@ -53,9 +58,9 @@ uv run pytest tests/test_file.py::test_name -v  # Single test
 
 ### Data Flow
 ```
-Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claude Sonnet 4.5 synthesis → Response
-           ↓                                       ↓
-   SparseEmbeddingsClient (BM25)            Hybrid RRF fusion (3 collections)
+Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → GraphStore (Neo4j) → Claude synthesis
+           ↓                                       ↓                       ↓
+   SparseEmbeddingsClient (BM25)            Hybrid RRF fusion      Graph enrichment
 ```
 
 ### Key Components
@@ -64,6 +69,8 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 - `vectorstore.py` - AsyncQdrantClient with hybrid search (dense + sparse vectors, RRF fusion)
 - `embeddings.py` - Voyage AI client using `voyage-context-3` for contextualized embeddings
 - `sparse_embeddings.py` - FastEmbed BM25 for keyword matching
+- `graph_store.py` - Neo4j async client for knowledge graph operations
+- `entity_extractor.py` - LLM-based entity extraction using Claude Haiku
 - `database.py` - SQLite camera database with CRUD operations and upsert pattern
 - `analytics_db.py` - Separate SQLite database for search analytics tracking
 
@@ -84,6 +91,10 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 **Services Layer** (`src/clorag/services/`):
 - `custom_docs.py` - `CustomDocumentService` for CRUD operations on custom knowledge documents (chunking, embedding, Qdrant storage)
 
+**Graph Layer** (`src/clorag/graph/`):
+- `schema.py` - Pydantic models for graph entities (Camera, Product, Protocol, Issue, Solution)
+- `enrichment.py` - Graph context enrichment service for RAG search results
+
 **Web Layer** (`src/clorag/web/`):
 - `app.py` - FastAPI with streaming responses, hybrid RRF search across all 3 collections
 - Camera management routes: public `/cameras`, admin `/admin/cameras`
@@ -95,6 +106,7 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Claud
 - REST API for knowledge: `GET/POST/PUT/DELETE /api/admin/knowledge`, `POST /api/admin/knowledge/upload` (file upload)
 - REST API for analytics: `GET /api/admin/search-stats`
 - REST API for chunks: `GET/PUT/DELETE /api/admin/chunks`
+- REST API for graph: `GET /api/admin/graph/stats`
 
 **Models Layer** (`src/clorag/models/`):
 - `camera.py` - Camera Pydantic models with CameraSource enum for tracking data origin
@@ -127,6 +139,10 @@ All settings via environment variables (see `.env.example`):
 - `ADMIN_PASSWORD` - Admin authentication for camera management and analytics (also used for OAuth token encryption)
 - `SEARXNG_URL` - SearXNG instance URL for web searches (default: `https://search.sapti.me`)
 - `SECURE_COOKIES` - Enable secure cookies for HTTPS (default: `true`, set `false` for local development)
+- `NEO4J_URI` - Neo4j Bolt protocol URI (default: `bolt://localhost:7687`)
+- `NEO4J_USER` - Neo4j username (default: `neo4j`)
+- `NEO4J_PASSWORD` - Neo4j password (optional, disables GraphRAG if not set)
+- `NEO4J_DATABASE` - Neo4j database name (default: `neo4j`)
 
 Settings loaded via `clorag.config.get_settings()` (cached singleton).
 
@@ -182,6 +198,14 @@ Admin-managed documents stored in `custom_docs` Qdrant collection. Features:
 - Full metadata: title, tags, URL reference, expiration date, notes
 - Chunked, embedded, and included in hybrid RAG search
 - Admin UI at `/admin/knowledge` with "Paste Text" and "Upload File" modes
+
+### GraphRAG (Knowledge Graph Augmented Retrieval)
+Optional Neo4j-based knowledge graph enrichment:
+- **Entity types**: Camera, Product, Protocol, Port, Control, Issue, Solution, Firmware, Chunk
+- **Relationships**: COMPATIBLE_WITH, USES_PROTOCOL, HAS_PORT, AFFECTS, RESOLVED_BY, MENTIONS
+- **Population**: `uv run populate-graph` extracts entities from Qdrant chunks using Claude Haiku
+- **Integration**: Graph context is automatically added to Claude synthesis when Neo4j is configured
+- **Graceful degradation**: Works without Neo4j if `NEO4J_PASSWORD` is not set
 
 ## Deployment
 

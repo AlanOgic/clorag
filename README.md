@@ -15,6 +15,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 - **Draft Auto-Reply System** - AI-powered draft creation for unanswered support threads
 - **Query Embedding Cache** - LRU cache reduces API calls for repeated queries
 - **Dynamic Score Thresholds** - Adaptive filtering based on query characteristics
+- **GraphRAG** - Neo4j knowledge graph enrichment with entity extraction from chunks
 
 ## Architecture
 
@@ -155,9 +156,10 @@ Two data ingestion pipelines populate the vector database:
 |-----------|-------------|
 | Orchestration | Claude Agent SDK 0.1.9+ |
 | Vector DB | Qdrant |
+| Graph DB | Neo4j (optional, for GraphRAG) |
 | Dense Embeddings | Voyage AI (voyage-context-3) |
 | Sparse Embeddings | FastEmbed BM25 |
-| LLM Synthesis | Claude Haiku 4.5 |
+| LLM Synthesis | Claude Sonnet 4.5 |
 | Database | SQLite (camera + analytics) |
 | Web | FastAPI + Jinja2 |
 | Sessions | itsdangerous (signed cookies) |
@@ -371,6 +373,12 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 | PUT | `/api/admin/knowledge/{id}` | Update document |
 | DELETE | `/api/admin/knowledge/{id}` | Delete document |
 
+### Graph (Admin)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/graph/stats` | Knowledge graph statistics |
+
 ### Authentication
 
 | Method | Endpoint | Description |
@@ -400,6 +408,8 @@ clorag/
          embeddings.py     # Client Voyage AI
          sparse_embeddings.py  # FastEmbed BM25
          vectorstore.py    # Client Qdrant
+         graph_store.py    # Neo4j async client
+         entity_extractor.py  # LLM entity extraction
          retriever.py      # Multi-source retriever
          database.py       # SQLite camera database
          analytics_db.py   # SQLite analytics database
@@ -423,6 +433,9 @@ clorag/
          gmail.py          # Pipeline Gmail
          curated_gmail.py  # Pipeline curated
          chunker.py        # Text chunking
+      graph/
+         schema.py         # Graph entity models
+         enrichment.py     # Context enrichment service
       web/
          app.py            # FastAPI application
          templates/        # Jinja2 templates
@@ -445,6 +458,7 @@ clorag/
          ingest_docs.py    # CLI ingestion docs
          ingest_gmail.py   # CLI ingestion Gmail
          ingest_curated.py # CLI ingestion curated
+         populate_graph.py # CLI graph population
          draft_support.py  # CLI draft creation
          run_web.py        # CLI run web server
    tests/

@@ -2,6 +2,43 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.5.0] - 2025-12-26
+
+### Added
+- **GraphRAG (Knowledge Graph Augmented Retrieval)**
+  - Neo4j knowledge graph integration for entity-based context enrichment
+  - Entity extraction using Claude Haiku from Qdrant chunks
+  - 8 node types: Camera, Product, Protocol, Port, Control, Issue, Solution, Firmware
+  - 11 relationship types: COMPATIBLE_WITH, USES_PROTOCOL, HAS_PORT, AFFECTS, etc.
+  - Graph context automatically added to Claude synthesis when Neo4j is configured
+  - Graceful degradation when Neo4j is unavailable
+
+- **New Files**
+  - `src/clorag/core/graph_store.py` - Neo4j async client wrapper
+  - `src/clorag/core/entity_extractor.py` - LLM-based entity extraction
+  - `src/clorag/graph/schema.py` - Pydantic models for graph entities
+  - `src/clorag/graph/enrichment.py` - Graph context enrichment service
+  - `src/clorag/scripts/populate_graph.py` - CLI command for graph population
+
+- **New CLI Command**
+  - `uv run populate-graph` - Extract entities from Qdrant chunks and populate Neo4j
+
+- **New API Endpoint**
+  - `GET /api/admin/graph/stats` - Get knowledge graph statistics
+
+### Changed
+- Search synthesis now includes graph relationship context when available
+- Docker Compose includes Neo4j service (neo4j:5-community)
+
+### Dependencies
+- Added `neo4j>=6.0.0` for Neo4j async Python driver
+
+### Configuration
+- `NEO4J_URI` - Neo4j Bolt protocol URI (default: `bolt://localhost:7687`)
+- `NEO4J_USER` - Neo4j username (default: `neo4j`)
+- `NEO4J_PASSWORD` - Neo4j password (optional, disables GraphRAG if not set)
+- `NEO4J_DATABASE` - Neo4j database name (default: `neo4j`)
+
 ## [0.4.0] - 2025-12-22
 
 ### Added

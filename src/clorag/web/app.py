@@ -63,6 +63,10 @@ from clorag.services.custom_docs import CustomDocumentService
 # Initialize logger
 logger = structlog.get_logger()
 
+# Graph enrichment (optional - graceful degradation if Neo4j unavailable)
+_graph_enrichment_available: bool | None = None
+_graph_enrichment_service = None
+
 
 # =============================================================================
 # Middleware Configuration
@@ -264,6 +268,41 @@ def get_custom_docs_service() -> CustomDocumentService:
     return _custom_docs_service
 
 
+async def get_graph_enrichment():
+    """Get graph enrichment service if Neo4j is available.
+
+    Returns None if Neo4j is not configured or unavailable.
+    Caches availability check to avoid repeated connection attempts.
+    """
+    global _graph_enrichment_available, _graph_enrichment_service
+
+    # Already checked and not available
+    if _graph_enrichment_available is False:
+        return None
+
+    # Already initialized
+    if _graph_enrichment_service is not None:
+        return _graph_enrichment_service
+
+    # Try to initialize
+    settings = get_settings()
+    if not settings.neo4j_password:
+        _graph_enrichment_available = False
+        logger.info("graph_enrichment_disabled", reason="no_neo4j_password")
+        return None
+
+    try:
+        from clorag.graph.enrichment import get_enrichment_service
+        _graph_enrichment_service = await get_enrichment_service()
+        _graph_enrichment_available = True
+        logger.info("graph_enrichment_enabled")
+        return _graph_enrichment_service
+    except Exception as e:
+        _graph_enrichment_available = False
+        logger.warning("graph_enrichment_unavailable", error=str(e))
+        return None
+
+
 # =============================================================================
 # Conversation Session Management
 # =============================================================================
@@ -449,9 +488,24 @@ def _filter_by_dynamic_threshold(
     return filtered_results, filtered_chunks
 
 
-def _build_context(chunks: list[dict], max_chunks: int = 8) -> str:
-    """Build context string from chunks for Claude synthesis."""
+def _build_context(
+    chunks: list[dict],
+    max_chunks: int = 8,
+    graph_context: str | None = None,
+) -> str:
+    """Build context string from chunks for Claude synthesis.
+
+    Args:
+        chunks: Retrieved document chunks.
+        max_chunks: Maximum chunks to include.
+        graph_context: Optional graph enrichment context string.
+    """
     parts = []
+
+    # Add graph context first if available
+    if graph_context:
+        parts.append(f"[Knowledge Graph Relationships]\n{graph_context}")
+
     for i, chunk in enumerate(chunks[:max_chunks], 1):
         text = chunk.get("text", "")[:2000]
         source_type = chunk.get("source_type")
@@ -569,6 +623,7 @@ async def synthesize_answer(
     query: str,
     chunks: list[dict],
     conversation_history: list[dict] | None = None,
+    graph_context: str | None = None,
 ) -> str:
     """Use Claude Haiku to synthesize an answer from retrieved chunks.
 
@@ -576,12 +631,13 @@ async def synthesize_answer(
         query: The user's question.
         chunks: Retrieved context chunks.
         conversation_history: Optional list of previous messages for follow-up context.
+        graph_context: Optional graph enrichment context string.
     """
     if not chunks:
         return "No relevant information found for your query."
 
     settings = get_settings()
-    context = _build_context(chunks)
+    context = _build_context(chunks, graph_context=graph_context)
 
     # Build messages with conversation history
     messages = []
@@ -602,6 +658,7 @@ async def synthesize_answer_stream(
     query: str,
     chunks: list[dict],
     conversation_history: list[dict] | None = None,
+    graph_context: str | None = None,
 ):
     """Stream answer synthesis using Claude Haiku.
 
@@ -609,13 +666,14 @@ async def synthesize_answer_stream(
         query: The user's question.
         chunks: Retrieved context chunks.
         conversation_history: Optional list of previous messages for follow-up context.
+        graph_context: Optional graph enrichment context string.
     """
     if not chunks:
         yield "No relevant information found for your query."
         return
 
     settings = get_settings()
-    context = _build_context(chunks)
+    context = _build_context(chunks, graph_context=graph_context)
 
     # Build messages with conversation history
     messages = []
@@ -633,14 +691,16 @@ async def synthesize_answer_stream(
             yield text
 
 
-async def _perform_search(req: SearchRequest) -> tuple[list[SearchResult], list[dict]]:
+async def _perform_search(
+    req: SearchRequest,
+) -> tuple[list[SearchResult], list[dict], str | None]:
     """Perform hybrid search and return results with chunks for synthesis.
 
     Uses hybrid search (dense + sparse vectors) with RRF fusion for better
     results on queries with specific model numbers or technical terms.
 
     Returns:
-        Tuple of (search_results, chunks_for_synthesis)
+        Tuple of (search_results, chunks_for_synthesis, graph_context)
     """
     vs = get_vectorstore()
     emb = get_embeddings()
@@ -755,7 +815,28 @@ async def _perform_search(req: SearchRequest) -> tuple[list[SearchResult], list[
         results, chunks_for_synthesis, req.query
     )
 
-    return results, chunks_for_synthesis
+    # Get graph enrichment if available
+    graph_context = None
+    try:
+        enrichment = await get_graph_enrichment()
+        if enrichment and results:
+            # Extract chunk IDs for graph traversal
+            chunk_ids = []
+            for result in results[:5]:  # Top 5 chunks
+                if hasattr(result, "metadata") and result.metadata:
+                    chunk_id = result.metadata.get("id") or result.metadata.get("chunk_id")
+                    if chunk_id:
+                        chunk_ids.append(str(chunk_id))
+
+            if chunk_ids:
+                enrichment_ctx = await enrichment.enrich_from_chunks(chunk_ids)
+                graph_context = enrichment_ctx.to_context_string()
+                if graph_context:
+                    logger.debug("graph_enrichment_added", context_len=len(graph_context))
+    except Exception as e:
+        logger.debug("graph_enrichment_skipped", error=str(e))
+
+    return results, chunks_for_synthesis, graph_context
 
 
 @app.post("/api/search/stream")
@@ -777,8 +858,8 @@ async def search_stream(request: Request, req: SearchRequest):
     session = get_session_store().get_or_create_session(req.session_id)
     conversation_history = session.get_context_messages()
 
-    # Use helper to perform search (we only need chunks_for_synthesis)
-    _, chunks_for_synthesis = await _perform_search(req)
+    # Use helper to perform search
+    _, chunks_for_synthesis, graph_context = await _perform_search(req)
 
     # Extract top 3 unique source links
     source_links = _extract_source_links(chunks_for_synthesis)
@@ -792,9 +873,9 @@ async def search_stream(request: Request, req: SearchRequest):
             # Send session_id first so frontend can track the conversation
             yield f"data: {json.dumps({'type': 'session', 'session_id': session.session_id})}\n\n"
 
-            # Stream the answer with conversation history context
+            # Stream the answer with conversation history and graph context
             async for chunk in synthesize_answer_stream(
-                req.query, chunks_for_synthesis, conversation_history
+                req.query, chunks_for_synthesis, conversation_history, graph_context
             ):
                 collected_response.append(chunk)
                 yield f"data: {json.dumps({'type': 'text', 'text': chunk})}\n\n"
@@ -856,10 +937,12 @@ async def search(request: Request, req: SearchRequest):
     conversation_history = session.get_context_messages()
 
     # Use helper to perform search
-    results, chunks_for_synthesis = await _perform_search(req)
+    results, chunks_for_synthesis, graph_context = await _perform_search(req)
 
-    # Generate synthesized answer using Claude Haiku with conversation history
-    answer = await synthesize_answer(req.query, chunks_for_synthesis, conversation_history)
+    # Generate synthesized answer using Claude with conversation history and graph context
+    answer = await synthesize_answer(
+        req.query, chunks_for_synthesis, conversation_history, graph_context
+    )
 
     # Store this exchange in the session for future follow-ups
     session.add_exchange(req.query, answer)
@@ -1478,6 +1561,43 @@ async def api_get_conversations(
     """Get recent conversations grouped by session_id."""
     analytics = get_analytics_db()
     return analytics.get_recent_conversations(limit=limit)
+
+
+# =============================================================================
+# Graph Stats Routes (Admin)
+# =============================================================================
+
+
+@app.get("/api/admin/graph/stats", tags=["Graph"])
+async def api_graph_stats(_: bool = Depends(verify_admin)):
+    """Get knowledge graph statistics.
+
+    Returns node and relationship counts from Neo4j.
+    Returns empty stats if graph is not available.
+    """
+    enrichment = await get_graph_enrichment()
+    if not enrichment:
+        return {
+            "available": False,
+            "message": "Graph database not configured or unavailable",
+            "stats": {},
+        }
+
+    try:
+        from clorag.core.graph_store import get_graph_store
+        store = await get_graph_store()
+        stats = await store.get_stats()
+        return {
+            "available": True,
+            "stats": stats,
+        }
+    except Exception as e:
+        logger.warning("graph_stats_failed", error=str(e))
+        return {
+            "available": False,
+            "message": str(e),
+            "stats": {},
+        }
 
 
 # =============================================================================
@@ -2177,11 +2297,11 @@ async def api_search_debug(
 
     # Perform search and measure retrieval time
     retrieval_start = time.time()
-    results, chunks_for_synthesis = await _perform_search(req)
+    results, chunks_for_synthesis, graph_context = await _perform_search(req)
     retrieval_time_ms = int((time.time() - retrieval_start) * 1000)
 
     # Build context (same as synthesis)
-    context = _build_context(chunks_for_synthesis)
+    context = _build_context(chunks_for_synthesis, graph_context=graph_context)
     user_prompt = f"Question: {req.query}\n\nContext:\n{context}"
 
     # Synthesize and measure time

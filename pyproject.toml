@@ -1,6 +1,6 @@
 [project]
 name = "clorag"
-version = "0.4.0"
+version = "0.5.0"
 description = "Multi-RAG Agent with Claude Agent SDK - Docusaurus docs + Gmail support threads"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -55,6 +55,9 @@ dependencies = [
 
     # Document Processing
     "pypdf>=5.0.0",  # PDF text extraction for file uploads
+
+    # Graph Database (GraphRAG)
+    "neo4j>=6.0.0",  # Neo4j async Python driver
 ]
 
 [project.optional-dependencies]
@@ -73,6 +76,7 @@ ingest-curated = "clorag.scripts.ingest_curated:main"
 rag-web = "clorag.scripts.run_web:main"
 enrich-cameras = "clorag.scripts.enrich_model_codes:main"
 draft-support = "clorag.scripts.draft_support:main"
+populate-graph = "clorag.scripts.populate_graph:main"
 
 [build-system]
 requires = ["hatchling"]
