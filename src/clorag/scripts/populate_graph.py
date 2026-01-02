@@ -6,7 +6,6 @@ import sys
 import anyio
 import structlog
 
-from clorag.config import get_settings
 from clorag.core.entity_extractor import EntityExtractor
 from clorag.core.graph_store import close_graph_driver, get_graph_store
 from clorag.core.vectorstore import VectorStore
@@ -33,8 +32,7 @@ async def populate_from_collection(
     Returns:
         Dict with entity counts.
     """
-    settings = get_settings()
-    vector_store = VectorStore(settings.qdrant_url, api_key=settings.qdrant_api_key)
+    vector_store = VectorStore()
     extractor = EntityExtractor()
     graph_store = await get_graph_store()
 
