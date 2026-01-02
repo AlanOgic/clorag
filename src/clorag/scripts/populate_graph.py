@@ -73,9 +73,10 @@ async def populate_from_collection(
         # Prepare chunks for extraction
         chunk_data = []
         for chunk in chunks:
-            chunk_id = str(chunk.id)
-            text = chunk.payload.get("text", "")
-            title = chunk.payload.get("title") or chunk.payload.get("subject", "")
+            chunk_id = str(chunk["id"])
+            payload = chunk.get("payload", {})
+            text = payload.get("text", "")
+            title = payload.get("title") or payload.get("subject", "")
 
             if text and len(text) > 50:
                 chunk_data.append((chunk_id, text, title))
@@ -85,7 +86,7 @@ async def populate_from_collection(
                     chunk_id=chunk_id,
                     collection=collection,
                     title=title,
-                    source_url=chunk.payload.get("url"),
+                    source_url=payload.get("url"),
                 ))
 
         # Extract entities from batch
