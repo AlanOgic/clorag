@@ -720,6 +720,306 @@ class GraphStore:
                 logger.warning("fulltext_search_failed", error=str(e))
         return results
 
+    # =========================================================================
+    # Admin Browser Operations
+    # =========================================================================
+
+    async def get_entity_type_counts(self) -> list[dict]:
+        """Get counts for each entity type.
+
+        Returns:
+            List of dicts with type and count
+        """
+        query = """
+        CALL {
+            MATCH (c:Camera) RETURN 'Camera' as type, count(c) as count
+            UNION ALL
+            MATCH (p:Product) RETURN 'Product' as type, count(p) as count
+            UNION ALL
+            MATCH (p:Protocol) RETURN 'Protocol' as type, count(p) as count
+            UNION ALL
+            MATCH (p:Port) RETURN 'Port' as type, count(p) as count
+            UNION ALL
+            MATCH (c:Control) RETURN 'Control' as type, count(c) as count
+            UNION ALL
+            MATCH (i:Issue) RETURN 'Issue' as type, count(i) as count
+            UNION ALL
+            MATCH (s:Solution) RETURN 'Solution' as type, count(s) as count
+            UNION ALL
+            MATCH (f:Firmware) RETURN 'Firmware' as type, count(f) as count
+            UNION ALL
+            MATCH (c:Chunk) RETURN 'Chunk' as type, count(c) as count
+        }
+        RETURN type, count
+        ORDER BY count DESC
+        """
+        results = []
+        async with await self._session() as session:
+            result = await session.run(query)
+            async for record in result:
+                results.append({"type": record["type"], "count": record["count"]})
+        return results
+
+    async def list_entities_by_type(
+        self,
+        entity_type: str,
+        page: int = 1,
+        page_size: int = 20,
+        search: str | None = None,
+    ) -> tuple[list[dict], int]:
+        """List entities of a specific type with pagination.
+
+        Args:
+            entity_type: Node label (Camera, Product, Protocol, etc.)
+            page: Page number (1-indexed)
+            page_size: Items per page
+            search: Optional search filter for name/description
+
+        Returns:
+            Tuple of (list of entity dicts, total count)
+        """
+        # Validate entity type to prevent injection
+        valid_types = {
+            "Camera", "Product", "Protocol", "Port", "Control",
+            "Issue", "Solution", "Firmware", "Chunk"
+        }
+        if entity_type not in valid_types:
+            return [], 0
+
+        skip = (page - 1) * page_size
+
+        # Build query based on entity type (different primary fields)
+        if entity_type == "Issue":
+            name_field = "description"
+        elif entity_type == "Solution":
+            name_field = "description"
+        elif entity_type == "Firmware":
+            name_field = "version"
+        elif entity_type == "Chunk":
+            name_field = "chunk_id"
+        else:
+            name_field = "name"
+
+        # Count query
+        if search:
+            count_query = f"""
+            MATCH (n:{entity_type})
+            WHERE toLower(n.{name_field}) CONTAINS toLower($search)
+            RETURN count(n) as total
+            """
+        else:
+            count_query = f"""
+            MATCH (n:{entity_type})
+            RETURN count(n) as total
+            """
+
+        # Data query with relationship count
+        if search:
+            data_query = f"""
+            MATCH (n:{entity_type})
+            WHERE toLower(n.{name_field}) CONTAINS toLower($search)
+            OPTIONAL MATCH (n)-[r]-()
+            WITH n, count(DISTINCT r) as rel_count
+            RETURN elementId(n) as id, properties(n) as props, rel_count
+            ORDER BY n.{name_field}
+            SKIP $skip LIMIT $limit
+            """
+        else:
+            data_query = f"""
+            MATCH (n:{entity_type})
+            OPTIONAL MATCH (n)-[r]-()
+            WITH n, count(DISTINCT r) as rel_count
+            RETURN elementId(n) as id, properties(n) as props, rel_count
+            ORDER BY n.{name_field}
+            SKIP $skip LIMIT $limit
+            """
+
+        entities = []
+        total = 0
+
+        async with await self._session() as session:
+            # Get total count
+            count_result = await session.run(
+                count_query,
+                search=search if search else "",
+            )
+            count_record = await count_result.single()
+            total = count_record["total"] if count_record else 0
+
+            # Get entities
+            data_result = await session.run(
+                data_query,
+                search=search if search else "",
+                skip=skip,
+                limit=page_size,
+            )
+            async for record in data_result:
+                props = dict(record["props"])
+                entities.append({
+                    "id": record["id"],
+                    "name": props.get(name_field, ""),
+                    "entity_type": entity_type,
+                    "properties": props,
+                    "relationship_count": record["rel_count"],
+                })
+
+        return entities, total
+
+    async def get_entity_with_relationships(
+        self,
+        entity_type: str,
+        entity_id: str,
+    ) -> dict | None:
+        """Get entity details with all its relationships.
+
+        Args:
+            entity_type: Node label
+            entity_id: Neo4j element ID
+
+        Returns:
+            Dict with entity properties and relationships list
+        """
+        valid_types = {
+            "Camera", "Product", "Protocol", "Port", "Control",
+            "Issue", "Solution", "Firmware", "Chunk"
+        }
+        if entity_type not in valid_types:
+            return None
+
+        query = f"""
+        MATCH (n:{entity_type})
+        WHERE elementId(n) = $entity_id
+        OPTIONAL MATCH (n)-[r]-(m)
+        RETURN n, collect({{
+            direction: CASE WHEN startNode(r) = n THEN 'outgoing' ELSE 'incoming' END,
+            rel_type: type(r),
+            target_type: labels(m)[0],
+            target_name: COALESCE(m.name, m.description, m.version, m.chunk_id),
+            target_id: elementId(m)
+        }}) as relationships
+        """
+
+        async with await self._session() as session:
+            result = await session.run(query, entity_id=entity_id)
+            record = await result.single()
+            if not record:
+                return None
+
+            node = record["n"]
+            rels = record["relationships"]
+
+            # Determine primary name field
+            props = dict(node)
+            if entity_type in ("Issue", "Solution"):
+                name = props.get("description", "")
+            elif entity_type == "Firmware":
+                name = props.get("version", "")
+            elif entity_type == "Chunk":
+                name = props.get("chunk_id", "")
+            else:
+                name = props.get("name", "")
+
+            return {
+                "id": entity_id,
+                "name": name,
+                "entity_type": entity_type,
+                "properties": props,
+                "relationships": [r for r in rels if r["target_name"]],
+            }
+
+    async def list_relationships(
+        self,
+        source_type: str | None = None,
+        source_name: str | None = None,
+        relationship_type: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """List relationships with optional filtering.
+
+        Args:
+            source_type: Filter by source node type
+            source_name: Filter by source node name/description
+            relationship_type: Filter by relationship type
+            limit: Maximum results
+
+        Returns:
+            List of relationship dicts
+        """
+        # Build dynamic query
+        where_clauses = []
+        params: dict = {"limit": limit}
+
+        if source_type:
+            valid_types = {
+                "Camera", "Product", "Protocol", "Port", "Control",
+                "Issue", "Solution", "Firmware", "Chunk"
+            }
+            if source_type not in valid_types:
+                return []
+
+        if source_name:
+            where_clauses.append(
+                "(a.name = $source_name OR a.description = $source_name "
+                "OR a.version = $source_name OR a.chunk_id = $source_name)"
+            )
+            params["source_name"] = source_name
+
+        # Base query
+        if source_type:
+            match_clause = f"MATCH (a:{source_type})-[r]->(b)"
+        else:
+            match_clause = "MATCH (a)-[r]->(b)"
+
+        if relationship_type:
+            match_clause = match_clause.replace("-[r]->", f"-[r:{relationship_type}]->")
+
+        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+        query = f"""
+        {match_clause}
+        {where_clause}
+        RETURN
+            labels(a)[0] as source_type,
+            COALESCE(a.name, a.description, a.version, a.chunk_id) as source_name,
+            type(r) as relationship,
+            labels(b)[0] as target_type,
+            COALESCE(b.name, b.description, b.version, b.chunk_id) as target_name,
+            properties(r) as properties
+        LIMIT $limit
+        """
+
+        results = []
+        async with await self._session() as session:
+            result = await session.run(query, **params)
+            async for record in result:
+                results.append({
+                    "source_type": record["source_type"],
+                    "source_name": record["source_name"],
+                    "relationship": record["relationship"],
+                    "target_type": record["target_type"],
+                    "target_name": record["target_name"],
+                    "properties": dict(record["properties"]) if record["properties"] else {},
+                })
+        return results
+
+    async def get_relationship_type_counts(self) -> list[dict]:
+        """Get counts for each relationship type.
+
+        Returns:
+            List of dicts with type and count
+        """
+        query = """
+        MATCH ()-[r]->()
+        RETURN type(r) as type, count(r) as count
+        ORDER BY count DESC
+        """
+        results = []
+        async with await self._session() as session:
+            result = await session.run(query)
+            async for record in result:
+                results.append({"type": record["type"], "count": record["count"]})
+        return results
+
 
 # Factory function
 _graph_store: GraphStore | None = None

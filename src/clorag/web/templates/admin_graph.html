@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Knowledge Graph - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --danger: #dc3545;
+            --success: #28a745;
+            --warning: #ffc107;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: var(--cyanview-navy);
+            color: white;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+            filter: brightness(0) invert(1);
+        }
+
+        .navbar__badge {
+            background: var(--danger);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .navbar__link {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .navbar__link:hover {
+            color: white;
+        }
+
+        /* Main */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            color: var(--cyanview-navy);
+        }
+
+        /* Unavailable Notice */
+        .unavailable-notice {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .unavailable-notice h3 {
+            color: #856404;
+            margin-bottom: 0.5rem;
+        }
+
+        .unavailable-notice p {
+            color: #856404;
+            margin: 0;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--cyan-dark);
+        }
+
+        .tab.active {
+            color: var(--cyanview-navy);
+            border-bottom-color: var(--cyan-dark);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-card__number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--cyanview-navy);
+        }
+
+        .stat-card__label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .stat-card--health {
+            border-left: 4px solid var(--success);
+        }
+
+        .stat-card--health.disconnected {
+            border-left-color: var(--danger);
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-bar__search {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .filter-bar__search:focus {
+            outline: none;
+            border-color: var(--cyan-blue);
+        }
+
+        .filter-bar__select {
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background: white;
+            cursor: pointer;
+            min-width: 150px;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--cyan-dark);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--cyan-blue);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #606770;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .btn-sm {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        /* Table */
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #606770;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .tag--camera { background: #e3f2fd; color: #1565c0; }
+        .tag--product { background: #e8f5e9; color: #2e7d32; }
+        .tag--protocol { background: #fff3e0; color: #e65100; }
+        .tag--port { background: #f3e5f5; color: #7b1fa2; }
+        .tag--control { background: #e0f7fa; color: #00838f; }
+        .tag--issue { background: #ffebee; color: #c62828; }
+        .tag--solution { background: #e8f5e9; color: #2e7d32; }
+        .tag--firmware { background: #fce4ec; color: #ad1457; }
+        .tag--chunk { background: #eceff1; color: #546e7a; }
+
+        /* Entity Name */
+        .entity-name {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Relationship Arrow */
+        .rel-arrow {
+            color: var(--cyan-dark);
+            font-weight: 600;
+            padding: 0 0.5rem;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #666;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            align-items: center;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal__content {
+            background: white;
+            border-radius: 8px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal__header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal__title {
+            font-size: 1.25rem;
+            color: var(--cyanview-navy);
+        }
+
+        .modal__close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal__body {
+            padding: 1.5rem;
+        }
+
+        .property-list {
+            margin-bottom: 1.5rem;
+        }
+
+        .property-item {
+            display: flex;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .property-item:last-child {
+            border-bottom: none;
+        }
+
+        .property-key {
+            font-weight: 600;
+            color: #666;
+            width: 150px;
+            flex-shrink: 0;
+        }
+
+        .property-value {
+            color: #1c1e21;
+            word-break: break-word;
+        }
+
+        .relationships-section h4 {
+            margin-bottom: 1rem;
+            color: var(--cyanview-navy);
+        }
+
+        .relationship-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .data-table {
+                display: block;
+                overflow-x: auto;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .tabs {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2aWV3Qm94PSIwIDAgMjUxLjkgMTUwLjU4Ij48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6dXJsKCNsb2dvX2dyKTt9LmNscy0ye2ZpbGw6I2ZmZjt9LmNscy0ze2ZpbGw6IzZkYzlmMzt9PC9zdHlsZT48bGluZWFyR3JhZGllbnQgaWQ9ImxvZ29fZ3IiIHgxPSIyNTEuOSIgeTE9Ijc1LjI5IiB4Mj0iMCIgeTI9Ijc1LjI5IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMDA1ZmEwIi8+PHN0b3Agb2Zmc2V0PSIwLjI2IiBzdG9wLWNvbG9yPSIjMDA2NmE3Ii8+PHN0b3Agb2Zmc2V0PSIwLjYyIiBzdG9wLWNvbG9yPSIjMDA3OGI5Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDA5M2QzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHRpdGxlPkxvZ29fQ3lhbl9ncjwvdGl0bGU+PGcgaWQ9IkxheWVyXzIiIGRhdGEtbmFtZT0iTGF5ZXIgMiI+PGcgaWQ9IkxheWVyXzEtMiIgZGF0YS1uYW1lPSJMYXllciAxIj48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNzYuNjIsMEE3NSw3NSwwLDAsMCwxMjYsMTkuNiw3NS4yOSw3NS4yOSwwLDEsMCwxMjYsMTMxLDc1LjI5LDc1LjI5LDAsMSwwLDE3Ni42MiwwWiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTE1LjQxLDg0LjI0VjU5LjUzYzAtNy4zOCw0LjcxLTEyLjI5LDExLjY3LTEyLjI5LDYuNywwLDExLjI3LDUuMTIsMTEuNDcsMTMuMTFhLjc5Ljc5LDAsMCwxLS44OC44OEgzMy4zYS43OS43OSwwLDAsMS0uODktLjg4QzMyLjI3LDU1LjU3LDMwLjE2LDUzLDI3LDUzYy0zLjQyLDAtNS40LDIuMzItNS40LDYuMTVWODQuNThjMCwzLjgzLDIsNi4xNSw1LjQsNi4xNXM1LjU5LTIuOCw1LjczLTcuNzhhLjc5Ljc5LDAsMCwxLC44OS0uODlIMzhhLjg1Ljg1LDAsMCwxLC44OSwxYy0uMjgsOC4yNy00Ljg1LDEzLjUyLTExLjgyLDEzLjUyUzE1LjQxLDkxLjYyLDE1LjQxLDg0LjI0WiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTY1LjkzLDYyLjUzVjk5LjA2YzAsNi43Ni00LjIzLDExLjEzLTEwLjc5LDExLjEzLTYuMjEsMC0xMC4zNy00LjMtMTAuNzItMTFhLjguOCwwLDAsMSwuODktMWg0Yy41NSwwLC44Mi4yNy44OSwxLC4yLDMuNDEsMiw1LjM5LDQuOTEsNS4zOSwzLjE0LDAsNC45Mi0yLDQuOTItNS4zM1Y5Mi4zN2E3LjA5LDcuMDksMCwwLDEtNS4zOSwyLjQ2Yy02LDAtMTAuMzEtNC41OC0xMC4zMS0xMS4wNlY2Mi41M2EuODQuODQsMCwwLDEsMS0uODloNGEuODUuODUsMCwwLDEsMSwuODlWODRjMCwzLjE0LDEuODQsNS4zMyw0LjkxLDUuMzNzNC45Mi0yLjE5LDQuOTItNS4zM1Y2Mi41M2EuODUuODUsMCwwLDEsMS0uODloNEEuODguODgsMCwwLDEsNjUuOTMsNjIuNTNaIi8+PHBhdGggY2xhc3M9ImNscy0yIiBkPSJNNzIuMzUsODUuNDdjMC01LjY2LDQuMzctMTAsMTAuNzgtMTBoNS4xM1Y3MS42OGMwLTMuMDctMS44NS01LjE5LTQuOTItNS4xOS0yLjg3LDAtNC40NCwxLjkxLTQuNjQsNC43MS0uMDcuNjItLjM0LjgyLTEsLjgyaC00YS44OC44OCwwLDAsMS0uODktMWMuNDEtNS45NCw0LjQ0LTEwLjE4LDEwLjUyLTEwLjE4LDYuNDgsMCwxMC42NSw0LjY0LDEwLjY1LDExLjA2Vjg1LjY4YzAsNi4yOC00LjEsMTAuNzktMTAuNjUsMTAuNzlTNzIuMzUsOTEuODksNzIuMzUsODUuNDdabTE1LjkxLjIxdi01SDgzLjM0Yy0zLjIxLDAtNS4xMiwyLjEyLTUuMTIsNC43OCwwLDMuMjgsMS45MSw1LjQsNS4xMiw1LjRTODguMjYsODguODIsODguMjYsODUuNjhaIi8+PHBhdGggY2xhc3M9ImNscy0yIiBkPSJNMTAwLjYxLDk0LjgzVjcyYzAtNi40OSw0LjMtMTEuMTMsMTAuNjUtMTEuMTNTMTIxLjkxLDY1LjUzLDEyMS45MSw3MlY5NC44M2EuODYuODYsMCwwLDEtMSwxaC00YS44Ni44NiwwLDAsMS0xLTF2LTIzYzAtMy4yMS0xLjc3LTUuNC00Ljc4LTUuNHMtNC43OCwyLjE5LTQuNzgsNS40djIzYS44Ni44NiwwLDAsMS0xLDFoLTRBLjg2Ljg2LDAsMCwxLDEwMC42MSw5NC44M1oiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0xNTIuMjksNDguOTRsLTguMTIsNDQuNTlhMi43NSwyLjc1LDAsMCwxLTIuOTQsMi41M2gtMy43NWEyLjc1LDIuNzUsMCwwLDEtMi45NC0yLjUzbC04LjEyLTQ0LjU5YS43Ni43NiwwLDAsMSwuODItLjk1aDQuNDRhLjkzLjkzLDAsMCwxLDEsLjgybDYuNjksNDAsNi42OS00MGEuODYuODYsMCwwLDEsMS0uODJoNC40NEMxNTIuMDksNDgsMTUyLjQzLDQ4LjQsMTUyLjI5LDQ4Ljk0WiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTE1Ni44LDUzLjg2YTMuMzksMy4zOSwwLDAsMSwzLjQ4LTMuNTUsMy40OCwzLjQ4LDAsMCwxLDMuNTUsMy41NSwzLjU2LDMuNTYsMCwwLDEtMy41NSwzLjQ4QTMuMzcsMy4zNywwLDAsMSwxNTYuOCw1My44NlptLjU0LDQxVjYyLjUzYS44NS44NSwwLDAsMSwxLS44OWg0YS44NS44NSwwLDAsMSwxLC44OXYzMi4zYS44Ny44NywwLDAsMS0xLDFoLTRBLjg3Ljg3LDAsMCwxLDE1Ny4zNCw5NC44M1oiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0xNjkuNSw4NS4zNFY3MmMuMDctNi40OCw0LjMtMTEsMTAuODUtMTFhMTAuNCwxMC40LDAsMCwxLDEwLjkzLDEwLjc5YzAsNi00LjM3LDEwLjMxLTEwLjg2LDEwLjMxaC01djMuNTVjMCwzLjE0LDEuODQsNS4zMiw1LDUuMzIsMi44LDAsNC42NS0yLDQuODUtNS4wNWEuODguODgsMCwwLDEsMS0uODloNGEuODMuODMsMCwwLDEsLjg4Ljg5Yy0uMzQsNi4zNS00LjY0LDEwLjU5LTEwLjc4LDEwLjU5QzE3My44Nyw5Ni40NywxNjkuNSw5MiwxNjkuNSw4NS4zNFptMTAuOTItOC42MWMzLjE0LDAsNS0yLDUtNC44NCwwLTMuMjgtMS45Mi01LjQtNS4wNi01LjRzLTUsMi4xMi01LDUuNHY0Ljg0WiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTIxNSw5Mi4zN2E4Ljc1LDguNzUsMCwwLDEtNy4zOCw0LjE2Yy02LjIxLDAtMTAuMzEtNC42NC0xMC4zMS0xMS4xM1Y2Mi42YS44Ny44NywwLDAsMSwxLTFoMy44OWEuODcuODcsMCwwLDEsMSwxdjIzYzAsMy4yMSwxLjYzLDUuMzIsNC41LDUuMzJzNC40NC0yLjExLDQuNDQtNS4zMnYtMjNhLjg3Ljg3LDAsMCwxLDEtMWg0YS44NC44NCwwLDAsMSwuODgsMXYyM2MwLDMuMjEsMS42NCw1LjMyLDQuNTEsNS4zMnM0LjQ0LTIuMTEsNC40NC01LjMydi0yM2EuODYuODYsMCwwLDEsMS0xaDRhLjg1Ljg1LDAsMCwxLC44OSwxVjg1LjRjMCw2LjQ5LTQsMTEuMTMtMTAuMjQsMTEuMTNBOC42NSw4LjY1LDAsMCwxLDIxNSw5Mi4zN1oiLz48L2c+PC9nPjwvc3ZnPg==" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Dashboard</a>
+            <a href="/" class="navbar__link">AI Search</a>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">Knowledge Graph Explorer</h1>
+            <button class="btn btn-secondary" onclick="loadStats()">Refresh</button>
+        </div>
+
+        <!-- Unavailable Notice -->
+        <div class="unavailable-notice" id="unavailableNotice">
+            <h3>Graph Database Unavailable</h3>
+            <p>Neo4j is not configured or not reachable. Set <code>NEO4J_PASSWORD</code> environment variable to enable GraphRAG.</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs" id="tabsContainer">
+            <button class="tab active" data-tab="statistics">Statistics</button>
+            <button class="tab" data-tab="entities">Entity Browser</button>
+            <button class="tab" data-tab="relationships">Relationships</button>
+        </div>
+
+        <!-- Statistics Tab -->
+        <div class="tab-content active" id="statistics">
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card stat-card--health" id="healthCard">
+                    <div class="stat-card__number" id="healthStatus">-</div>
+                    <div class="stat-card__label">Status</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__number" id="totalNodes">-</div>
+                    <div class="stat-card__label">Total Nodes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__number" id="totalRelationships">-</div>
+                    <div class="stat-card__label">Relationships</div>
+                </div>
+            </div>
+
+            <h3 style="margin-bottom: 1rem; color: var(--cyanview-navy);">Entity Types</h3>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Count</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="entityTypesBody">
+                        <tr><td colspan="3" class="loading">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 style="margin: 2rem 0 1rem; color: var(--cyanview-navy);">Relationship Types</h3>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Relationship</th>
+                            <th>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody id="relationshipTypesBody">
+                        <tr><td colspan="2" class="loading">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Entity Browser Tab -->
+        <div class="tab-content" id="entities">
+            <div class="filter-bar">
+                <select class="filter-bar__select" id="entityTypeFilter">
+                    <option value="">Select entity type...</option>
+                </select>
+                <input type="text" class="filter-bar__search" id="entitySearch" placeholder="Search entities...">
+                <button class="btn btn-primary" onclick="searchEntities()">Search</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Relationships</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="entitiesBody">
+                        <tr><td colspan="4" class="empty-state">Select an entity type to browse</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="entitiesPagination" style="display: none;">
+                <button class="btn btn-secondary btn-sm" id="prevPage" onclick="changePage(-1)">Previous</button>
+                <span id="pageInfo">Page 1</span>
+                <button class="btn btn-secondary btn-sm" id="nextPage" onclick="changePage(1)">Next</button>
+            </div>
+        </div>
+
+        <!-- Relationships Tab -->
+        <div class="tab-content" id="relationships">
+            <div class="filter-bar">
+                <select class="filter-bar__select" id="relSourceType">
+                    <option value="">All source types</option>
+                </select>
+                <select class="filter-bar__select" id="relType">
+                    <option value="">All relationships</option>
+                </select>
+                <button class="btn btn-primary" onclick="loadRelationships()">Filter</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th></th>
+                            <th>Relationship</th>
+                            <th></th>
+                            <th>Target</th>
+                        </tr>
+                    </thead>
+                    <tbody id="relationshipsBody">
+                        <tr><td colspan="5" class="loading">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Entity Detail Modal -->
+    <div class="modal" id="entityModal">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title" id="modalTitle">Entity Details</h2>
+                <button class="modal__close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal__body" id="modalBody">
+                <!-- Content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let graphAvailable = false;
+        let currentPage = 1;
+        let currentEntityType = '';
+        let entityTypes = [];
+        let relationshipTypes = [];
+
+        // Check session
+        async function checkSession() {
+            try {
+                const response = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch (error) {
+                window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+            }
+        }
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/admin/graph/stats', { credentials: 'include' });
+                const data = await response.json();
+
+                if (!data.available) {
+                    graphAvailable = false;
+                    document.getElementById('unavailableNotice').style.display = 'block';
+                    document.getElementById('tabsContainer').style.display = 'none';
+                    document.getElementById('statistics').style.display = 'none';
+                    document.getElementById('healthCard').classList.add('disconnected');
+                    document.getElementById('healthStatus').textContent = 'Offline';
+                    return;
+                }
+
+                graphAvailable = true;
+                document.getElementById('unavailableNotice').style.display = 'none';
+                document.getElementById('tabsContainer').style.display = 'flex';
+                document.getElementById('healthStatus').textContent = 'Connected';
+
+                const stats = data.stats;
+                let totalNodes = 0;
+                for (const key in stats) {
+                    if (key !== 'relationships') {
+                        totalNodes += stats[key];
+                    }
+                }
+                document.getElementById('totalNodes').textContent = totalNodes.toLocaleString();
+                document.getElementById('totalRelationships').textContent = (stats.relationships || 0).toLocaleString();
+
+                // Load entity types
+                await loadEntityTypes();
+                // Load relationship types
+                await loadRelationshipTypes();
+
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        async function loadEntityTypes() {
+            try {
+                const response = await fetch('/api/admin/graph/entity-types', { credentials: 'include' });
+                const data = await response.json();
+
+                if (!data.available) return;
+
+                entityTypes = data.types;
+                const tbody = document.getElementById('entityTypesBody');
+                tbody.innerHTML = '';
+
+                // Populate filter dropdown
+                const select = document.getElementById('entityTypeFilter');
+                const relSourceType = document.getElementById('relSourceType');
+                select.innerHTML = '<option value="">Select entity type...</option>';
+                relSourceType.innerHTML = '<option value="">All source types</option>';
+
+                data.types.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><span class="tag tag--${item.type.toLowerCase()}">${item.type}</span></td>
+                        <td>${item.count.toLocaleString()}</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="browseEntityType('${item.type}')">Browse</button></td>
+                    `;
+                    tbody.appendChild(row);
+
+                    // Add to dropdown
+                    const option = document.createElement('option');
+                    option.value = item.type;
+                    option.textContent = `${item.type} (${item.count})`;
+                    select.appendChild(option);
+
+                    const relOption = option.cloneNode(true);
+                    relSourceType.appendChild(relOption);
+                });
+
+            } catch (error) {
+                console.error('Failed to load entity types:', error);
+            }
+        }
+
+        async function loadRelationshipTypes() {
+            try {
+                const response = await fetch('/api/admin/graph/relationship-types', { credentials: 'include' });
+                const data = await response.json();
+
+                if (!data.available) return;
+
+                relationshipTypes = data.types;
+                const tbody = document.getElementById('relationshipTypesBody');
+                tbody.innerHTML = '';
+
+                // Populate filter dropdown
+                const select = document.getElementById('relType');
+                select.innerHTML = '<option value="">All relationships</option>';
+
+                data.types.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><code>${item.type}</code></td>
+                        <td>${item.count.toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(row);
+
+                    const option = document.createElement('option');
+                    option.value = item.type;
+                    option.textContent = `${item.type} (${item.count})`;
+                    select.appendChild(option);
+                });
+
+            } catch (error) {
+                console.error('Failed to load relationship types:', error);
+            }
+        }
+
+        function browseEntityType(type) {
+            document.getElementById('entityTypeFilter').value = type;
+            switchTab('entities');
+            loadEntities(type);
+        }
+
+        async function loadEntities(type, page = 1, search = '') {
+            if (!type) return;
+
+            currentEntityType = type;
+            currentPage = page;
+            const tbody = document.getElementById('entitiesBody');
+            tbody.innerHTML = '<tr><td colspan="4" class="loading">Loading...</td></tr>';
+
+            try {
+                let url = `/api/admin/graph/entities?entity_type=${type}&page=${page}&page_size=20`;
+                if (search) {
+                    url += `&search=${encodeURIComponent(search)}`;
+                }
+
+                const response = await fetch(url, { credentials: 'include' });
+                const data = await response.json();
+
+                if (!data.available) return;
+
+                tbody.innerHTML = '';
+
+                if (data.entities.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No entities found</td></tr>';
+                    document.getElementById('entitiesPagination').style.display = 'none';
+                    return;
+                }
+
+                data.entities.forEach(entity => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><span class="entity-name" title="${escapeHtml(entity.name)}">${escapeHtml(entity.name.substring(0, 80))}${entity.name.length > 80 ? '...' : ''}</span></td>
+                        <td><span class="tag tag--${entity.entity_type.toLowerCase()}">${entity.entity_type}</span></td>
+                        <td>${entity.relationship_count}</td>
+                        <td><button class="btn btn-sm btn-secondary" onclick="viewEntity('${entity.entity_type}', '${escapeAttr(entity.id)}')">View</button></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                // Pagination
+                const pagination = document.getElementById('entitiesPagination');
+                if (data.total > 20) {
+                    pagination.style.display = 'flex';
+                    document.getElementById('pageInfo').textContent = `Page ${page} of ${Math.ceil(data.total / 20)}`;
+                    document.getElementById('prevPage').disabled = page <= 1;
+                    document.getElementById('nextPage').disabled = !data.has_more;
+                } else {
+                    pagination.style.display = 'none';
+                }
+
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        function searchEntities() {
+            const type = document.getElementById('entityTypeFilter').value;
+            const search = document.getElementById('entitySearch').value.trim();
+            if (type) {
+                loadEntities(type, 1, search);
+            }
+        }
+
+        function changePage(delta) {
+            const newPage = currentPage + delta;
+            if (newPage >= 1) {
+                const search = document.getElementById('entitySearch').value.trim();
+                loadEntities(currentEntityType, newPage, search);
+            }
+        }
+
+        async function viewEntity(type, id) {
+            try {
+                const response = await fetch(`/api/admin/graph/entities/${type}/${encodeURIComponent(id)}`, { credentials: 'include' });
+                const data = await response.json();
+
+                if (!data.available || !data.entity) {
+                    alert('Entity not found');
+                    return;
+                }
+
+                const entity = data.entity;
+                document.getElementById('modalTitle').textContent = `${entity.entity_type}: ${entity.name.substring(0, 50)}`;
+
+                let html = '<div class="property-list">';
+                for (const [key, value] of Object.entries(entity.properties)) {
+                    if (value !== null && value !== undefined) {
+                        html += `
+                            <div class="property-item">
+                                <span class="property-key">${escapeHtml(key)}</span>
+                                <span class="property-value">${escapeHtml(String(value))}</span>
+                            </div>
+                        `;
+                    }
+                }
+                html += '</div>';
+
+                if (entity.relationships && entity.relationships.length > 0) {
+                    html += '<div class="relationships-section"><h4>Relationships</h4>';
+                    entity.relationships.forEach(rel => {
+                        const arrow = rel.direction === 'outgoing' ? '→' : '←';
+                        html += `
+                            <div class="relationship-item">
+                                <span class="tag tag--${entity.entity_type.toLowerCase()}">${entity.entity_type}</span>
+                                <span class="rel-arrow">${arrow} ${rel.rel_type} ${arrow === '→' ? '→' : '←'}</span>
+                                <span class="tag tag--${rel.target_type.toLowerCase()}">${rel.target_type}</span>
+                                <span style="margin-left: 0.5rem;">${escapeHtml(rel.target_name ? rel.target_name.substring(0, 40) : '')}</span>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+
+                document.getElementById('modalBody').innerHTML = html;
+                document.getElementById('entityModal').classList.add('active');
+
+            } catch (error) {
+                alert('Error loading entity: ' + error.message);
+            }
+        }
+
+        async function loadRelationships() {
+            const sourceType = document.getElementById('relSourceType').value;
+            const relType = document.getElementById('relType').value;
+            const tbody = document.getElementById('relationshipsBody');
+            tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+
+            try {
+                let url = '/api/admin/graph/relationships?limit=50';
+                if (sourceType) url += `&source_type=${sourceType}`;
+                if (relType) url += `&relationship_type=${relType}`;
+
+                const response = await fetch(url, { credentials: 'include' });
+                const data = await response.json();
+
+                if (!data.available) return;
+
+                tbody.innerHTML = '';
+
+                if (data.relationships.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No relationships found</td></tr>';
+                    return;
+                }
+
+                data.relationships.forEach(rel => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>
+                            <span class="tag tag--${rel.source_type.toLowerCase()}">${rel.source_type}</span>
+                            <span class="entity-name" style="display: block; margin-top: 0.25rem;">${escapeHtml((rel.source_name || '').substring(0, 30))}</span>
+                        </td>
+                        <td class="rel-arrow">→</td>
+                        <td><code>${rel.relationship}</code></td>
+                        <td class="rel-arrow">→</td>
+                        <td>
+                            <span class="tag tag--${rel.target_type.toLowerCase()}">${rel.target_type}</span>
+                            <span class="entity-name" style="display: block; margin-top: 0.25rem;">${escapeHtml((rel.target_name || '').substring(0, 30))}</span>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('entityModal').classList.remove('active');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+
+            if (tabId === 'relationships' && graphAvailable) {
+                loadRelationships();
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        function escapeAttr(text) {
+            return (text || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        // Event listeners
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        });
+
+        document.getElementById('entityTypeFilter').addEventListener('change', function() {
+            if (this.value) {
+                loadEntities(this.value, 1);
+            }
+        });
+
+        document.getElementById('entitySearch').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') searchEntities();
+        });
+
+        document.getElementById('entityModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Initialize
+        checkSession().then(() => {
+            loadStats();
+        });
+    </script>
+</body>
+</html>
