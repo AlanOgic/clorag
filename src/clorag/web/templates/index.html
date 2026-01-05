@@ -17,19 +17,38 @@
             startOnLoad: false,
             theme: 'base',
             themeVariables: {
-                // Cyanview devices: Blue background with white text (default)
+                // Primary: Cyanview devices - navy blue background with white text
                 primaryColor: '#003366',
-                primaryTextColor: '#fff',
+                primaryTextColor: '#ffffff',
                 primaryBorderColor: '#0077b6',
+                // Secondary: Light blue background with dark text
+                secondaryColor: '#e8f4fc',
+                secondaryTextColor: '#003366',
+                secondaryBorderColor: '#0077b6',
+                // Tertiary: Light gray background with dark text
+                tertiaryColor: '#f5f5f5',
+                tertiaryTextColor: '#1c1e21',
+                tertiaryBorderColor: '#cccccc',
                 // Network wires in blue
                 lineColor: '#0077b6',
-                // Secondary/tertiary colors
-                secondaryColor: '#e8f4fc',
-                tertiaryColor: '#f8f9fa',
-                // Text colors
+                // General text colors - ensure dark text on light backgrounds
                 textColor: '#1c1e21',
+                mainBkg: '#ffffff',
+                // Node styling
+                nodeBorder: '#0077b6',
+                clusterBkg: '#f8f9fa',
+                clusterBorder: '#cccccc',
                 // Edge/link colors
-                edgeLabelBackground: '#fff'
+                edgeLabelBackground: '#ffffff',
+                // Note styling (for annotations)
+                noteBkgColor: '#fff8dc',
+                noteTextColor: '#1c1e21',
+                noteBorderColor: '#e6d9a8',
+                // Actor styling (for sequence diagrams)
+                actorBkg: '#003366',
+                actorTextColor: '#ffffff',
+                actorBorder: '#0077b6',
+                actorLineColor: '#0077b6'
             },
             flowchart: {
                 useMaxWidth: true,
@@ -485,9 +504,10 @@
             stroke: #0077b6 !important;
         }
 
-        .answer-content .mermaid-container svg .node.cyanview .nodeLabel {
-            color: #fff !important;
-            fill: #fff !important;
+        .answer-content .mermaid-container svg .node.cyanview .nodeLabel,
+        .answer-content .mermaid-container svg .node.cyanview span {
+            color: #ffffff !important;
+            fill: #ffffff !important;
         }
 
         /* Network wires - blue solid stroke */
@@ -507,6 +527,47 @@
             stroke: #F57C00 !important;
             stroke-width: 2px !important;
             stroke-dasharray: 5, 5 !important;
+        }
+
+        /* Default node styling - ensure readable text on all backgrounds */
+        .answer-content .mermaid-container svg .node rect,
+        .answer-content .mermaid-container svg .node polygon,
+        .answer-content .mermaid-container svg .node circle,
+        .answer-content .mermaid-container svg .node ellipse {
+            stroke-width: 2px !important;
+        }
+
+        /* Default node labels - dark text unless explicitly styled otherwise */
+        .answer-content .mermaid-container svg .node .nodeLabel {
+            color: #1c1e21 !important;
+            fill: #1c1e21 !important;
+        }
+
+        /* Navy/dark background nodes need white text */
+        .answer-content .mermaid-container svg .node[class*="primary"] .nodeLabel,
+        .answer-content .mermaid-container svg .node.default .nodeLabel {
+            color: #ffffff !important;
+            fill: #ffffff !important;
+        }
+
+        /* Subgraph/cluster labels */
+        .answer-content .mermaid-container svg .cluster-label .nodeLabel {
+            color: #1c1e21 !important;
+            fill: #1c1e21 !important;
+        }
+
+        /* Edge labels - ensure dark text on white background */
+        .answer-content .mermaid-container svg .edgeLabel {
+            background-color: #ffffff !important;
+            color: #1c1e21 !important;
+        }
+
+        .answer-content .mermaid-container svg .edgeLabel rect {
+            fill: #ffffff !important;
+        }
+
+        .answer-content .mermaid-container svg .edgeLabel span {
+            color: #1c1e21 !important;
         }
 
         .results-header {
