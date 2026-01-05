@@ -412,8 +412,10 @@
                 <ul class="docs-nav__list">
                     <li class="docs-nav__item"><a href="#architecture" class="docs-nav__link">Architecture</a></li>
                     <li class="docs-nav__item"><a href="#search-system" class="docs-nav__link">Search System</a></li>
+                    <li class="docs-nav__item"><a href="#graphrag" class="docs-nav__link">GraphRAG</a></li>
                     <li class="docs-nav__item"><a href="#data-ingestion" class="docs-nav__link">Data Ingestion</a></li>
                     <li class="docs-nav__item"><a href="#knowledge-base" class="docs-nav__link">Knowledge Base</a></li>
+                    <li class="docs-nav__item"><a href="#chunk-editor" class="docs-nav__link">Chunk Editor</a></li>
                     <li class="docs-nav__item"><a href="#conversations" class="docs-nav__link">Conversations</a></li>
                     <li class="docs-nav__item"><a href="#draft-management" class="docs-nav__link">Draft Management</a></li>
                     <li class="docs-nav__item"><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
@@ -461,9 +463,11 @@ Streaming Response</code></pre>
                 <table>
                     <tr><th>Component</th><th>Technology</th></tr>
                     <tr><td>Vector Database</td><td>Qdrant</td></tr>
+                    <tr><td>Graph Database</td><td>Neo4j (GraphRAG)</td></tr>
                     <tr><td>Dense Embeddings</td><td>Voyage AI (voyage-context-3)</td></tr>
                     <tr><td>Sparse Embeddings</td><td>FastEmbed BM25</td></tr>
                     <tr><td>LLM Synthesis</td><td>Claude Sonnet 4.5</td></tr>
+                    <tr><td>Entity Extraction</td><td>Claude Haiku</td></tr>
                     <tr><td>Diagram Rendering</td><td>Mermaid.js v11 (ESM)</td></tr>
                     <tr><td>Web Framework</td><td>FastAPI + Jinja2</td></tr>
                     <tr><td>Database</td><td>SQLite (cameras + analytics)</td></tr>
@@ -505,6 +509,103 @@ Streaming Response</code></pre>
                     <li><strong>Multi-device setups</strong> - Complex integration scenarios</li>
                 </ul>
                 <p>Diagrams are rendered client-side using Mermaid.js v11 ESM modules with Cyanview color theming (navy blue nodes, cyan connections).</p>
+
+                <h2 id="graphrag">GraphRAG Knowledge Graph</h2>
+
+                <h3>Overview</h3>
+                <p>GraphRAG extends the traditional RAG system with a Neo4j knowledge graph that captures relationships between entities. This provides richer context for Claude synthesis by understanding how cameras, products, protocols, and issues are interconnected.</p>
+
+                <h3>Integration Flow</h3>
+                <pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                    GRAPHRAG INTEGRATION FLOW                         │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│  USER QUERY   │     │    VECTOR     │     │    GRAPH      │
+│               │────▶│    SEARCH     │────▶│  ENRICHMENT   │
+│  "RIO + C70"  │     │   (Qdrant)    │     │   (Neo4j)     │
+└───────────────┘     └───────────────┘     └───────────────┘
+                              │                     │
+                              │  Top chunks         │  Related entities
+                              │                     │  + relationships
+                              ▼                     ▼
+                      ┌─────────────────────────────────────┐
+                      │         CLAUDE SYNTHESIS            │
+                      │  Context: chunks + graph context    │
+                      │  Output: enriched response          │
+                      └─────────────────────────────────────┘</code></pre>
+
+                <h3>Entity Types</h3>
+                <table>
+                    <tr><th>Entity</th><th>Description</th><th>Example</th></tr>
+                    <tr><td><code>Camera</code></td><td>Camera models with manufacturer info</td><td>Canon C70, Sony FX6</td></tr>
+                    <tr><td><code>Product</code></td><td>Cyanview products</td><td>RIO, RCP, CI0, VP4</td></tr>
+                    <tr><td><code>Protocol</code></td><td>Communication protocols</td><td>Serial, IP, GPIO, NDI</td></tr>
+                    <tr><td><code>Port</code></td><td>Physical connection ports</td><td>LANC, RS-422, USB</td></tr>
+                    <tr><td><code>Control</code></td><td>Controllable features</td><td>Iris, Focus, Zoom, ISO</td></tr>
+                    <tr><td><code>Issue</code></td><td>Known problems</td><td>Firmware bugs, connection issues</td></tr>
+                    <tr><td><code>Solution</code></td><td>Verified solutions</td><td>Workarounds, configuration fixes</td></tr>
+                    <tr><td><code>Firmware</code></td><td>Firmware versions</td><td>RIO v2.5.0, CI0 v1.3.2</td></tr>
+                    <tr><td><code>Chunk</code></td><td>Links to source chunks</td><td>References to Qdrant chunks</td></tr>
+                </table>
+
+                <h3>Relationships</h3>
+                <table>
+                    <tr><th>Relationship</th><th>From → To</th><th>Description</th></tr>
+                    <tr><td><code>COMPATIBLE_WITH</code></td><td>Camera → Product</td><td>Camera works with product</td></tr>
+                    <tr><td><code>USES_PROTOCOL</code></td><td>Camera/Product → Protocol</td><td>Uses this protocol</td></tr>
+                    <tr><td><code>HAS_PORT</code></td><td>Camera/Product → Port</td><td>Has this connection port</td></tr>
+                    <tr><td><code>SUPPORTS_CONTROL</code></td><td>Camera → Control</td><td>This control is available</td></tr>
+                    <tr><td><code>AFFECTS</code></td><td>Issue → Camera/Product</td><td>Issue affects this device</td></tr>
+                    <tr><td><code>RESOLVED_BY</code></td><td>Issue → Solution</td><td>Issue is fixed by solution</td></tr>
+                    <tr><td><code>MENTIONS</code></td><td>Chunk → Any Entity</td><td>Chunk references entity</td></tr>
+                    <tr><td><code>REQUIRES_FIRMWARE</code></td><td>Solution → Firmware</td><td>Solution needs this version</td></tr>
+                </table>
+
+                <h3>Graph Population</h3>
+                <p>The knowledge graph is populated from Qdrant chunks using Claude Haiku for entity extraction:</p>
+                <pre><code># Populate graph from all collections
+uv run populate-graph
+
+# Populate from specific collections only
+uv run populate-graph --collections docusaurus_docs gmail_cases
+
+# Limit chunks for testing
+uv run populate-graph --max-chunks 100</code></pre>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Entity Extraction</div>
+                    <p>Each chunk is analyzed by Claude Haiku to extract entities and relationships. The process is idempotent - running it multiple times will merge new entities with existing ones.</p>
+                </div>
+
+                <h3>Configuration</h3>
+                <p>GraphRAG requires Neo4j to be configured in the environment:</p>
+                <pre><code># Neo4j Configuration
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_secure_password
+NEO4J_DATABASE=neo4j  # Optional, defaults to "neo4j"</code></pre>
+
+                <h3>Local Development</h3>
+                <p>The production Neo4j instance is bound to localhost only. For local development, use SSH tunneling:</p>
+                <pre><code># Create SSH tunnel to production Neo4j
+ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
+
+# Then set in local .env
+NEO4J_URI=bolt://localhost:7687</code></pre>
+
+                <h3>Graceful Degradation</h3>
+                <p>If Neo4j is not configured or unavailable:</p>
+                <ul>
+                    <li>The system falls back to standard RAG (vector search only)</li>
+                    <li>No errors are thrown - graph enrichment is simply skipped</li>
+                    <li>Check <code>NEO4J_PASSWORD</code> env var to enable GraphRAG</li>
+                </ul>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Graph Statistics</div>
+                    <p>View current graph stats at <a href="/api/admin/graph/stats">/api/admin/graph/stats</a> (requires authentication). Current production graph: ~5,500 nodes and ~3,600 relationships.</p>
+                </div>
 
                 <h3>Performance Optimizations</h3>
                 <p>The RAG system includes several optimizations for better performance and cost efficiency:</p>
@@ -856,6 +957,70 @@ uv run ingest-curated --offset 600 --max-threads 300</code></pre>
                 <div class="info-box info-box--info">
                     <div class="info-box__title">Chunking and Embedding</div>
                     <p>Documents are automatically split into 1000-character chunks with 100-character overlap, then embedded using voyage-context-3 (dense) and BM25 (sparse). All chunks from a document share the same metadata and parent_doc_id for grouping.</p>
+                </div>
+
+                <h2 id="chunk-editor">Chunk Editor</h2>
+
+                <h3>Overview</h3>
+                <p>The Chunk Editor provides direct access to browse, search, and edit individual chunks in the vector database. This is useful for:</p>
+                <ul>
+                    <li>Inspecting what content is actually indexed</li>
+                    <li>Correcting inaccuracies in ingested content</li>
+                    <li>Fine-tuning chunk metadata (tags, titles)</li>
+                    <li>Deleting outdated or incorrect chunks</li>
+                    <li>Debugging search relevance issues</li>
+                </ul>
+
+                <h3>Admin Interface</h3>
+                <p>Access the Chunk Editor at <a href="/admin/chunks">/admin/chunks</a>:</p>
+                <ul>
+                    <li><strong>Collection Selector</strong> - Switch between <code>docusaurus_docs</code>, <code>gmail_cases</code>, and <code>custom_docs</code></li>
+                    <li><strong>Search</strong> - Full-text search within the selected collection</li>
+                    <li><strong>Browse</strong> - Paginated list of all chunks with metadata preview</li>
+                    <li><strong>View/Edit</strong> - Expand a chunk to see full content and edit in-place</li>
+                    <li><strong>Delete</strong> - Remove individual chunks from the vector store</li>
+                </ul>
+
+                <h3>Chunk Metadata</h3>
+                <table>
+                    <tr><th>Field</th><th>Description</th><th>Editable</th></tr>
+                    <tr><td><code>id</code></td><td>Unique chunk identifier (UUID)</td><td>No</td></tr>
+                    <tr><td><code>text</code></td><td>The actual chunk content</td><td>Yes</td></tr>
+                    <tr><td><code>title</code></td><td>Document or page title</td><td>Yes</td></tr>
+                    <tr><td><code>url</code></td><td>Source URL (for docs/cases)</td><td>Yes</td></tr>
+                    <tr><td><code>chunk_index</code></td><td>Position within parent document</td><td>No</td></tr>
+                    <tr><td><code>parent_doc_id</code></td><td>Groups chunks from same document</td><td>No</td></tr>
+                    <tr><td><code>collection</code></td><td>Source collection name</td><td>No</td></tr>
+                    <tr><td><code>created_at</code></td><td>Ingestion timestamp</td><td>No</td></tr>
+                    <tr><td><code>human_modified</code></td><td>Flag for manual edits</td><td>Auto-set</td></tr>
+                </table>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Human Modified Flag</div>
+                    <p>When you edit a chunk, the <code>human_modified</code> flag is automatically set to <code>true</code>. This protects your edits from being overwritten by future ingestion runs. Re-ingesting the same source will not update human-modified chunks.</p>
+                </div>
+
+                <h3>Re-Embedding on Edit</h3>
+                <p>When chunk text is edited:</p>
+                <ol>
+                    <li>New dense (Voyage AI) and sparse (BM25) embeddings are generated</li>
+                    <li>The chunk is updated in Qdrant with new vectors</li>
+                    <li>The <code>human_modified</code> flag is set to prevent overwrite</li>
+                    <li>Changes are immediately reflected in search results</li>
+                </ol>
+
+                <h3>API Endpoints</h3>
+                <p>Chunk operations are available via REST API:</p>
+                <ul>
+                    <li><code>GET /api/admin/chunks</code> - List chunks with pagination and search</li>
+                    <li><code>GET /api/admin/chunks/{id}</code> - Get single chunk details</li>
+                    <li><code>PUT /api/admin/chunks/{id}</code> - Update chunk content/metadata</li>
+                    <li><code>DELETE /api/admin/chunks/{id}</code> - Delete a chunk</li>
+                </ul>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Deleting vs Editing</div>
+                    <p>Prefer editing over deleting when correcting information. Deleted chunks leave gaps in document coverage. If a chunk contains completely wrong info, edit it to correct the information rather than removing it.</p>
                 </div>
 
                 <h3 id="conversations">Conversation Sessions</h3>
@@ -1422,6 +1587,66 @@ QDRANT_API_KEY=your_qdrant_key               # Secures vector database</code></p
                 </div>
                 <p>Get stored search details including response and chunks. Requires authentication.</p>
 
+                <h3>Chunk Endpoints</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/chunks</span>
+                </div>
+                <p>List chunks with pagination. Query params: <code>collection</code>, <code>search</code>, <code>limit</code>, <code>offset</code>. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/chunks/{id}</span>
+                </div>
+                <p>Get a single chunk by ID with full content and metadata. Requires authentication.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--put">PUT</span>
+                    <span class="endpoint__path">/api/admin/chunks/{id}</span>
+                </div>
+                <p>Update chunk content or metadata. Triggers re-embedding if text changed. Sets <code>human_modified=true</code>. Requires authentication.</p>
+                <pre><code>{
+  "text": "Updated chunk content...",
+  "title": "Updated Title",
+  "url": "https://..."
+}</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--delete">DELETE</span>
+                    <span class="endpoint__path">/api/admin/chunks/{id}</span>
+                </div>
+                <p>Delete a chunk from the vector store. Requires authentication.</p>
+
+                <h3>Graph Endpoints</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/graph/stats</span>
+                </div>
+                <p>Get knowledge graph statistics including node counts by type, relationship counts, and total entities. Requires authentication.</p>
+                <pre><code>Response:
+{
+  "total_nodes": 5519,
+  "total_relationships": 3614,
+  "nodes_by_type": {
+    "Camera": 245,
+    "Product": 12,
+    "Protocol": 8,
+    "Port": 15,
+    "Control": 42,
+    "Issue": 128,
+    "Solution": 156,
+    "Chunk": 4913
+  },
+  "relationships_by_type": {
+    "COMPATIBLE_WITH": 312,
+    "USES_PROTOCOL": 189,
+    "MENTIONS": 2845,
+    ...
+  }
+}</code></pre>
+
                 <h3>Draft Endpoints</h3>
 
                 <div class="endpoint">
@@ -1536,6 +1761,9 @@ ssh root@server "cd /opt/clorag && docker compose build && docker compose up -d"
                     <tr><td><code>ADMIN_PASSWORD</code></td><td>Yes</td><td>Admin authentication password</td></tr>
                     <tr><td><code>DATABASE_PATH</code></td><td>No</td><td>Camera DB path (default: data/clorag.db)</td></tr>
                     <tr><td><code>ANALYTICS_DATABASE_PATH</code></td><td>No</td><td>Analytics DB path (default: data/analytics.db)</td></tr>
+                    <tr><td><code>NEO4J_URI</code></td><td>No</td><td>Neo4j Bolt URI (default: bolt://localhost:7687)</td></tr>
+                    <tr><td><code>NEO4J_USER</code></td><td>No</td><td>Neo4j username (default: neo4j)</td></tr>
+                    <tr><td><code>NEO4J_PASSWORD</code></td><td>No</td><td>Neo4j password (enables GraphRAG if set)</td></tr>
                 </table>
 
                 <h2 id="configuration">Configuration</h2>
