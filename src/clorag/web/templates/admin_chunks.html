@@ -239,12 +239,33 @@
         }
 
         .chunk-preview {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #606770;
-            max-width: 400px;
+            max-width: 450px;
+        }
+
+        .chunk-preview__text {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.4;
+            margin-bottom: 0.25rem;
+        }
+
+        .chunk-preview__link {
+            font-size: 0.75rem;
+            color: var(--cyan-dark);
+            text-decoration: none;
+            display: inline-block;
+            max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        .chunk-preview__link:hover {
+            text-decoration: underline;
         }
 
         /* Tags */
@@ -530,10 +551,16 @@
                     '<span class="tag tag--docs">Docs</span>' :
                     '<span class="tag tag--cases">Cases</span>';
 
+                // Build preview with optional link
+                let previewHtml = `<div class="chunk-preview__text">${escapeHtml(chunk.text_preview)}</div>`;
+                if (chunk.url) {
+                    previewHtml += `<a href="${escapeHtml(chunk.url)}" target="_blank" class="chunk-preview__link" title="${escapeHtml(chunk.url)}">${escapeHtml(chunk.url)}</a>`;
+                }
+
                 row.innerHTML = `
                     <td><span class="chunk-id" title="${chunk.id}">${chunk.id.substring(0, 8)}...</span></td>
                     <td><span class="chunk-title">${escapeHtml(displayTitle)}</span></td>
-                    <td><span class="chunk-preview">${escapeHtml(chunk.text_preview)}</span></td>
+                    <td><div class="chunk-preview">${previewHtml}</div></td>
                     <td>${collectionTag}</td>
                     <td>
                         <div class="actions">
