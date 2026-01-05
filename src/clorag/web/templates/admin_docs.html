@@ -412,6 +412,7 @@
                 <ul class="docs-nav__list">
                     <li class="docs-nav__item"><a href="#architecture" class="docs-nav__link">Architecture</a></li>
                     <li class="docs-nav__item"><a href="#search-system" class="docs-nav__link">Search System</a></li>
+                    <li class="docs-nav__item"><a href="#retrieval-flow" class="docs-nav__link">Retrieval Flow</a></li>
                     <li class="docs-nav__item"><a href="#graphrag" class="docs-nav__link">GraphRAG</a></li>
                     <li class="docs-nav__item"><a href="#data-ingestion" class="docs-nav__link">Data Ingestion</a></li>
                     <li class="docs-nav__item"><a href="#knowledge-base" class="docs-nav__link">Knowledge Base</a></li>
@@ -499,6 +500,159 @@ Streaming Response</code></pre>
                     <li>Used for synthesis: 8 top chunks</li>
                     <li>Max chunk size: 2000 characters</li>
                 </ul>
+
+                <h2 id="retrieval-flow">Complete Retrieval Flow</h2>
+
+                <p>The following diagram shows the end-to-end retrieval pipeline from user query to AI response:</p>
+
+                <pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                              USER QUERY                                      │
+│                    "How do I configure RIO IP address?"                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         1. QUERY EMBEDDING                                   │
+│  ┌─────────────────────────┐    ┌─────────────────────────────────┐        │
+│  │  Voyage AI (voyage-3)   │    │  FastEmbed BM25                 │        │
+│  │  → 1024-dim dense vec   │    │  → sparse vector (term weights) │        │
+│  └─────────────────────────┘    └─────────────────────────────────┘        │
+│           (cached LRU 200)              (cached LRU 200)                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    2. PARALLEL SEARCH (3 collections)                        │
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
+│  │  docusaurus_docs │  │   gmail_cases    │  │   custom_docs    │          │
+│  │  (documentation) │  │ (support cases)  │  │ (admin-managed)  │          │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘          │
+│           │                     │                     │                     │
+│           └─────────────────────┼─────────────────────┘                     │
+│                                 ▼                                           │
+│                    asyncio.gather() - parallel                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      3. HYBRID SEARCH (per collection)                       │
+│                                                                              │
+│   Dense Search ──────────┐                                                  │
+│   (semantic similarity)  │                                                  │
+│                          ├──► RRF Fusion ──► Ranked Results                 │
+│   Sparse Search ─────────┘    (k=60)                                        │
+│   (keyword matching)                                                        │
+│                                                                              │
+│   RRF Score = Σ 1/(k + rank_dense) + 1/(k + rank_sparse)                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       4. DYNAMIC THRESHOLD FILTER                            │
+│                                                                              │
+│   Short query (≤2 words):  threshold 0.15 (permissive)                      │
+│   Medium query (3-5 words): threshold 0.20                                  │
+│   Long query (&gt;5 words):    threshold 0.25 (strict)                         │
+│   Technical terms (rio, rcp): +0.05 boost                                   │
+│   Minimum 3 results always returned                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    5. GRAPHRAG ENRICHMENT (if Neo4j configured)             │
+│                                                                              │
+│   For each chunk, query Neo4j for related entities:                         │
+│   • Camera → COMPATIBLE_WITH → Products                                     │
+│   • Product → USES_PROTOCOL → Protocols                                     │
+│   • Issue → RESOLVED_BY → Solutions                                         │
+│                                                                              │
+│   Adds context: "Related: CI0 compatible with RIO, uses RCP protocol"       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      6. CLAUDE SYNTHESIS                                     │
+│                                                                              │
+│   Claude Sonnet 4 receives:                                                 │
+│   • User query                                                              │
+│   • Retrieved chunks (with source URLs)                                     │
+│   • Graph context (entities &amp; relationships)                                │
+│   • System prompt (Cyanview expert persona)                                 │
+│                                                                              │
+│   Generates:                                                                │
+│   • Comprehensive answer                                                    │
+│   • Mermaid diagrams (for connections/topology)                             │
+│   • Source citations                                                        │
+│                                                                              │
+│   Streamed back to user via SSE                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         7. ANALYTICS LOGGING                                 │
+│                                                                              │
+│   Stored in SQLite (analytics.db):                                          │
+│   • Query text, timestamp                                                   │
+│   • Sources used, chunk IDs                                                 │
+│   • Response time, token usage                                              │
+└─────────────────────────────────────────────────────────────────────────────┘</code></pre>
+
+                <h3>Dense vs Sparse Embeddings</h3>
+                <p>The system uses two complementary embedding types for optimal retrieval:</p>
+                <table>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Dense (Voyage AI)</th>
+                        <th>Sparse (BM25)</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Vector Type</strong></td>
+                        <td>1024 floats (continuous values)</td>
+                        <td>Millions of dimensions, mostly zeros</td>
+                    </tr>
+                    <tr>
+                        <td><strong>What It Captures</strong></td>
+                        <td>Semantic meaning, concepts</td>
+                        <td>Exact keyword matches</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Strength</strong></td>
+                        <td>"RIO configuration" finds "RCP IP setup"</td>
+                        <td>"RIO" finds exactly "RIO"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Weakness</strong></td>
+                        <td>May miss exact technical terms</td>
+                        <td>Misses synonyms/paraphrases</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Best For</strong></td>
+                        <td>Conceptual questions, how-to queries</td>
+                        <td>Product codes, model numbers, exact terms</td>
+                    </tr>
+                </table>
+
+                <h3>Why BM25 Instead of Voyage for Sparse?</h3>
+                <p><strong>Voyage AI doesn't offer sparse embeddings.</strong> Their models (voyage-3, voyage-context-3) only produce dense vectors. BM25 via FastEmbed is the industry-standard choice for sparse/keyword matching:</p>
+                <ul>
+                    <li><strong>Free</strong> - No API costs, runs locally</li>
+                    <li><strong>Fast</strong> - Local computation, no network latency</li>
+                    <li><strong>Proven</strong> - Classic TF-IDF based algorithm, decades of research</li>
+                    <li><strong>Complementary</strong> - Pairs perfectly with neural dense embeddings</li>
+                </ul>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Key Code Paths</div>
+                    <p>
+                        <code>app.py:stream_search()</code> - orchestrates the flow<br>
+                        <code>vectorstore.py:hybrid_search()</code> - RRF fusion<br>
+                        <code>embeddings.py:embed_query()</code> - dense vectors<br>
+                        <code>sparse_embeddings.py:embed_query()</code> - BM25 vectors<br>
+                        <code>graph/enrichment.py</code> - Neo4j context<br>
+                        <code>app.py:_synthesize_response()</code> - Claude streaming
+                    </p>
+                </div>
 
                 <h3>Mermaid Diagram Generation</h3>
                 <p>Claude autonomously generates Mermaid.js diagrams when explaining integration scenarios:</p>
