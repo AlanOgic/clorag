@@ -70,6 +70,59 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 └────────────────────────────────────────────────────────────┘
 ```
 
+### GraphRAG Enrichment
+
+When Neo4j is configured, search results are enriched with knowledge graph context:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    VECTOR SEARCH RESULTS                   │
+│              Top N chunks from Qdrant hybrid search        │
+└────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────┐
+│                    GRAPH ENRICHMENT                        │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │  1. enrich_from_chunks()                              │ │
+│  │     Traverse graph from chunk IDs to find:            │ │
+│  │     • Related cameras and their protocols             │ │
+│  │     • Products with compatibility info                │ │
+│  │     • Known issues and solutions                      │ │
+│  │                                                       │ │
+│  │  2. enrich_from_query()                               │ │
+│  │     Full-text search for query-relevant entities:     │ │
+│  │     • Cameras matching query terms                    │ │
+│  │     • Protocols and ports mentioned                   │ │
+│  │     • Firmware versions                               │ │
+│  └───────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────┐
+│                 CLAUDE SYNTHESIS                           │
+│      Vector chunks + Graph context → Rich answer           │
+│  Example: "Sony cameras use Visca protocol via RS-422"     │
+└────────────────────────────────────────────────────────────┘
+```
+
+#### Graph Population Pipeline
+
+```bash
+# Extract entities from Qdrant chunks and populate Neo4j
+uv run populate-graph
+
+# Process specific collections
+uv run populate-graph --collections docusaurus_docs gmail_cases
+
+# Limit for testing
+uv run populate-graph --max-chunks 100
+```
+
+**Entity Types**: Camera, Product, Protocol, Port, Control, Issue, Solution, Firmware, Chunk
+
+**Relationships**: COMPATIBLE_WITH, USES_PROTOCOL, HAS_PORT, AFFECTS, RESOLVED_BY, MENTIONS
+
 ### Ingestion Pipelines
 
 Two data ingestion pipelines populate the vector database:
@@ -214,6 +267,11 @@ ADMIN_PASSWORD=your_secure_password
 
 # SearXNG (optional, for web search augmentation)
 SEARXNG_URL=https://search.sapti.me
+
+# Neo4j (optional, for GraphRAG enrichment)
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_neo4j_password
 ```
 
 ## Usage
@@ -477,6 +535,27 @@ docker run -d \
   -e QDRANT__SERVICE__API_KEY=your_api_key \
   qdrant/qdrant
 ```
+
+## Setup Neo4j (Docker) - Optional
+
+Neo4j enables GraphRAG for knowledge graph enrichment:
+
+```bash
+docker run -d \
+  --name neo4j \
+  -p 7474:7474 -p 7687:7687 \
+  -v $(pwd)/neo4j_data:/data \
+  -e NEO4J_AUTH=neo4j/your_password \
+  neo4j:5-community
+```
+
+After starting Neo4j, populate the graph from Qdrant chunks:
+
+```bash
+uv run populate-graph
+```
+
+**Note**: GraphRAG is optional. The system gracefully degrades to vector-only search when Neo4j is not configured.
 
 ## Setup Gmail OAuth
 

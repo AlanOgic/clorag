@@ -2,6 +2,16 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.5.1] - 2026-01-05
+
+### Fixed
+- **SecretStr handling in populate_graph** - Properly extract Neo4j password from Pydantic SecretStr
+- **Dict access in scroll_chunks return type** - Fixed attribute access for scroll_chunks response handling
+
+### Documentation
+- Updated README with detailed GraphRAG workflow integration diagram
+- Updated CLAUDE.md with Neo4j configuration and SSH tunnel instructions
+
 ## [0.5.0] - 2025-12-26
 
 ### Added

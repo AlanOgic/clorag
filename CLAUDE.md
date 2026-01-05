@@ -207,6 +207,12 @@ Optional Neo4j-based knowledge graph enrichment:
 - **Integration**: Graph context is automatically added to Claude synthesis when Neo4j is configured
 - **Graceful degradation**: Works without Neo4j if `NEO4J_PASSWORD` is not set
 
+**Local development**: Production Neo4j is bound to localhost only. Use SSH tunnel:
+```bash
+ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
+```
+Then set `NEO4J_URI=bolt://localhost:7687` in local `.env`.
+
 ## Deployment
 
 Production runs on Docker:
