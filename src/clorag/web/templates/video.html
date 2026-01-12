@@ -518,8 +518,14 @@
 
         // Video autoplay handling
         const video = document.getElementById('mainVideo');
-        video.play().catch(function(error) {
+        video.play().then(function() {
+            // Unmute and set volume to 60% after autoplay starts
+            video.muted = false;
+            video.volume = 0.6;
+        }).catch(function(error) {
             console.log('Autoplay prevented:', error);
+            // Still set volume for manual play
+            video.volume = 0.6;
         });
     </script>
 </body>
