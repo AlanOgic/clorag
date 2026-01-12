@@ -1064,6 +1064,7 @@ uv run ingest-curated --offset 600 --max-threads 300</code></pre>
                     <tr><td>release_notes</td><td>Software/hardware release documentation</td></tr>
                     <tr><td>faq</td><td>Frequently asked questions</td></tr>
                     <tr><td>best_practices</td><td>Recommended approaches and tips</td></tr>
+                    <tr><td>pre_sales</td><td>Pre-sales materials, product positioning, buyer guides</td></tr>
                     <tr><td>internal</td><td>Internal team knowledge</td></tr>
                     <tr><td>other</td><td>Uncategorized content</td></tr>
                 </table>
@@ -1112,6 +1113,24 @@ uv run ingest-curated --offset 600 --max-threads 300</code></pre>
                     <div class="info-box__title">Chunking and Embedding</div>
                     <p>Documents are automatically split into 1000-character chunks with 100-character overlap, then embedded using voyage-context-3 (dense) and BM25 (sparse). All chunks from a document share the same metadata and parent_doc_id for grouping.</p>
                 </div>
+
+                <h3>Bulk Import CLI</h3>
+                <p>For importing multiple documents at once, use the <code>import-docs</code> CLI command:</p>
+                <pre><code># Preview what would be imported (dry run)
+uv run import-docs ./your-folder --category pre_sales --dry-run
+
+# Import all documents with category and tags
+uv run import-docs ./your-folder --category pre_sales --tags "presales,integration"
+
+# Import with default category (other)
+uv run import-docs ./your-folder</code></pre>
+                <p>Supported file types: <code>.txt</code>, <code>.md</code>, <code>.pdf</code></p>
+                <ul>
+                    <li>Recursively scans the folder for supported files</li>
+                    <li>Auto-generates titles from filenames (underscores/hyphens become spaces)</li>
+                    <li>Applies the same category and tags to all imported documents</li>
+                    <li>Use <code>--dry-run</code> to preview without importing</li>
+                </ul>
 
                 <h2 id="chunk-editor">Chunk Editor</h2>
 

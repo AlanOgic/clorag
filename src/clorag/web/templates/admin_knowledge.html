@@ -901,7 +901,8 @@
 
             try {
                 const response = await fetch(url, { credentials: 'include' });
-                const docs = await response.json();
+                const result = await response.json();
+                const docs = result.items || [];
 
                 const tbody = document.getElementById('docsBody');
                 if (docs.length === 0) {

@@ -18,6 +18,7 @@ class DocumentCategory(str, Enum):
     RELEASE_NOTES = "release_notes"
     FAQ = "faq"
     BEST_PRACTICES = "best_practices"
+    PRE_SALES = "pre_sales"
     INTERNAL = "internal"
     OTHER = "other"
 

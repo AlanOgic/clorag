@@ -45,6 +45,10 @@ uv run populate-graph
 uv run populate-graph --collections docusaurus_docs gmail_cases
 uv run populate-graph --max-chunks 100  # Limit for testing
 
+# Bulk import custom documents from a folder
+uv run import-docs ./folder --category pre_sales --tags "presales,integration"
+uv run import-docs ./folder --dry-run  # Preview without importing
+
 # Linting and type checking
 uv run ruff check src/
 uv run mypy src/clorag --strict
@@ -193,8 +197,9 @@ Claude automatically generates Mermaid.js diagrams when explaining camera connec
 ### Custom Knowledge Documents
 Admin-managed documents stored in `custom_docs` Qdrant collection. Features:
 - **File upload**: Support for .txt, .md, .pdf files with drag-and-drop UI
+- **Bulk import CLI**: `uv run import-docs ./folder --category pre_sales` for batch ingestion
 - **PDF extraction**: Text extracted using pypdf library
-- 9 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, internal, other
+- 10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other
 - Full metadata: title, tags, URL reference, expiration date, notes
 - Chunked, embedded, and included in hybrid RAG search
 - Admin UI at `/admin/knowledge` with "Paste Text" and "Upload File" modes
