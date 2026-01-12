@@ -1121,13 +1121,18 @@ class GraphStore:
         where_clauses = []
         params: dict = {"limit": limit}
 
-        if source_type:
-            valid_types = {
-                "Camera", "Product", "Protocol", "Port", "Control",
-                "Issue", "Solution", "Firmware", "Chunk"
-            }
-            if source_type not in valid_types:
-                return []
+        # Whitelist of valid entity types (Cypher injection protection)
+        valid_entity_types = {
+            "Camera", "Product", "Protocol", "Port", "Control",
+            "Issue", "Solution", "Firmware", "Chunk"
+        }
+        if source_type and source_type not in valid_entity_types:
+            return []
+
+        # Whitelist of valid relationship types derived from canonical enum
+        valid_relationship_types = {rt.value for rt in RelationType}
+        if relationship_type and relationship_type not in valid_relationship_types:
+            return []
 
         if source_name:
             where_clauses.append(

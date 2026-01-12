@@ -88,6 +88,39 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"detail": "Request timeout"}, status_code=504)
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Middleware to add security headers to all responses."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Add security headers to response."""
+        response = await call_next(request)
+        # Prevent clickjacking
+        response.headers["X-Frame-Options"] = "DENY"
+        # Prevent MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        # XSS protection (legacy browsers)
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        # Referrer policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # Content Security Policy - allow inline for existing JS, Mermaid from CDN
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self'; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'"
+        )
+        # Prevent caching of API responses (may contain sensitive data)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+
 # =============================================================================
 # Background Scheduler for Draft Creation
 # =============================================================================
@@ -157,6 +190,9 @@ app.add_middleware(
 
 # Add timeout middleware
 app.add_middleware(TimeoutMiddleware)
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Optimized system prompt - single source of truth
 SYNTHESIS_SYSTEM_PROMPT = """You are a Cyanview support expert, representing Cyanview's excellence in broadcast camera control solutions.
@@ -2215,6 +2251,42 @@ async def api_knowledge_delete(
     return {"status": "deleted", "id": doc_id}
 
 
+# Maximum file upload size (10MB)
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+async def read_upload_with_limit(file: UploadFile, max_bytes: int = MAX_UPLOAD_BYTES) -> bytes:
+    """Read uploaded file with streaming size limit to prevent memory exhaustion.
+
+    Args:
+        file: FastAPI UploadFile object.
+        max_bytes: Maximum allowed file size in bytes.
+
+    Returns:
+        File contents as bytes.
+
+    Raises:
+        HTTPException: If file exceeds size limit.
+    """
+    chunks: list[bytes] = []
+    total_size = 0
+    chunk_size = 64 * 1024  # 64KB chunks
+
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is {max_bytes // (1024 * 1024)}MB.",
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
+
+
 @app.post(
     "/api/admin/knowledge/upload",
     response_model=CustomDocument,
@@ -2235,6 +2307,7 @@ async def api_knowledge_upload(
 
     Extracts text content from the uploaded file and creates a new document.
     Supported formats: .txt, .md, .pdf
+    Max file size: 10MB
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
@@ -2247,8 +2320,8 @@ async def api_knowledge_upload(
             detail="Unsupported file type. Allowed: .txt, .md, .pdf",
         )
 
-    # Read file content
-    content_bytes = await file.read()
+    # Read file content with streaming size limit
+    content_bytes = await read_upload_with_limit(file)
     content = ""
 
     if filename.endswith((".txt", ".md")):
@@ -2283,9 +2356,10 @@ async def api_knowledge_upload(
                 detail="PDF support not available. Install pypdf package.",
             )
         except Exception as e:
+            logger.warning("PDF extraction failed", error=str(e))
             raise HTTPException(
                 status_code=400,
-                detail=f"Failed to extract text from PDF: {str(e)}",
+                detail="Failed to extract text from PDF. Please ensure the file is a valid PDF.",
             )
 
     # Validate content
@@ -2341,7 +2415,7 @@ async def api_knowledge_upload(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to create document: {str(e)}",
+            detail="Failed to create document. Please try again or contact support.",
         )
 
 
