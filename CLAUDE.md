@@ -110,7 +110,8 @@ Query → EmbeddingsClient (voyage-context-3) → VectorStore (Qdrant) → Graph
 - REST API for knowledge: `GET/POST/PUT/DELETE /api/admin/knowledge`, `POST /api/admin/knowledge/upload` (file upload)
 - REST API for analytics: `GET /api/admin/search-stats`
 - REST API for chunks: `GET/PUT/DELETE /api/admin/chunks`
-- REST API for graph: `GET /api/admin/graph/stats`
+- REST API for graph: `GET /api/admin/graph/*` (stats, entities, relationships, entity-types, relationship-types)
+- Knowledge Graph Explorer: `/admin/graph` for browsing entities, viewing relationships, editing/deleting relationships
 
 **Models Layer** (`src/clorag/models/`):
 - `camera.py` - Camera Pydantic models with CameraSource enum for tracking data origin
@@ -207,9 +208,11 @@ Admin-managed documents stored in `custom_docs` Qdrant collection. Features:
 ### GraphRAG (Knowledge Graph Augmented Retrieval)
 Optional Neo4j-based knowledge graph enrichment:
 - **Entity types**: Camera, Product, Protocol, Port, Control, Issue, Solution, Firmware, Chunk
-- **Relationships**: COMPATIBLE_WITH, USES_PROTOCOL, HAS_PORT, AFFECTS, RESOLVED_BY, MENTIONS
+- **Relationships**: COMPATIBLE_WITH, USES_PROTOCOL, HAS_PORT, AFFECTS, RESOLVED_BY, MENTIONS, etc.
 - **Population**: `uv run populate-graph` extracts entities from Qdrant chunks using Claude Haiku
 - **Integration**: Graph context is automatically added to Claude synthesis when Neo4j is configured
+- **Admin UI**: Knowledge Graph Explorer at `/admin/graph` for browsing entities and managing relationships
+- **Relationship management**: Edit (change type) or delete relationships via admin UI
 - **Graceful degradation**: Works without Neo4j if `NEO4J_PASSWORD` is not set
 
 **Local development**: Production Neo4j is bound to localhost only. Use SSH tunnel:

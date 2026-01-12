@@ -369,6 +369,11 @@
             color: #c62828;
         }
 
+        .endpoint__method--patch {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
         .endpoint__path {
             font-family: var(--ifm-font-family-mono);
             font-size: 0.9rem;
@@ -754,6 +759,15 @@ NEO4J_URI=bolt://localhost:7687</code></pre>
                     <li>The system falls back to standard RAG (vector search only)</li>
                     <li>No errors are thrown - graph enrichment is simply skipped</li>
                     <li>Check <code>NEO4J_PASSWORD</code> env var to enable GraphRAG</li>
+                </ul>
+
+                <h3>Knowledge Graph Explorer</h3>
+                <p>The admin UI at <a href="/admin/graph">/admin/graph</a> provides a visual interface for exploring the knowledge graph:</p>
+                <ul>
+                    <li><strong>Overview</strong>: Total node and relationship counts by type</li>
+                    <li><strong>Entity Browser</strong>: Browse entities by type with pagination and search</li>
+                    <li><strong>Relationship Browser</strong>: View and filter relationships between entities</li>
+                    <li><strong>Relationship Management</strong>: Edit (change type) or delete relationships directly from the UI</li>
                 </ul>
 
                 <div class="info-box info-box--warning">
@@ -1819,6 +1833,76 @@ QDRANT_API_KEY=your_qdrant_key               # Secures vector database</code></p
     ...
   }
 }</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/graph/relationships</span>
+                </div>
+                <p>List relationships with optional filtering by source type, source name, or relationship type.</p>
+                <pre><code>Query Parameters:
+- source_type: Filter by source entity type (e.g., "Camera")
+- source_name: Filter by source entity name
+- relationship_type: Filter by relationship type (e.g., "COMPATIBLE_WITH")
+- limit: Max results (default: 50, max: 200)
+
+Response:
+{
+  "available": true,
+  "relationships": [
+    {
+      "source_type": "Camera",
+      "source_name": "Canon C70",
+      "relationship": "USES_PROTOCOL",
+      "target_type": "Protocol",
+      "target_name": "Canon XC"
+    },
+    ...
+  ]
+}</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--delete">DELETE</span>
+                    <span class="endpoint__path">/api/admin/graph/relationships</span>
+                </div>
+                <p>Delete a specific relationship between two entities.</p>
+                <pre><code>Request Body:
+{
+  "source_type": "Camera",
+  "source_name": "Canon C70",
+  "rel_type": "USES_PROTOCOL",
+  "target_type": "Protocol",
+  "target_name": "Canon XC"
+}
+
+Response:
+{ "success": true }
+// or
+{ "success": false, "error": "Relationship not found" }</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--patch">PATCH</span>
+                    <span class="endpoint__path">/api/admin/graph/relationships</span>
+                </div>
+                <p>Update the type of a relationship between two entities. Properties are preserved.</p>
+                <pre><code>Request Body:
+{
+  "source_type": "Camera",
+  "source_name": "Canon C70",
+  "old_rel_type": "USES_PROTOCOL",
+  "new_rel_type": "COMPATIBLE_WITH",
+  "target_type": "Protocol",
+  "target_name": "Canon XC"
+}
+
+Valid relationship types:
+COMPATIBLE_WITH, USES_PROTOCOL, HAS_PORT, SUPPORTS_CONTROL,
+SUPPORTS_PROTOCOL, AFFECTS, RESOLVED_BY, MENTIONED_IN,
+FOR_PRODUCT, FIXES, MENTIONS
+
+Response:
+{ "success": true }
+// or
+{ "success": false, "error": "Failed to update relationship" }</code></pre>
 
                 <h3>Draft Endpoints</h3>
 

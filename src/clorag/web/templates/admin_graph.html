@@ -263,6 +263,29 @@
             font-size: 0.85rem;
         }
 
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .actions-cell {
+            display: flex;
+            gap: 0.5rem;
+        }
+
         /* Table */
         .table-container {
             background: white;
@@ -603,10 +626,11 @@
                             <th>Relationship</th>
                             <th></th>
                             <th>Target</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="relationshipsBody">
-                        <tr><td colspan="5" class="loading">Loading...</td></tr>
+                        <tr><td colspan="6" class="loading">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -626,12 +650,69 @@
         </div>
     </div>
 
+    <!-- Delete Relationship Modal -->
+    <div class="modal" id="deleteRelModal">
+        <div class="modal__content" style="max-width: 500px;">
+            <div class="modal__header">
+                <h2 class="modal__title">Delete Relationship</h2>
+                <button class="modal__close" onclick="closeDeleteRelModal()">&times;</button>
+            </div>
+            <div class="modal__body">
+                <p>Are you sure you want to delete this relationship?</p>
+                <div class="property-list" id="deleteRelDetails" style="margin: 1rem 0;">
+                    <!-- Populated dynamically -->
+                </div>
+                <p style="color: var(--danger); font-size: 0.9rem;"><strong>Warning:</strong> This action cannot be undone.</p>
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeDeleteRelModal()">Cancel</button>
+                    <button class="btn btn-danger" id="confirmDeleteRelBtn" onclick="confirmDeleteRelationship()">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Relationship Modal -->
+    <div class="modal" id="editRelModal">
+        <div class="modal__content" style="max-width: 500px;">
+            <div class="modal__header">
+                <h2 class="modal__title">Edit Relationship</h2>
+                <button class="modal__close" onclick="closeEditRelModal()">&times;</button>
+            </div>
+            <div class="modal__body">
+                <div class="property-list" id="editRelDetails" style="margin-bottom: 1.5rem;">
+                    <!-- Populated dynamically -->
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">New Relationship Type:</label>
+                    <select class="filter-bar__select" id="newRelTypeSelect" style="width: 100%;">
+                        <option value="COMPATIBLE_WITH">COMPATIBLE_WITH</option>
+                        <option value="USES_PROTOCOL">USES_PROTOCOL</option>
+                        <option value="HAS_PORT">HAS_PORT</option>
+                        <option value="SUPPORTS_CONTROL">SUPPORTS_CONTROL</option>
+                        <option value="SUPPORTS_PROTOCOL">SUPPORTS_PROTOCOL</option>
+                        <option value="AFFECTS">AFFECTS</option>
+                        <option value="RESOLVED_BY">RESOLVED_BY</option>
+                        <option value="MENTIONED_IN">MENTIONED_IN</option>
+                        <option value="FOR_PRODUCT">FOR_PRODUCT</option>
+                        <option value="FIXES">FIXES</option>
+                        <option value="MENTIONS">MENTIONS</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeEditRelModal()">Cancel</button>
+                    <button class="btn btn-primary" id="confirmEditRelBtn" onclick="confirmEditRelationship()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let graphAvailable = false;
         let currentPage = 1;
         let currentEntityType = '';
         let entityTypes = [];
         let relationshipTypes = [];
+        let currentRelationship = null;  // For edit/delete operations
 
         // Check session
         async function checkSession() {
@@ -907,12 +988,13 @@
                 tbody.innerHTML = '';
 
                 if (data.relationships.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No relationships found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No relationships found</td></tr>';
                     return;
                 }
 
-                data.relationships.forEach(rel => {
+                data.relationships.forEach((rel, index) => {
                     const row = document.createElement('tr');
+                    const relData = JSON.stringify(rel).replace(/"/g, '&quot;');
                     row.innerHTML = `
                         <td>
                             <span class="tag tag--${rel.source_type.toLowerCase()}">${rel.source_type}</span>
@@ -925,17 +1007,168 @@
                             <span class="tag tag--${rel.target_type.toLowerCase()}">${rel.target_type}</span>
                             <span class="entity-name" style="display: block; margin-top: 0.25rem;">${escapeHtml((rel.target_name || '').substring(0, 30))}</span>
                         </td>
+                        <td class="actions-cell">
+                            <button class="btn btn-sm btn-warning" onclick='openEditRelModal(${relData})' title="Edit">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick='openDeleteRelModal(${relData})' title="Delete">Delete</button>
+                        </td>
                     `;
                     tbody.appendChild(row);
                 });
 
             } catch (error) {
-                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Error: ${error.message}</td></tr>`;
             }
         }
 
         function closeModal() {
             document.getElementById('entityModal').classList.remove('active');
+        }
+
+        // Delete Relationship Modal Functions
+        function openDeleteRelModal(rel) {
+            currentRelationship = rel;
+            const details = document.getElementById('deleteRelDetails');
+            details.innerHTML = `
+                <div class="property-item">
+                    <span class="property-key">Source:</span>
+                    <span class="property-value">
+                        <span class="tag tag--${rel.source_type.toLowerCase()}">${rel.source_type}</span>
+                        ${escapeHtml(rel.source_name || '')}
+                    </span>
+                </div>
+                <div class="property-item">
+                    <span class="property-key">Relationship:</span>
+                    <span class="property-value"><code>${rel.relationship}</code></span>
+                </div>
+                <div class="property-item">
+                    <span class="property-key">Target:</span>
+                    <span class="property-value">
+                        <span class="tag tag--${rel.target_type.toLowerCase()}">${rel.target_type}</span>
+                        ${escapeHtml(rel.target_name || '')}
+                    </span>
+                </div>
+            `;
+            document.getElementById('deleteRelModal').classList.add('active');
+        }
+
+        function closeDeleteRelModal() {
+            document.getElementById('deleteRelModal').classList.remove('active');
+            currentRelationship = null;
+        }
+
+        async function confirmDeleteRelationship() {
+            if (!currentRelationship) return;
+
+            const btn = document.getElementById('confirmDeleteRelBtn');
+            btn.disabled = true;
+            btn.textContent = 'Deleting...';
+
+            try {
+                const response = await fetch('/api/admin/graph/relationships', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        source_type: currentRelationship.source_type,
+                        source_name: currentRelationship.source_name,
+                        rel_type: currentRelationship.relationship,
+                        target_type: currentRelationship.target_type,
+                        target_name: currentRelationship.target_name
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    closeDeleteRelModal();
+                    loadRelationships();  // Refresh the list
+                    loadRelationshipTypes();  // Update counts
+                } else {
+                    alert('Failed to delete relationship: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error deleting relationship: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Delete';
+            }
+        }
+
+        // Edit Relationship Modal Functions
+        function openEditRelModal(rel) {
+            currentRelationship = rel;
+            const details = document.getElementById('editRelDetails');
+            details.innerHTML = `
+                <div class="property-item">
+                    <span class="property-key">Source:</span>
+                    <span class="property-value">
+                        <span class="tag tag--${rel.source_type.toLowerCase()}">${rel.source_type}</span>
+                        ${escapeHtml((rel.source_name || '').substring(0, 50))}
+                    </span>
+                </div>
+                <div class="property-item">
+                    <span class="property-key">Current Type:</span>
+                    <span class="property-value"><code>${rel.relationship}</code></span>
+                </div>
+                <div class="property-item">
+                    <span class="property-key">Target:</span>
+                    <span class="property-value">
+                        <span class="tag tag--${rel.target_type.toLowerCase()}">${rel.target_type}</span>
+                        ${escapeHtml((rel.target_name || '').substring(0, 50))}
+                    </span>
+                </div>
+            `;
+            // Pre-select current relationship type
+            document.getElementById('newRelTypeSelect').value = rel.relationship;
+            document.getElementById('editRelModal').classList.add('active');
+        }
+
+        function closeEditRelModal() {
+            document.getElementById('editRelModal').classList.remove('active');
+            currentRelationship = null;
+        }
+
+        async function confirmEditRelationship() {
+            if (!currentRelationship) return;
+
+            const newRelType = document.getElementById('newRelTypeSelect').value;
+            if (newRelType === currentRelationship.relationship) {
+                closeEditRelModal();
+                return;  // No change
+            }
+
+            const btn = document.getElementById('confirmEditRelBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                const response = await fetch('/api/admin/graph/relationships', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        source_type: currentRelationship.source_type,
+                        source_name: currentRelationship.source_name,
+                        old_rel_type: currentRelationship.relationship,
+                        new_rel_type: newRelType,
+                        target_type: currentRelationship.target_type,
+                        target_name: currentRelationship.target_name
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    closeEditRelModal();
+                    loadRelationships();  // Refresh the list
+                    loadRelationshipTypes();  // Update counts
+                } else {
+                    alert('Failed to update relationship: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error updating relationship: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save';
+            }
         }
 
         function switchTab(tabId) {
@@ -976,6 +1209,14 @@
 
         document.getElementById('entityModal').addEventListener('click', function(e) {
             if (e.target === this) closeModal();
+        });
+
+        document.getElementById('deleteRelModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDeleteRelModal();
+        });
+
+        document.getElementById('editRelModal').addEventListener('click', function(e) {
+            if (e.target === this) closeEditRelModal();
         });
 
         // Initialize

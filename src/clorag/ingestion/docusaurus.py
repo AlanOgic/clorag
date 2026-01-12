@@ -16,6 +16,7 @@ from clorag.ingestion.base import BaseIngestionPipeline, Document
 from clorag.ingestion.chunker import TextChunker
 from clorag.models.camera import CameraSource
 from clorag.utils.logger import get_logger
+from clorag.utils.text_transforms import apply_product_name_transforms
 
 logger = get_logger(__name__)
 
@@ -137,7 +138,8 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
 
             results.append((url, lastmod))
 
-        logger.info("Filtered sitemap URLs", total=len(results), with_lastmod=sum(1 for _, lm in results if lm))
+        with_lastmod = sum(1 for _, lm in results if lm)
+        logger.info("Filtered sitemap URLs", total=len(results), with_lastmod=with_lastmod)
         return results
 
     async def _fetch_page(
@@ -167,6 +169,10 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
 
         if not text or len(text) < 100:  # Skip very short pages
             return None
+
+        # Apply product name transformations (RIO-Live -> RIO +LAN, RIO -> RIO +WAN)
+        text = self._apply_text_transformations(text)
+        title = self._apply_text_transformations(title)
 
         metadata = {
             "source": "docusaurus",
@@ -235,6 +241,21 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
                 return cleaned
 
         return "Untitled"
+
+    def _apply_text_transformations(self, text: str) -> str:
+        """Apply product name transformations to text.
+
+        Transforms:
+        - RIO-Live / RIO Live / RIOLive -> RIO +LAN
+        - RIO (standalone) -> RIO +WAN
+
+        Args:
+            text: Input text to transform.
+
+        Returns:
+            Transformed text with product name replacements.
+        """
+        return apply_product_name_transforms(text)
 
     async def process(self, documents: list[Document]) -> list[tuple[Document, list[Document]]]:
         """Chunk documents for contextualized embedding.

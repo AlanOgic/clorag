@@ -5,6 +5,7 @@ import base64
 import re
 import uuid
 from collections.abc import Callable
+from datetime import datetime, timedelta
 from functools import partial
 from pathlib import Path
 from typing import Any, TypeVar
@@ -71,6 +72,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
         chunk_overlap: int = 150,
         max_threads: int | None = None,
         offset: int = 0,
+        since_days: int | None = None,
     ) -> None:
         """Initialize the pipeline.
 
@@ -84,6 +86,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
             chunk_overlap: Overlap between chunks.
             max_threads: Maximum number of threads to fetch (most recent first).
             offset: Number of threads to skip (for incremental ingestion).
+            since_days: Only fetch threads from the last N days.
         """
         settings = get_settings()
         self._label = label or settings.gmail_label
@@ -94,6 +97,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
         self._chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         self._max_threads = max_threads
         self._offset = offset
+        self._since_days = since_days
         self._service = None
 
     def _get_credentials(self) -> Credentials:
@@ -159,18 +163,37 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
             logger.error("Label not found", label=self._label)
             return []
 
-        logger.info("Fetching threads with label", label=self._label, label_id=label_id)
+        # Build query for date filtering
+        query = None
+        if self._since_days:
+            since_date = datetime.now() - timedelta(days=self._since_days)
+            query = f"after:{since_date.strftime('%Y/%m/%d')}"
+            logger.info(
+                "Fetching threads with label and date filter",
+                label=self._label,
+                label_id=label_id,
+                since_days=self._since_days,
+                query=query,
+            )
+        else:
+            logger.info("Fetching threads with label", label=self._label, label_id=label_id)
 
         # List threads with this label
         threads = []
         page_token = None
 
         while True:
+            list_args: dict[str, Any] = {
+                "userId": "me",
+                "labelIds": [label_id],
+            }
+            if page_token:
+                list_args["pageToken"] = page_token
+            if query:
+                list_args["q"] = query
+
             results = await run_sync(
-                service.users()
-                .threads()
-                .list(userId="me", labelIds=[label_id], pageToken=page_token)
-                .execute
+                service.users().threads().list(**list_args).execute
             )
 
             threads.extend(results.get("threads", []))

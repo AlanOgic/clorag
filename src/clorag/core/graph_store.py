@@ -488,6 +488,178 @@ class GraphStore:
                 )
                 return False
 
+    async def delete_relationship(
+        self,
+        source_type: str,
+        source_name: str,
+        rel_type: str,
+        target_type: str,
+        target_name: str,
+    ) -> bool:
+        """Delete a relationship between two nodes.
+
+        Args:
+            source_type: Source node type (Camera, Product, etc.)
+            source_name: Source node identifier (name/description/version/chunk_id)
+            rel_type: Relationship type (COMPATIBLE_WITH, USES_PROTOCOL, etc.)
+            target_type: Target node type
+            target_name: Target node identifier
+
+        Returns:
+            True if relationship was deleted, False otherwise
+        """
+        valid_types = {
+            "Camera", "Product", "Protocol", "Port", "Control",
+            "Issue", "Solution", "Firmware", "Chunk"
+        }
+        if source_type not in valid_types or target_type not in valid_types:
+            return False
+
+        # Determine the property name based on node type
+        def get_prop_name(node_type: str) -> str:
+            if node_type in ("Issue", "Solution"):
+                return "description"
+            elif node_type == "Firmware":
+                return "version"
+            elif node_type == "Chunk":
+                return "chunk_id"
+            return "name"
+
+        source_prop = get_prop_name(source_type)
+        target_prop = get_prop_name(target_type)
+
+        query = f"""
+        MATCH (a:{source_type} {{{source_prop}: $source_name}})
+              -[r:{rel_type}]->
+              (b:{target_type} {{{target_prop}: $target_name}})
+        DELETE r
+        RETURN count(r) as deleted
+        """
+
+        async with await self._session() as session:
+            try:
+                result = await session.run(
+                    query,
+                    source_name=source_name,
+                    target_name=target_name,
+                )
+                record = await result.single()
+                deleted = record["deleted"] if record else 0
+                if deleted > 0:
+                    logger.info(
+                        "relationship_deleted",
+                        source_type=source_type,
+                        rel_type=rel_type,
+                        target_type=target_type,
+                    )
+                return deleted > 0
+            except Exception as e:
+                logger.warning("relationship_delete_failed", error=str(e))
+                return False
+
+    async def update_relationship_type(
+        self,
+        source_type: str,
+        source_name: str,
+        old_rel_type: str,
+        new_rel_type: str,
+        target_type: str,
+        target_name: str,
+    ) -> bool:
+        """Update a relationship type between two nodes.
+
+        Args:
+            source_type: Source node type
+            source_name: Source node identifier
+            old_rel_type: Current relationship type
+            new_rel_type: New relationship type
+            target_type: Target node type
+            target_name: Target node identifier
+
+        Returns:
+            True if relationship was updated, False otherwise
+        """
+        valid_types = {
+            "Camera", "Product", "Protocol", "Port", "Control",
+            "Issue", "Solution", "Firmware", "Chunk"
+        }
+        if source_type not in valid_types or target_type not in valid_types:
+            return False
+
+        # Valid relationship types
+        valid_rel_types = {
+            "COMPATIBLE_WITH", "USES_PROTOCOL", "HAS_PORT", "SUPPORTS_CONTROL",
+            "SUPPORTS_PROTOCOL", "AFFECTS", "RESOLVED_BY", "MENTIONED_IN",
+            "FOR_PRODUCT", "FIXES", "MENTIONS"
+        }
+        if new_rel_type not in valid_rel_types:
+            return False
+
+        def get_prop_name(node_type: str) -> str:
+            if node_type in ("Issue", "Solution"):
+                return "description"
+            elif node_type == "Firmware":
+                return "version"
+            elif node_type == "Chunk":
+                return "chunk_id"
+            return "name"
+
+        source_prop = get_prop_name(source_type)
+        target_prop = get_prop_name(target_type)
+
+        # Delete old and create new relationship (Neo4j doesn't support changing rel type)
+        delete_query = f"""
+        MATCH (a:{source_type} {{{source_prop}: $source_name}})
+              -[r:{old_rel_type}]->
+              (b:{target_type} {{{target_prop}: $target_name}})
+        WITH a, b, properties(r) as props
+        DELETE r
+        RETURN a, b, props
+        """
+
+        async with await self._session() as session:
+            try:
+                # Delete old relationship and get nodes
+                result = await session.run(
+                    delete_query,
+                    source_name=source_name,
+                    target_name=target_name,
+                )
+                record = await result.single()
+                if not record:
+                    return False
+
+                # Create new relationship with same properties
+                props = record["props"] or {}
+                create_query = f"""
+                MATCH (a:{source_type} {{{source_prop}: $source_name}}),
+                      (b:{target_type} {{{target_prop}: $target_name}})
+                CREATE (a)-[r:{new_rel_type}]->(b)
+                SET r += $props
+                RETURN r
+                """
+
+                create_result = await session.run(
+                    create_query,
+                    source_name=source_name,
+                    target_name=target_name,
+                    props=props,
+                )
+                create_record = await create_result.single()
+                if create_record:
+                    logger.info(
+                        "relationship_type_updated",
+                        source_type=source_type,
+                        old_type=old_rel_type,
+                        new_type=new_rel_type,
+                        target_type=target_type,
+                    )
+                    return True
+                return False
+            except Exception as e:
+                logger.warning("relationship_update_failed", error=str(e))
+                return False
+
     # =========================================================================
     # Batch Operations
     # =========================================================================

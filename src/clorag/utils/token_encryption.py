@@ -7,6 +7,7 @@ The encryption key is derived from the admin password using PBKDF2.
 import base64
 import json
 import os
+import shutil
 from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -132,10 +133,11 @@ def save_encrypted_token(token_path: Path, token_data: dict[str, object]) -> Non
     encrypted = encrypt_token_data(token_data)
     token_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Write to temporary file then rename for atomic operation
+    # Write to temporary file then move for atomic operation
+    # Use shutil.move instead of rename to handle Docker volume mounts
     temp_path = token_path.with_suffix(".tmp")
     temp_path.write_text(encrypted)
-    temp_path.rename(token_path)
+    shutil.move(str(temp_path), str(token_path))
 
     # Set restrictive permissions (owner read/write only)
     token_path.chmod(0o600)

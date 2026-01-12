@@ -2,6 +2,35 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.5.2] - 2026-01-12
+
+### Added
+- **Knowledge Graph Relationship Management**
+  - Edit relationships: Change relationship type between entities via admin UI
+  - Delete relationships: Remove unwanted relationships from the knowledge graph
+  - Confirmation modals for safe delete/edit operations
+  - Automatic refresh of relationship list after modifications
+
+- **New API Endpoints**
+  - `DELETE /api/admin/graph/relationships` - Delete a relationship
+  - `PATCH /api/admin/graph/relationships` - Update a relationship type
+
+- **GraphStore Methods**
+  - `delete_relationship()` - Delete relationship by source/target/type
+  - `update_relationship_type()` - Change relationship type (preserves properties)
+
+- **Product Name Transformations**
+  - Shared text transform utility (`utils/text_transforms.py`)
+  - RIO → RIO +WAN, RIO-Live → RIO +LAN transformations during ingestion
+  - Applied to both docusaurus_docs and gmail_cases collections
+
+### Changed
+- Knowledge Graph Explorer (`/admin/graph`) Relationships tab now includes Edit/Delete action buttons
+- Gmail ingestion supports `--fresh` flag to delete and re-create collection
+
+### Fixed
+- Token encryption now uses `shutil.move()` instead of `pathlib.rename()` to fix Docker volume mount issues
+
 ## [0.5.1] - 2026-01-05
 
 ### Fixed

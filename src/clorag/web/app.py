@@ -1723,6 +1723,84 @@ async def api_graph_relationships(
         return {"available": False, "relationships": [], "error": str(e)}
 
 
+class RelationshipDeleteRequest(BaseModel):
+    """Request body for deleting a relationship."""
+
+    source_type: str
+    source_name: str
+    rel_type: str
+    target_type: str
+    target_name: str
+
+
+@app.delete("/api/admin/graph/relationships", tags=["Graph"])
+async def api_delete_relationship(
+    request: RelationshipDeleteRequest,
+    _: bool = Depends(verify_admin),
+):
+    """Delete a relationship between two nodes."""
+    enrichment = await get_graph_enrichment()
+    if not enrichment:
+        return {"success": False, "error": "Graph database not available"}
+
+    try:
+        from clorag.core.graph_store import get_graph_store
+        store = await get_graph_store()
+        success = await store.delete_relationship(
+            source_type=request.source_type,
+            source_name=request.source_name,
+            rel_type=request.rel_type,
+            target_type=request.target_type,
+            target_name=request.target_name,
+        )
+        if success:
+            return {"success": True}
+        return {"success": False, "error": "Relationship not found"}
+    except Exception as e:
+        logger.warning("graph_relationship_delete_failed", error=str(e))
+        return {"success": False, "error": str(e)}
+
+
+class RelationshipUpdateRequest(BaseModel):
+    """Request body for updating a relationship type."""
+
+    source_type: str
+    source_name: str
+    old_rel_type: str
+    new_rel_type: str
+    target_type: str
+    target_name: str
+
+
+@app.patch("/api/admin/graph/relationships", tags=["Graph"])
+async def api_update_relationship(
+    request: RelationshipUpdateRequest,
+    _: bool = Depends(verify_admin),
+):
+    """Update the type of a relationship between two nodes."""
+    enrichment = await get_graph_enrichment()
+    if not enrichment:
+        return {"success": False, "error": "Graph database not available"}
+
+    try:
+        from clorag.core.graph_store import get_graph_store
+        store = await get_graph_store()
+        success = await store.update_relationship_type(
+            source_type=request.source_type,
+            source_name=request.source_name,
+            old_rel_type=request.old_rel_type,
+            new_rel_type=request.new_rel_type,
+            target_type=request.target_type,
+            target_name=request.target_name,
+        )
+        if success:
+            return {"success": True}
+        return {"success": False, "error": "Failed to update relationship"}
+    except Exception as e:
+        logger.warning("graph_relationship_update_failed", error=str(e))
+        return {"success": False, "error": str(e)}
+
+
 # =============================================================================
 # Chunk Editor Routes (Admin)
 # =============================================================================

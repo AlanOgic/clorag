@@ -351,6 +351,7 @@ uv run rag-web
 | `/admin/search-debug` | Debug RAG: view chunks, prompts, timing |
 | `/admin/docs` | Technical documentation |
 | `/admin/chunks` | Chunk editor: browse, search, edit, delete vectors |
+| `/admin/graph` | Knowledge Graph Explorer: browse entities, edit/delete relationships |
 
 Admin authentication uses secure session cookies (24-hour expiry). Set `ADMIN_PASSWORD` in your `.env` file.
 
@@ -436,6 +437,13 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/admin/graph/stats` | Knowledge graph statistics |
+| GET | `/api/admin/graph/entity-types` | List entity types with counts |
+| GET | `/api/admin/graph/relationship-types` | List relationship types with counts |
+| GET | `/api/admin/graph/entities` | List entities (paginated, filterable) |
+| GET | `/api/admin/graph/entities/{type}/{id}` | Get entity with relationships |
+| GET | `/api/admin/graph/relationships` | List relationships (filterable) |
+| DELETE | `/api/admin/graph/relationships` | Delete a relationship |
+| PATCH | `/api/admin/graph/relationships` | Update relationship type |
 
 ### Authentication
 

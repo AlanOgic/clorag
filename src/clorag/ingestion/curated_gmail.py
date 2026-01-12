@@ -21,6 +21,7 @@ from clorag.models import (
 )
 from clorag.models.camera import CameraSource
 from clorag.utils.anonymizer import AnonymizationContext, TextAnonymizer
+from clorag.utils.text_transforms import apply_product_name_transforms
 
 logger = structlog.get_logger(__name__)
 
@@ -45,6 +46,7 @@ class CuratedGmailPipeline:
         haiku_concurrent: int = 10,
         sonnet_concurrent: int = 5,
         extract_cameras: bool = True,
+        since_days: int | None = None,
     ) -> None:
         """Initialize the curated pipeline.
 
@@ -55,6 +57,7 @@ class CuratedGmailPipeline:
             haiku_concurrent: Concurrent Haiku requests.
             sonnet_concurrent: Concurrent Sonnet requests.
             extract_cameras: Whether to extract camera compatibility info.
+            since_days: Only fetch threads from the last N days.
         """
         self._settings = get_settings()
         self._max_threads = max_threads
@@ -62,7 +65,9 @@ class CuratedGmailPipeline:
         self._min_confidence = min_confidence
 
         # Initialize components
-        self._gmail = GmailIngestionPipeline(max_threads=max_threads, offset=offset)
+        self._gmail = GmailIngestionPipeline(
+            max_threads=max_threads, offset=offset, since_days=since_days
+        )
         self._analyzer = ThreadAnalyzer(max_concurrent=haiku_concurrent)
         self._qc = QualityController()
         self._embeddings = EmbeddingsClient()
@@ -106,22 +111,24 @@ class CuratedGmailPipeline:
             logger.warning("No threads remaining after RMA filtering")
             return 0
 
-        # Step 1.6: Pre-anonymize thread content
-        logger.info("Anonymizing thread content")
+        # Step 1.6: Pre-anonymize thread content and apply product name transforms
+        logger.info("Anonymizing thread content and applying product name transforms")
         anonymized_documents: list[Document] = []
         for doc in raw_documents:
             # Create a new context for each thread (consistent placeholders within thread)
             context = AnonymizationContext()
             anonymized_text, _ = self._anonymizer.anonymize(doc.text, context)
+            # Apply product name transformations (RIO-Live -> RIO +LAN, RIO -> RIO +WAN)
+            transformed_text = apply_product_name_transforms(anonymized_text)
             anonymized_documents.append(
                 Document(
                     id=doc.id,
-                    text=anonymized_text,
+                    text=transformed_text,
                     metadata=doc.metadata,
                 )
             )
         raw_documents = anonymized_documents
-        logger.info("Anonymized threads", count=len(raw_documents))
+        logger.info("Anonymized and transformed threads", count=len(raw_documents))
 
         # Step 2: Analyze with Haiku
         logger.info("Step 2: Analyzing threads with Haiku")
@@ -186,18 +193,21 @@ class CuratedGmailPipeline:
                 or "Support Case"
             )
 
+            # Apply product name transforms to final document
+            final_document = apply_product_name_transforms(qc_result.final_document)
+
             case = SupportCase(
                 id=str(uuid.uuid4()),
                 thread_id=analysis.thread_id,
                 subject=anonymized_subject,  # Use anonymized title instead of original
                 status=CaseStatus.RESOLVED,
                 resolution_quality=ResolutionQuality(analysis.resolution_quality) if analysis.resolution_quality else None,
-                problem_summary=qc_result.refined_problem,
-                solution_summary=qc_result.refined_solution,
+                problem_summary=apply_product_name_transforms(qc_result.refined_problem),
+                solution_summary=apply_product_name_transforms(qc_result.refined_solution),
                 keywords=qc_result.refined_keywords,
                 category=qc_result.refined_category,
                 product=analysis.product,
-                document=qc_result.final_document,
+                document=final_document,
                 raw_thread=doc.text,
                 messages_count=doc.metadata.get("message_count", 0),
                 created_at=datetime.fromisoformat(doc.metadata["date"]) if doc.metadata.get("date") else None,
@@ -343,6 +353,7 @@ async def run_curated_ingestion(
     max_threads: int | None = None,
     offset: int = 0,
     min_confidence: float = 0.7,
+    since_days: int | None = None,
 ) -> int:
     """Run curated Gmail ingestion.
 
@@ -350,6 +361,7 @@ async def run_curated_ingestion(
         max_threads: Maximum threads to fetch.
         offset: Number of threads to skip (for incremental ingestion).
         min_confidence: Minimum confidence for resolved cases.
+        since_days: Only fetch threads from the last N days.
 
     Returns:
         Number of cases ingested.
@@ -358,5 +370,6 @@ async def run_curated_ingestion(
         max_threads=max_threads,
         offset=offset,
         min_confidence=min_confidence,
+        since_days=since_days,
     )
     return await pipeline.run()
