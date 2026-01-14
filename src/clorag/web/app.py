@@ -104,13 +104,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         # Referrer policy
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        # Content Security Policy - allow inline for existing JS, Mermaid from CDN
+        # Content Security Policy - allow inline for existing JS, Mermaid/Swagger from CDN
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "img-src 'self' data: https:; "
-            "font-src 'self'; "
+            "font-src 'self' https://cdn.jsdelivr.net; "
             "connect-src 'self'; "
             "frame-ancestors 'none'"
         )
