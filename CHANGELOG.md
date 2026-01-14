@@ -2,6 +2,21 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.5.3] - 2026-01-14
+
+### Fixed
+- **MultiSourceRetriever Hybrid Search** - Retriever now properly uses hybrid RRF search with both dense (Voyage AI) and sparse (BM25) vectors instead of dense-only search
+- **Agent MCP Tools** - All search tools (`search_docs`, `search_cases`, `search_custom`, `hybrid_search`) now use the hybrid retriever with proper sparse embedding support
+
+### Added
+- **New `search_custom` Tool** - Agent can now search custom knowledge documents added by administrators
+- **Technical Terms Detection** - 30+ domain-specific terms (firmware, protocol, rcp, rio, visca, etc.) for improved threshold calculation
+- **Cache Statistics API** - `hybrid_search` tool now returns embedding cache hit rates for debugging
+
+### Changed
+- Agent MCP server version bumped to 1.1.0
+- Dynamic score thresholds now properly applied with RRF-scaled values (threshold * 0.5 for RRF score range)
+
 ## [0.5.2] - 2026-01-12
 
 ### Added

@@ -1244,9 +1244,18 @@ async def admin_index(request: Request):
 
 
 @app.get("/admin/docs", response_class=HTMLResponse)
-async def admin_docs(request: Request):
-    """Admin technical documentation page."""
-    return templates.TemplateResponse("admin_docs.html", {"request": request})
+async def admin_docs_index(request: Request):
+    """Admin technical documentation - index page."""
+    return templates.TemplateResponse("docs/index.html", {"request": request})
+
+
+@app.get("/admin/docs/{page}", response_class=HTMLResponse)
+async def admin_docs_page(request: Request, page: str):
+    """Admin technical documentation - specific page."""
+    # Validate page name to prevent path traversal
+    if not page.replace("-", "").replace("_", "").isalnum():
+        raise HTTPException(status_code=404, detail="Page not found")
+    return templates.TemplateResponse(f"docs/{page}.html", {"request": request})
 
 
 @app.get("/admin/login", response_class=HTMLResponse)

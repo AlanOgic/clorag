@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Operations - Technical Documentation</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root { --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; --ifm-font-family-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace; --cyan-blue: #00a8e8; --cyan-dark: #0077b6; --cyanview-navy: #003366; --hero-bg: #003366; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--ifm-font-family-base); line-height: 1.65; color: #1c1e21; background: #f8f9fa; padding-bottom: 60px; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; background: #fff; padding: 12px; font-size: 0.85rem; border-top: 1px solid #e0e0e0; z-index: 50; color: #606770; }
+        .footer a { color: var(--cyan-dark); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: #fff; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 100; height: 60px; }
+        .navbar__brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit; font-weight: 700; font-size: 1.1rem; }
+        .navbar__logo { height: 32px; }
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+        .navbar__link { color: #606770; text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+        .navbar__link:hover { color: var(--cyan-blue); }
+        .navbar__link--active { color: var(--cyan-blue); font-weight: 600; }
+        .hero { background: var(--hero-bg); padding: 1.5rem 2rem; color: white; }
+        .hero__breadcrumb { font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.5rem; }
+        .hero__breadcrumb a { color: white; text-decoration: none; }
+        .hero__breadcrumb a:hover { text-decoration: underline; }
+        .hero__title { font-size: 1.8rem; font-weight: 700; }
+        .main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .docs-layout { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; }
+        @media (max-width: 900px) { .docs-layout { grid-template-columns: 1fr; } .docs-nav { display: none; } }
+        .docs-nav { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+        .docs-nav__section { margin-bottom: 1.5rem; }
+        .docs-nav__title { font-size: 0.7rem; font-weight: 600; color: #606770; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+        .docs-nav__list { list-style: none; }
+        .docs-nav__link { display: block; padding: 0.35rem 0.75rem; color: #444; text-decoration: none; font-size: 0.85rem; border-radius: 6px; transition: all 0.15s; }
+        .docs-nav__link:hover { background: #e3f2fd; color: var(--cyan-dark); }
+        .docs-nav__link--active { background: var(--cyan-blue); color: white; }
+        .docs-nav__link--page { font-weight: 500; }
+        .docs-content { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+        .docs-content h1 { font-size: 1.8rem; font-weight: 700; color: var(--cyanview-navy); margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e1e4e8; }
+        .docs-content h2 { font-size: 1.4rem; font-weight: 600; color: var(--cyanview-navy); margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e1e4e8; }
+        .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+        .docs-content h3 { font-size: 1.1rem; font-weight: 600; color: #333; margin: 1.5rem 0 0.75rem; }
+        .docs-content p { margin-bottom: 1rem; }
+        .docs-content ul, .docs-content ol { margin: 0 0 1rem 1.5rem; }
+        .docs-content li { margin-bottom: 0.5rem; }
+        .docs-content code { background: #f1f3f5; padding: 0.15rem 0.4rem; border-radius: 4px; font-family: var(--ifm-font-family-mono); font-size: 0.9em; }
+        .docs-content pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: 0.85rem; }
+        .docs-content pre code { background: transparent; padding: 0; color: inherit; }
+        .docs-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+        .docs-content th, .docs-content td { border: 1px solid #e1e4e8; padding: 0.6rem; text-align: left; }
+        .docs-content th { background: #f6f8fa; font-weight: 600; }
+        .info-box { border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+        .info-box--info { background: #e3f2fd; border-left: 4px solid var(--cyan-blue); }
+        .info-box--warning { background: #fff3e0; border-left: 4px solid #ff9800; }
+        .info-box__title { font-weight: 600; margin-bottom: 0.5rem; }
+        .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e1e4e8; }
+        .page-nav__link { display: flex; flex-direction: column; padding: 1rem; border-radius: 8px; text-decoration: none; color: inherit; transition: background 0.2s; max-width: 45%; }
+        .page-nav__link:hover { background: #f6f8fa; }
+        .page-nav__label { font-size: 0.75rem; color: #606770; text-transform: uppercase; }
+        .page-nav__title { font-weight: 600; color: var(--cyan-dark); }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Admin</a>
+            <a href="/admin/docs" class="navbar__link navbar__link--active">Docs</a>
+            <span id="authLoading" class="navbar__link">...</span>
+            <a href="#" id="logoutBtn" class="navbar__link" style="display:none;">Logout</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero__breadcrumb"><a href="/admin/docs">Documentation</a> / Operations</div>
+        <h1 class="hero__title">Operations</h1>
+    </section>
+
+    <main class="main">
+        <div class="docs-layout">
+            <nav class="docs-nav">
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">Documentation</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="/admin/docs/architecture" class="docs-nav__link docs-nav__link--page">Architecture</a></li>
+                        <li><a href="/admin/docs/retrieval" class="docs-nav__link docs-nav__link--page">Retrieval System</a></li>
+                        <li><a href="/admin/docs/ingestion" class="docs-nav__link docs-nav__link--page">Data Ingestion</a></li>
+                        <li><a href="/admin/docs/content" class="docs-nav__link docs-nav__link--page">Content Management</a></li>
+                        <li><a href="/admin/docs/features" class="docs-nav__link docs-nav__link--page">Features</a></li>
+                        <li><a href="/admin/docs/api" class="docs-nav__link docs-nav__link--page">API Reference</a></li>
+                        <li><a href="/admin/docs/security" class="docs-nav__link docs-nav__link--page">Security</a></li>
+                        <li><a href="/admin/docs/operations" class="docs-nav__link docs-nav__link--page docs-nav__link--active">Operations</a></li>
+                    </ul>
+                </div>
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">On This Page</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="#deployment" class="docs-nav__link">Deployment</a></li>
+                        <li><a href="#environment" class="docs-nav__link">Environment Variables</a></li>
+                        <li><a href="#commands" class="docs-nav__link">CLI Commands</a></li>
+                        <li><a href="#databases" class="docs-nav__link">Database Locations</a></li>
+                        <li><a href="#local-dev" class="docs-nav__link">Local Development</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="docs-content">
+                <h1>Operations</h1>
+
+                <h2 id="deployment">Deployment</h2>
+
+                <h3>Docker Deployment</h3>
+                <pre><code># Build and deploy
+rsync -avz --exclude '.venv' --exclude 'data' . root@server:/opt/clorag/
+ssh root@server "cd /opt/clorag && docker compose build && docker compose up -d"</code></pre>
+
+                <p>Web UI is accessible at https://cyanview.cloud/ (reverse proxy to port 8085).</p>
+
+                <h2 id="environment">Environment Variables</h2>
+                <table>
+                    <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
+                    <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Yes</td><td>Anthropic API key for Claude</td></tr>
+                    <tr><td><code>VOYAGE_API_KEY</code></td><td>Yes</td><td>Voyage AI API key for embeddings</td></tr>
+                    <tr><td><code>QDRANT_URL</code></td><td>Yes</td><td>Qdrant server URL</td></tr>
+                    <tr><td><code>QDRANT_API_KEY</code></td><td>No</td><td>Qdrant API key (if secured)</td></tr>
+                    <tr><td><code>ADMIN_PASSWORD</code></td><td>Yes</td><td>Admin authentication password</td></tr>
+                    <tr><td><code>SECURE_COOKIES</code></td><td>No</td><td>Enable secure cookies (default: true)</td></tr>
+                    <tr><td><code>DATABASE_PATH</code></td><td>No</td><td>Camera DB path (default: data/clorag.db)</td></tr>
+                    <tr><td><code>ANALYTICS_DATABASE_PATH</code></td><td>No</td><td>Analytics DB path (default: data/analytics.db)</td></tr>
+                    <tr><td><code>NEO4J_URI</code></td><td>No</td><td>Neo4j Bolt URI (default: bolt://localhost:7687)</td></tr>
+                    <tr><td><code>NEO4J_USER</code></td><td>No</td><td>Neo4j username (default: neo4j)</td></tr>
+                    <tr><td><code>NEO4J_PASSWORD</code></td><td>No</td><td>Neo4j password (enables GraphRAG if set)</td></tr>
+                    <tr><td><code>DOCUSAURUS_URL</code></td><td>No</td><td>Documentation site to scrape</td></tr>
+                    <tr><td><code>GMAIL_LABEL</code></td><td>No</td><td>Gmail label for support threads</td></tr>
+                    <tr><td><code>SEARXNG_URL</code></td><td>No</td><td>SearXNG instance URL for web searches</td></tr>
+                </table>
+
+                <h2 id="commands">CLI Commands</h2>
+
+                <h3>Server</h3>
+                <pre><code># Run web server (FastAPI on port 8080)
+uv run rag-web
+
+# Run CLI agent (interactive or single query)
+uv run clorag
+uv run clorag "How do I configure the RIO IP address?"</code></pre>
+
+                <h3>Ingestion</h3>
+                <pre><code># Ingest documentation from Docusaurus
+uv run ingest-docs
+
+# Ingest Gmail threads (curated with LLM analysis)
+uv run ingest-curated --max-threads 300
+
+# Incremental ingestion (skip first N threads)
+uv run ingest-curated --offset 300 --max-threads 300
+
+# Enrich camera model codes from documentation
+uv run enrich-cameras</code></pre>
+
+                <h3>Knowledge Graph</h3>
+                <pre><code># Populate Neo4j knowledge graph from Qdrant chunks
+uv run populate-graph
+uv run populate-graph --collections docusaurus_docs gmail_cases
+uv run populate-graph --max-chunks 100  # Limit for testing</code></pre>
+
+                <h3>Bulk Import</h3>
+                <pre><code># Bulk import custom documents from a folder
+uv run import-docs ./folder --category pre_sales --tags "presales,integration"
+uv run import-docs ./folder --dry-run  # Preview without importing</code></pre>
+
+                <h3>Drafts</h3>
+                <pre><code># Draft auto-reply for unanswered threads
+uv run draft-support
+uv run draft-support --preview  # Preview without creating</code></pre>
+
+                <h3>Development</h3>
+                <pre><code># Linting and type checking
+uv run ruff check src/
+uv run mypy src/clorag --strict
+
+# Tests
+uv run pytest
+uv run pytest tests/test_file.py::test_name -v  # Single test</code></pre>
+
+                <h2 id="databases">Database Locations</h2>
+                <ul>
+                    <li><code>data/clorag.db</code> - Camera compatibility database</li>
+                    <li><code>data/analytics.db</code> - Search analytics database</li>
+                    <li><code>data/.token_salt</code> - Salt file for OAuth token encryption</li>
+                </ul>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Backup Recommendation</div>
+                    <p>Regularly backup the SQLite databases in the <code>data/</code> directory. These contain camera entries and search analytics that cannot be recovered from vector stores alone.</p>
+                </div>
+
+                <h2 id="local-dev">Local Development</h2>
+
+                <h3>Initial Setup</h3>
+                <pre><code># Install dependencies
+uv sync
+
+# Create .env file from example
+cp .env.example .env
+# Edit .env with your API keys</code></pre>
+
+                <h3>Neo4j SSH Tunnel</h3>
+                <p>Production Neo4j is bound to localhost only. For local development:</p>
+                <pre><code># Create SSH tunnel to production Neo4j
+ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
+
+# Then set in local .env
+NEO4J_URI=bolt://localhost:7687</code></pre>
+
+                <h3>Local HTTP Development</h3>
+                <p>Set <code>SECURE_COOKIES=false</code> in your local <code>.env</code> to allow cookies over HTTP during development.</p>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Settings</div>
+                    <p>Settings are loaded via <code>clorag.config.get_settings()</code> (cached singleton). Changes to environment variables require server restart.</p>
+                </div>
+
+                <div class="page-nav">
+                    <a href="/admin/docs/security" class="page-nav__link">
+                        <span class="page-nav__label">Previous</span>
+                        <span class="page-nav__title">← Security</span>
+                    </a>
+                    <a href="/admin/docs" class="page-nav__link page-nav__link--next">
+                        <span class="page-nav__label">Back to</span>
+                        <span class="page-nav__title">Documentation Home →</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
+        AI Search with Claude AI, Voyage AI &amp; Qdrant
+    </footer>
+
+    <script>
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
+                if (!data.authenticated) { window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname); return; }
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+            } catch (e) { window.location.href = '/admin/login'; }
+        }
+        checkAuth();
+        logoutBtn.addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST' }); window.location.href = '/admin/login'; });
+        document.querySelectorAll('.docs-nav__link[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => { e.preventDefault(); const id = link.getAttribute('href').slice(1); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); });
+        });
+    </script>
+</body>
+</html>

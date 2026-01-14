@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Content Management - Technical Documentation</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root { --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; --ifm-font-family-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace; --cyan-blue: #00a8e8; --cyan-dark: #0077b6; --cyanview-navy: #003366; --hero-bg: #003366; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--ifm-font-family-base); line-height: 1.65; color: #1c1e21; background: #f8f9fa; padding-bottom: 60px; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; background: #fff; padding: 12px; font-size: 0.85rem; border-top: 1px solid #e0e0e0; z-index: 50; color: #606770; }
+        .footer a { color: var(--cyan-dark); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: #fff; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 100; height: 60px; }
+        .navbar__brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit; font-weight: 700; font-size: 1.1rem; }
+        .navbar__logo { height: 32px; }
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+        .navbar__link { color: #606770; text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+        .navbar__link:hover { color: var(--cyan-blue); }
+        .navbar__link--active { color: var(--cyan-blue); font-weight: 600; }
+        .hero { background: var(--hero-bg); padding: 1.5rem 2rem; color: white; }
+        .hero__breadcrumb { font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.5rem; }
+        .hero__breadcrumb a { color: white; text-decoration: none; }
+        .hero__breadcrumb a:hover { text-decoration: underline; }
+        .hero__title { font-size: 1.8rem; font-weight: 700; }
+        .main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .docs-layout { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; }
+        @media (max-width: 900px) { .docs-layout { grid-template-columns: 1fr; } .docs-nav { display: none; } }
+        .docs-nav { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+        .docs-nav__section { margin-bottom: 1.5rem; }
+        .docs-nav__title { font-size: 0.7rem; font-weight: 600; color: #606770; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+        .docs-nav__list { list-style: none; }
+        .docs-nav__link { display: block; padding: 0.35rem 0.75rem; color: #444; text-decoration: none; font-size: 0.85rem; border-radius: 6px; transition: all 0.15s; }
+        .docs-nav__link:hover { background: #e3f2fd; color: var(--cyan-dark); }
+        .docs-nav__link--active { background: var(--cyan-blue); color: white; }
+        .docs-nav__link--page { font-weight: 500; }
+        .docs-content { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+        .docs-content h1 { font-size: 1.8rem; font-weight: 700; color: var(--cyanview-navy); margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e1e4e8; }
+        .docs-content h2 { font-size: 1.4rem; font-weight: 600; color: var(--cyanview-navy); margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e1e4e8; }
+        .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+        .docs-content h3 { font-size: 1.1rem; font-weight: 600; color: #333; margin: 1.5rem 0 0.75rem; }
+        .docs-content h4 { font-size: 1rem; font-weight: 600; color: #444; margin: 1rem 0 0.5rem; }
+        .docs-content p { margin-bottom: 1rem; }
+        .docs-content ul, .docs-content ol { margin: 0 0 1rem 1.5rem; }
+        .docs-content li { margin-bottom: 0.5rem; }
+        .docs-content code { background: #f1f3f5; padding: 0.15rem 0.4rem; border-radius: 4px; font-family: var(--ifm-font-family-mono); font-size: 0.9em; }
+        .docs-content pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: 0.85rem; }
+        .docs-content pre code { background: transparent; padding: 0; color: inherit; }
+        .docs-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+        .docs-content th, .docs-content td { border: 1px solid #e1e4e8; padding: 0.6rem; text-align: left; }
+        .docs-content th { background: #f6f8fa; font-weight: 600; }
+        .info-box { border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+        .info-box--info { background: #e3f2fd; border-left: 4px solid var(--cyan-blue); }
+        .info-box--warning { background: #fff3e0; border-left: 4px solid #ff9800; }
+        .info-box--success { background: #e8f5e9; border-left: 4px solid #4caf50; }
+        .info-box__title { font-weight: 600; margin-bottom: 0.5rem; }
+        .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e1e4e8; }
+        .page-nav__link { display: flex; flex-direction: column; padding: 1rem; border-radius: 8px; text-decoration: none; color: inherit; transition: background 0.2s; max-width: 45%; }
+        .page-nav__link:hover { background: #f6f8fa; }
+        .page-nav__label { font-size: 0.75rem; color: #606770; text-transform: uppercase; }
+        .page-nav__title { font-weight: 600; color: var(--cyan-dark); }
+        .page-nav__link--next { text-align: right; margin-left: auto; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Admin</a>
+            <a href="/admin/docs" class="navbar__link navbar__link--active">Docs</a>
+            <span id="authLoading" class="navbar__link">...</span>
+            <a href="#" id="logoutBtn" class="navbar__link" style="display:none;">Logout</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero__breadcrumb"><a href="/admin/docs">Documentation</a> / Content Management</div>
+        <h1 class="hero__title">Content Management</h1>
+    </section>
+
+    <main class="main">
+        <div class="docs-layout">
+            <nav class="docs-nav">
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">Documentation</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="/admin/docs/architecture" class="docs-nav__link docs-nav__link--page">Architecture</a></li>
+                        <li><a href="/admin/docs/retrieval" class="docs-nav__link docs-nav__link--page">Retrieval System</a></li>
+                        <li><a href="/admin/docs/ingestion" class="docs-nav__link docs-nav__link--page">Data Ingestion</a></li>
+                        <li><a href="/admin/docs/content" class="docs-nav__link docs-nav__link--page docs-nav__link--active">Content Management</a></li>
+                        <li><a href="/admin/docs/features" class="docs-nav__link docs-nav__link--page">Features</a></li>
+                        <li><a href="/admin/docs/api" class="docs-nav__link docs-nav__link--page">API Reference</a></li>
+                        <li><a href="/admin/docs/security" class="docs-nav__link docs-nav__link--page">Security</a></li>
+                        <li><a href="/admin/docs/operations" class="docs-nav__link docs-nav__link--page">Operations</a></li>
+                    </ul>
+                </div>
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">On This Page</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="#knowledge-base" class="docs-nav__link">Knowledge Base</a></li>
+                        <li><a href="#file-upload" class="docs-nav__link">File Upload</a></li>
+                        <li><a href="#bulk-import" class="docs-nav__link">Bulk Import CLI</a></li>
+                        <li><a href="#chunk-editor" class="docs-nav__link">Chunk Editor</a></li>
+                        <li><a href="#conversations" class="docs-nav__link">Conversations</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="docs-content">
+                <h1>Content Management</h1>
+
+                <h2 id="knowledge-base">Custom Knowledge Base</h2>
+
+                <h3>Overview</h3>
+                <p>The Knowledge Base allows administrators to add custom documents that are included in RAG search alongside documentation and support cases. This is useful for:</p>
+                <ul>
+                    <li>Internal technical notes not published to documentation</li>
+                    <li>Firmware release notes and known issues</li>
+                    <li>Troubleshooting guides from field experience</li>
+                    <li>Temporary information with expiration dates</li>
+                    <li>FAQ entries and best practices</li>
+                </ul>
+
+                <h3>Document Categories</h3>
+                <table>
+                    <tr><th>Category</th><th>Description</th></tr>
+                    <tr><td>product_info</td><td>Product specifications, features, capabilities</td></tr>
+                    <tr><td>troubleshooting</td><td>Problem-solution guides</td></tr>
+                    <tr><td>configuration</td><td>Setup and configuration instructions</td></tr>
+                    <tr><td>firmware</td><td>Firmware updates, release notes</td></tr>
+                    <tr><td>release_notes</td><td>Software/hardware release documentation</td></tr>
+                    <tr><td>faq</td><td>Frequently asked questions</td></tr>
+                    <tr><td>best_practices</td><td>Recommended approaches and tips</td></tr>
+                    <tr><td>pre_sales</td><td>Pre-sales materials, product positioning, buyer guides</td></tr>
+                    <tr><td>internal</td><td>Internal team knowledge</td></tr>
+                    <tr><td>other</td><td>Uncategorized content</td></tr>
+                </table>
+
+                <h3>Document Metadata</h3>
+                <ul>
+                    <li><strong>Title</strong> - Display name for the document</li>
+                    <li><strong>Content</strong> - Full text content (auto-chunked for embedding)</li>
+                    <li><strong>Category</strong> - One of the categories above</li>
+                    <li><strong>Tags</strong> - Comma-separated keywords for filtering</li>
+                    <li><strong>URL Reference</strong> - Optional link to source or related page</li>
+                    <li><strong>Expiration Date</strong> - Optional date when document should be excluded from search</li>
+                    <li><strong>Notes</strong> - Internal admin notes (not included in search)</li>
+                </ul>
+
+                <h3>Admin Interface</h3>
+                <p>Access the Knowledge Base manager at <a href="/admin/knowledge">/admin/knowledge</a>:</p>
+                <ul>
+                    <li><strong>Add Document</strong> - Two input modes:
+                        <ul>
+                            <li><em>Paste Text</em> - Enter content directly in a textarea</li>
+                            <li><em>Upload File</em> - Drag-and-drop or browse for .txt, .md, or .pdf files</li>
+                        </ul>
+                    </li>
+                    <li><strong>Browse Documents</strong> - List all documents with filtering by category and expired status</li>
+                    <li><strong>Edit Document</strong> - Update content and metadata (triggers re-embedding)</li>
+                    <li><strong>Delete Document</strong> - Remove document and all its chunks from the vector store</li>
+                </ul>
+
+                <h2 id="file-upload">File Upload</h2>
+                <p>The file upload feature supports:</p>
+                <table>
+                    <tr><th>Format</th><th>Processing</th></tr>
+                    <tr><td>.txt</td><td>Plain text, UTF-8 with latin-1 fallback</td></tr>
+                    <tr><td>.md</td><td>Markdown text, UTF-8 with latin-1 fallback</td></tr>
+                    <tr><td>.pdf</td><td>Text extraction using pypdf library</td></tr>
+                </table>
+                <ul>
+                    <li>Maximum file size is determined by server configuration</li>
+                    <li>Minimum content length: 10 characters after extraction</li>
+                    <li>Title auto-populated from filename if not specified</li>
+                    <li>All other metadata (category, tags, etc.) can be set during upload</li>
+                </ul>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Chunking and Embedding</div>
+                    <p>Documents are automatically split into 1000-character chunks with 100-character overlap, then embedded using voyage-context-3 (dense) and BM25 (sparse). All chunks from a document share the same metadata and parent_doc_id for grouping.</p>
+                </div>
+
+                <h2 id="bulk-import">Bulk Import CLI</h2>
+                <p>For importing multiple documents at once, use the <code>import-docs</code> CLI command:</p>
+                <pre><code># Preview what would be imported (dry run)
+uv run import-docs ./your-folder --category pre_sales --dry-run
+
+# Import all documents with category and tags
+uv run import-docs ./your-folder --category pre_sales --tags "presales,integration"
+
+# Import with default category (other)
+uv run import-docs ./your-folder</code></pre>
+                <p>Supported file types: <code>.txt</code>, <code>.md</code>, <code>.pdf</code></p>
+                <ul>
+                    <li>Recursively scans the folder for supported files</li>
+                    <li>Auto-generates titles from filenames (underscores/hyphens become spaces)</li>
+                    <li>Applies the same category and tags to all imported documents</li>
+                    <li>Use <code>--dry-run</code> to preview without importing</li>
+                </ul>
+
+                <h2 id="chunk-editor">Chunk Editor</h2>
+
+                <h3>Overview</h3>
+                <p>The Chunk Editor provides direct access to browse, search, and edit individual chunks in the vector database. This is useful for:</p>
+                <ul>
+                    <li>Inspecting what content is actually indexed</li>
+                    <li>Correcting inaccuracies in ingested content</li>
+                    <li>Fine-tuning chunk metadata (tags, titles)</li>
+                    <li>Deleting outdated or incorrect chunks</li>
+                    <li>Debugging search relevance issues</li>
+                </ul>
+
+                <h3>Admin Interface</h3>
+                <p>Access the Chunk Editor at <a href="/admin/chunks">/admin/chunks</a>:</p>
+                <ul>
+                    <li><strong>Collection Selector</strong> - Switch between <code>docusaurus_docs</code>, <code>gmail_cases</code>, and <code>custom_docs</code></li>
+                    <li><strong>Search</strong> - Full-text search within the selected collection</li>
+                    <li><strong>Browse</strong> - Paginated list of all chunks with metadata preview</li>
+                    <li><strong>View/Edit</strong> - Expand a chunk to see full content and edit in-place</li>
+                    <li><strong>Delete</strong> - Remove individual chunks from the vector store</li>
+                </ul>
+
+                <h3>Chunk Metadata</h3>
+                <table>
+                    <tr><th>Field</th><th>Description</th><th>Editable</th></tr>
+                    <tr><td><code>id</code></td><td>Unique chunk identifier (UUID)</td><td>No</td></tr>
+                    <tr><td><code>text</code></td><td>The actual chunk content</td><td>Yes</td></tr>
+                    <tr><td><code>title</code></td><td>Document or page title</td><td>Yes</td></tr>
+                    <tr><td><code>url</code></td><td>Source URL (for docs/cases)</td><td>Yes</td></tr>
+                    <tr><td><code>chunk_index</code></td><td>Position within parent document</td><td>No</td></tr>
+                    <tr><td><code>parent_doc_id</code></td><td>Groups chunks from same document</td><td>No</td></tr>
+                    <tr><td><code>collection</code></td><td>Source collection name</td><td>No</td></tr>
+                    <tr><td><code>created_at</code></td><td>Ingestion timestamp</td><td>No</td></tr>
+                    <tr><td><code>human_modified</code></td><td>Flag for manual edits</td><td>Auto-set</td></tr>
+                </table>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Human Modified Flag</div>
+                    <p>When you edit a chunk, the <code>human_modified</code> flag is automatically set to <code>true</code>. This protects your edits from being overwritten by future ingestion runs. Re-ingesting the same source will not update human-modified chunks.</p>
+                </div>
+
+                <h3>Re-Embedding on Edit</h3>
+                <p>When chunk text is edited:</p>
+                <ol>
+                    <li>New dense (Voyage AI) and sparse (BM25) embeddings are generated</li>
+                    <li>The chunk is updated in Qdrant with new vectors</li>
+                    <li>The <code>human_modified</code> flag is set to prevent overwrite</li>
+                    <li>Changes are immediately reflected in search results</li>
+                </ol>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Deleting vs Editing</div>
+                    <p>Prefer editing over deleting when correcting information. Deleted chunks leave gaps in document coverage. If a chunk contains completely wrong info, edit it to correct the information rather than removing it.</p>
+                </div>
+
+                <h2 id="conversations">Conversation Sessions</h2>
+                <p>The search system supports follow-up conversations with context retention:</p>
+                <ul>
+                    <li><strong>Session Storage</strong> - Server-side LRU cache with max 1000 concurrent sessions</li>
+                    <li><strong>History Depth</strong> - Last 3 Q&A exchanges are kept for context</li>
+                    <li><strong>Session Timeout</strong> - 30 minutes of inactivity</li>
+                    <li><strong>Context Passing</strong> - Previous exchanges are included in Claude messages</li>
+                </ul>
+
+                <h3>User Interface</h3>
+                <ul>
+                    <li><strong>Chat-style layout</strong> - User questions appear as bubbles, AI answers in cards</li>
+                    <li><strong>Inline follow-up input</strong> - After each answer, an input field appears below for the next question</li>
+                    <li><strong>Natural flow</strong> - Conversation stacks vertically, scrolling to show new exchanges</li>
+                    <li><strong>New conversation</strong> - Floating button resets session and clears history</li>
+                </ul>
+
+                <div class="page-nav">
+                    <a href="/admin/docs/ingestion" class="page-nav__link">
+                        <span class="page-nav__label">Previous</span>
+                        <span class="page-nav__title">← Data Ingestion</span>
+                    </a>
+                    <a href="/admin/docs/features" class="page-nav__link page-nav__link--next">
+                        <span class="page-nav__label">Next</span>
+                        <span class="page-nav__title">Features →</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
+        AI Search with Claude AI, Voyage AI &amp; Qdrant
+    </footer>
+
+    <script>
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
+                if (!data.authenticated) { window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname); return; }
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+            } catch (e) { window.location.href = '/admin/login'; }
+        }
+        checkAuth();
+        logoutBtn.addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST' }); window.location.href = '/admin/login'; });
+        document.querySelectorAll('.docs-nav__link[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => { e.preventDefault(); const id = link.getAttribute('href').slice(1); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); });
+        });
+    </script>
+</body>
+</html>

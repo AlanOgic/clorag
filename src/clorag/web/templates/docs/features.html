@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Features - Technical Documentation</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root { --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; --ifm-font-family-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace; --cyan-blue: #00a8e8; --cyan-dark: #0077b6; --cyanview-navy: #003366; --hero-bg: #003366; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--ifm-font-family-base); line-height: 1.65; color: #1c1e21; background: #f8f9fa; padding-bottom: 60px; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; background: #fff; padding: 12px; font-size: 0.85rem; border-top: 1px solid #e0e0e0; z-index: 50; color: #606770; }
+        .footer a { color: var(--cyan-dark); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: #fff; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 100; height: 60px; }
+        .navbar__brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit; font-weight: 700; font-size: 1.1rem; }
+        .navbar__logo { height: 32px; }
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+        .navbar__link { color: #606770; text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+        .navbar__link:hover { color: var(--cyan-blue); }
+        .navbar__link--active { color: var(--cyan-blue); font-weight: 600; }
+        .hero { background: var(--hero-bg); padding: 1.5rem 2rem; color: white; }
+        .hero__breadcrumb { font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.5rem; }
+        .hero__breadcrumb a { color: white; text-decoration: none; }
+        .hero__breadcrumb a:hover { text-decoration: underline; }
+        .hero__title { font-size: 1.8rem; font-weight: 700; }
+        .main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .docs-layout { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; }
+        @media (max-width: 900px) { .docs-layout { grid-template-columns: 1fr; } .docs-nav { display: none; } }
+        .docs-nav { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+        .docs-nav__section { margin-bottom: 1.5rem; }
+        .docs-nav__title { font-size: 0.7rem; font-weight: 600; color: #606770; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+        .docs-nav__list { list-style: none; }
+        .docs-nav__link { display: block; padding: 0.35rem 0.75rem; color: #444; text-decoration: none; font-size: 0.85rem; border-radius: 6px; transition: all 0.15s; }
+        .docs-nav__link:hover { background: #e3f2fd; color: var(--cyan-dark); }
+        .docs-nav__link--active { background: var(--cyan-blue); color: white; }
+        .docs-nav__link--page { font-weight: 500; }
+        .docs-content { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+        .docs-content h1 { font-size: 1.8rem; font-weight: 700; color: var(--cyanview-navy); margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e1e4e8; }
+        .docs-content h2 { font-size: 1.4rem; font-weight: 600; color: var(--cyanview-navy); margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e1e4e8; }
+        .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+        .docs-content h3 { font-size: 1.1rem; font-weight: 600; color: #333; margin: 1.5rem 0 0.75rem; }
+        .docs-content p { margin-bottom: 1rem; }
+        .docs-content ul, .docs-content ol { margin: 0 0 1rem 1.5rem; }
+        .docs-content li { margin-bottom: 0.5rem; }
+        .docs-content code { background: #f1f3f5; padding: 0.15rem 0.4rem; border-radius: 4px; font-family: var(--ifm-font-family-mono); font-size: 0.9em; }
+        .docs-content pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: 0.85rem; }
+        .docs-content pre code { background: transparent; padding: 0; color: inherit; }
+        .docs-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+        .docs-content th, .docs-content td { border: 1px solid #e1e4e8; padding: 0.6rem; text-align: left; }
+        .docs-content th { background: #f6f8fa; font-weight: 600; }
+        .info-box { border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+        .info-box--info { background: #e3f2fd; border-left: 4px solid var(--cyan-blue); }
+        .info-box--warning { background: #fff3e0; border-left: 4px solid #ff9800; }
+        .info-box--success { background: #e8f5e9; border-left: 4px solid #4caf50; }
+        .info-box__title { font-weight: 600; margin-bottom: 0.5rem; }
+        .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e1e4e8; }
+        .page-nav__link { display: flex; flex-direction: column; padding: 1rem; border-radius: 8px; text-decoration: none; color: inherit; transition: background 0.2s; max-width: 45%; }
+        .page-nav__link:hover { background: #f6f8fa; }
+        .page-nav__label { font-size: 0.75rem; color: #606770; text-transform: uppercase; }
+        .page-nav__title { font-weight: 600; color: var(--cyan-dark); }
+        .page-nav__link--next { text-align: right; margin-left: auto; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Admin</a>
+            <a href="/admin/docs" class="navbar__link navbar__link--active">Docs</a>
+            <span id="authLoading" class="navbar__link">...</span>
+            <a href="#" id="logoutBtn" class="navbar__link" style="display:none;">Logout</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero__breadcrumb"><a href="/admin/docs">Documentation</a> / Features</div>
+        <h1 class="hero__title">Features</h1>
+    </section>
+
+    <main class="main">
+        <div class="docs-layout">
+            <nav class="docs-nav">
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">Documentation</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="/admin/docs/architecture" class="docs-nav__link docs-nav__link--page">Architecture</a></li>
+                        <li><a href="/admin/docs/retrieval" class="docs-nav__link docs-nav__link--page">Retrieval System</a></li>
+                        <li><a href="/admin/docs/ingestion" class="docs-nav__link docs-nav__link--page">Data Ingestion</a></li>
+                        <li><a href="/admin/docs/content" class="docs-nav__link docs-nav__link--page">Content Management</a></li>
+                        <li><a href="/admin/docs/features" class="docs-nav__link docs-nav__link--page docs-nav__link--active">Features</a></li>
+                        <li><a href="/admin/docs/api" class="docs-nav__link docs-nav__link--page">API Reference</a></li>
+                        <li><a href="/admin/docs/security" class="docs-nav__link docs-nav__link--page">Security</a></li>
+                        <li><a href="/admin/docs/operations" class="docs-nav__link docs-nav__link--page">Operations</a></li>
+                    </ul>
+                </div>
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">On This Page</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="#draft-system" class="docs-nav__link">Draft Auto-Reply</a></li>
+                        <li><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
+                        <li><a href="#analytics" class="docs-nav__link">Analytics</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="docs-content">
+                <h1>Features</h1>
+
+                <h2 id="draft-system">Draft Auto-Reply System</h2>
+
+                <h3>Overview</h3>
+                <p>The draft system automatically generates email replies for unanswered support threads using RAG search and Claude AI synthesis.</p>
+
+                <h3>Pipeline Flow</h3>
+                <pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                    DRAFT CREATION PIPELINE                          │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│    GMAIL      │     │   ANALYZE     │     │    FILTER     │
+│    FETCH      │────▶│   THREADS     │────▶│   PENDING     │
+│  via API      │     │ ThreadAnalyzer│     │ no cyanview   │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│ CHECK DRAFTS  │     │  RAG SEARCH   │     │    CLAUDE     │
+│  in Gmail     │────▶│ docs + cases  │────▶│   SYNTHESIS   │
+│ skip existing │     │ hybrid query  │     │ draft content │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐
+│ CREATE DRAFT  │
+│  in Gmail     │
+│ In-Reply-To   │
+└───────────────┘</code></pre>
+
+                <h3>Key Components</h3>
+                <table>
+                    <tr><th>Component</th><th>Description</th></tr>
+                    <tr><td><code>GmailDraftService</code></td><td>Gmail API wrapper with compose scope for creating draft replies</td></tr>
+                    <tr><td><code>DraftResponseGenerator</code></td><td>RAG search + Claude synthesis for contextual email content</td></tr>
+                    <tr><td><code>DraftCreationPipeline</code></td><td>Orchestrates the full process: fetch → analyze → filter → generate → create</td></tr>
+                </table>
+
+                <h3>Admin Interface</h3>
+                <p>Access the draft management UI at <a href="/admin/drafts">/admin/drafts</a>:</p>
+                <ul>
+                    <li><strong>Pending Threads</strong> - List of unanswered threads with expandable message history</li>
+                    <li><strong>Thread Timeline</strong> - Visual timeline showing all messages with Cyanview badges</li>
+                    <li><strong>Gmail Links</strong> - Direct links to open threads in Gmail</li>
+                    <li><strong>Preview Draft</strong> - View AI-generated response before creating</li>
+                    <li><strong>Create Draft</strong> - Create the draft reply in Gmail</li>
+                    <li><strong>Run Pipeline</strong> - Batch process all pending threads</li>
+                </ul>
+
+                <h3>CLI Command</h3>
+                <pre><code># Process all unanswered threads (max 10)
+uv run draft-support
+
+# Preview drafts without creating
+uv run draft-support --preview
+
+# Process specific thread
+uv run draft-support --thread THREAD_ID
+
+# Increase limit
+uv run draft-support --max 20</code></pre>
+
+                <h3>Google Groups Handling</h3>
+                <p>The system correctly handles messages arriving via Google Groups:</p>
+                <ul>
+                    <li>Parses <code>X-Original-Sender</code> header for actual customer email</li>
+                    <li>Falls back to <code>Reply-To</code> header when available</li>
+                    <li>Strips "via Group" suffix from display names</li>
+                    <li>Correctly identifies Cyanview vs customer messages</li>
+                </ul>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">OAuth Scope</div>
+                    <p>Draft creation requires <code>gmail.compose</code> scope. If using existing OAuth token, delete <code>token_draft.json</code> to re-authenticate with new scopes.</p>
+                </div>
+
+                <h2 id="camera-database">Camera Database</h2>
+
+                <h3>Schema</h3>
+                <p>The camera compatibility database stores structured information:</p>
+                <table>
+                    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                    <tr><td>id</td><td>INTEGER</td><td>Primary key</td></tr>
+                    <tr><td>name</td><td>TEXT</td><td>Camera model name</td></tr>
+                    <tr><td>manufacturer</td><td>TEXT</td><td>Manufacturer (Canon, Sony, etc.)</td></tr>
+                    <tr><td>device_type</td><td>TEXT</td><td>Type (cinema, broadcast, PTZ, etc.)</td></tr>
+                    <tr><td>ports</td><td>JSON</td><td>Physical connection ports</td></tr>
+                    <tr><td>protocols</td><td>JSON</td><td>Communication protocols</td></tr>
+                    <tr><td>supported_controls</td><td>JSON</td><td>Controllable features</td></tr>
+                    <tr><td>notes</td><td>JSON</td><td>Additional notes</td></tr>
+                    <tr><td>doc_url</td><td>TEXT</td><td>Documentation URL</td></tr>
+                    <tr><td>manufacturer_url</td><td>TEXT</td><td>Manufacturer product page</td></tr>
+                    <tr><td>source</td><td>TEXT</td><td>Data source (documentation, support_case, manual)</td></tr>
+                </table>
+
+                <h3>Data Sources</h3>
+                <p>Camera data is extracted from multiple sources:</p>
+                <ul>
+                    <li><strong>Documentation</strong> - Automatic extraction during docs ingestion</li>
+                    <li><strong>Support Cases</strong> - Extraction from resolved support threads</li>
+                    <li><strong>Manual Entry</strong> - Admin interface for manual additions</li>
+                </ul>
+
+                <h3>Admin Interface</h3>
+                <p>Access the camera manager at <a href="/admin/cameras">/admin/cameras</a>:</p>
+                <ul>
+                    <li>Browse all cameras with filtering by manufacturer and type</li>
+                    <li>Add new camera entries manually</li>
+                    <li>Edit existing camera information</li>
+                    <li>Delete outdated entries</li>
+                </ul>
+
+                <h3>Enrichment Command</h3>
+                <pre><code># Enrich camera model codes from documentation
+uv run enrich-cameras</code></pre>
+                <p>This command scans documentation for camera model codes and enriches existing database entries with additional information.</p>
+
+                <h2 id="analytics">Analytics System</h2>
+
+                <h3>Data Collected</h3>
+                <p>Each search logs the following data:</p>
+                <ul>
+                    <li>Query text and source filter</li>
+                    <li>Response time (milliseconds)</li>
+                    <li>Number of results</li>
+                    <li>Full LLM response text</li>
+                    <li>Retrieved chunks (for replay without re-query)</li>
+                    <li>Timestamp</li>
+                </ul>
+
+                <h3>Statistics Available</h3>
+                <ul>
+                    <li>Total searches (with time range)</li>
+                    <li>Average response time</li>
+                    <li>Searches by source (docs/gmail/both)</li>
+                    <li>Daily search volume chart</li>
+                    <li>Popular queries (ranked)</li>
+                    <li>Recent searches (clickable to view details)</li>
+                </ul>
+
+                <h3>Admin Interface</h3>
+                <p>Access the analytics dashboard at <a href="/admin/analytics">/admin/analytics</a>:</p>
+                <ul>
+                    <li>Time-filtered statistics (7d, 30d, all time)</li>
+                    <li>Visual charts for search volume trends</li>
+                    <li>Click any search to view full details including response and sources</li>
+                </ul>
+
+                <div class="page-nav">
+                    <a href="/admin/docs/content" class="page-nav__link">
+                        <span class="page-nav__label">Previous</span>
+                        <span class="page-nav__title">← Content Management</span>
+                    </a>
+                    <a href="/admin/docs/api" class="page-nav__link page-nav__link--next">
+                        <span class="page-nav__label">Next</span>
+                        <span class="page-nav__title">API Reference →</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
+        AI Search with Claude AI, Voyage AI &amp; Qdrant
+    </footer>
+
+    <script>
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
+                if (!data.authenticated) { window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname); return; }
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+            } catch (e) { window.location.href = '/admin/login'; }
+        }
+        checkAuth();
+        logoutBtn.addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST' }); window.location.href = '/admin/login'; });
+        document.querySelectorAll('.docs-nav__link[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => { e.preventDefault(); const id = link.getAttribute('href').slice(1); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); });
+        });
+    </script>
+</body>
+</html>

@@ -455,13 +455,14 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 
 ## Tools RAG disponibles
 
-L'agent dispose de 3 outils de recherche :
+L'agent dispose de 4 outils de recherche avec hybrid RRF (dense + sparse vectors) :
 
 | Tool | Description |
 |------|-------------|
 | `search_docs` | Recherche dans la documentation officielle |
 | `search_cases` | Recherche dans les cas de support Gmail |
-| `hybrid_search` | Recherche combinee (docs + cases) |
+| `search_custom` | Recherche dans les documents custom (admin-managed) |
+| `hybrid_search` | Recherche combinee (docs + cases + custom) avec RRF fusion |
 
 ## Structure du Projet
 

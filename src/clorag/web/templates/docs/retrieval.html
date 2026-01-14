@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Retrieval System - Technical Documentation</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --ifm-font-family-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--ifm-font-family-base); line-height: 1.65; color: #1c1e21; background: #f8f9fa; padding-bottom: 60px; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; background: #fff; padding: 12px; font-size: 0.85rem; border-top: 1px solid #e0e0e0; z-index: 50; color: #606770; }
+        .footer a { color: var(--cyan-dark); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: #fff; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 100; height: 60px; }
+        .navbar__brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit; font-weight: 700; font-size: 1.1rem; }
+        .navbar__logo { height: 32px; }
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+        .navbar__link { color: #606770; text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+        .navbar__link:hover { color: var(--cyan-blue); }
+        .navbar__link--active { color: var(--cyan-blue); font-weight: 600; }
+        .hero { background: var(--hero-bg); padding: 1.5rem 2rem; color: white; }
+        .hero__breadcrumb { font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.5rem; }
+        .hero__breadcrumb a { color: white; text-decoration: none; }
+        .hero__breadcrumb a:hover { text-decoration: underline; }
+        .hero__title { font-size: 1.8rem; font-weight: 700; }
+        .main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .docs-layout { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; }
+        @media (max-width: 900px) { .docs-layout { grid-template-columns: 1fr; } .docs-nav { display: none; } }
+        .docs-nav { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+        .docs-nav__section { margin-bottom: 1.5rem; }
+        .docs-nav__title { font-size: 0.7rem; font-weight: 600; color: #606770; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+        .docs-nav__list { list-style: none; }
+        .docs-nav__link { display: block; padding: 0.35rem 0.75rem; color: #444; text-decoration: none; font-size: 0.85rem; border-radius: 6px; transition: all 0.15s; border-left: 2px solid transparent; }
+        .docs-nav__link:hover { background: #e3f2fd; color: var(--cyan-dark); }
+        .docs-nav__link--active { background: var(--cyan-blue); color: white; }
+        .docs-nav__link--page { font-weight: 500; }
+        .docs-content { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+        .docs-content h1 { font-size: 1.8rem; font-weight: 700; color: var(--cyanview-navy); margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e1e4e8; }
+        .docs-content h2 { font-size: 1.4rem; font-weight: 600; color: var(--cyanview-navy); margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e1e4e8; }
+        .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+        .docs-content h3 { font-size: 1.1rem; font-weight: 600; color: #333; margin: 1.5rem 0 0.75rem; }
+        .docs-content h4 { font-size: 1rem; font-weight: 600; color: #444; margin: 1rem 0 0.5rem; }
+        .docs-content p { margin-bottom: 1rem; }
+        .docs-content ul, .docs-content ol { margin: 0 0 1rem 1.5rem; }
+        .docs-content li { margin-bottom: 0.5rem; }
+        .docs-content code { background: #f1f3f5; padding: 0.15rem 0.4rem; border-radius: 4px; font-family: var(--ifm-font-family-mono); font-size: 0.9em; }
+        .docs-content pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: 0.85rem; }
+        .docs-content pre code { background: transparent; padding: 0; color: inherit; }
+        .docs-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .docs-content th, .docs-content td { border: 1px solid #e1e4e8; padding: 0.75rem; text-align: left; }
+        .docs-content th { background: #f6f8fa; font-weight: 600; }
+        .info-box { border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+        .info-box--info { background: #e3f2fd; border-left: 4px solid var(--cyan-blue); }
+        .info-box--warning { background: #fff3e0; border-left: 4px solid #ff9800; }
+        .info-box--success { background: #e8f5e9; border-left: 4px solid #4caf50; }
+        .info-box__title { font-weight: 600; margin-bottom: 0.5rem; }
+        .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e1e4e8; }
+        .page-nav__link { display: flex; flex-direction: column; padding: 1rem; border-radius: 8px; text-decoration: none; color: inherit; transition: background 0.2s; max-width: 45%; }
+        .page-nav__link:hover { background: #f6f8fa; }
+        .page-nav__label { font-size: 0.75rem; color: #606770; text-transform: uppercase; }
+        .page-nav__title { font-weight: 600; color: var(--cyan-dark); }
+        .page-nav__link--next { text-align: right; margin-left: auto; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Admin</a>
+            <a href="/admin/docs" class="navbar__link navbar__link--active">Docs</a>
+            <span id="authLoading" class="navbar__link">...</span>
+            <a href="#" id="logoutBtn" class="navbar__link" style="display:none;">Logout</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero__breadcrumb"><a href="/admin/docs">Documentation</a> / Retrieval System</div>
+        <h1 class="hero__title">Retrieval System</h1>
+    </section>
+
+    <main class="main">
+        <div class="docs-layout">
+            <nav class="docs-nav">
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">Documentation</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="/admin/docs/architecture" class="docs-nav__link docs-nav__link--page">Architecture</a></li>
+                        <li><a href="/admin/docs/retrieval" class="docs-nav__link docs-nav__link--page docs-nav__link--active">Retrieval System</a></li>
+                        <li><a href="/admin/docs/ingestion" class="docs-nav__link docs-nav__link--page">Data Ingestion</a></li>
+                        <li><a href="/admin/docs/content" class="docs-nav__link docs-nav__link--page">Content Management</a></li>
+                        <li><a href="/admin/docs/features" class="docs-nav__link docs-nav__link--page">Features</a></li>
+                        <li><a href="/admin/docs/api" class="docs-nav__link docs-nav__link--page">API Reference</a></li>
+                        <li><a href="/admin/docs/security" class="docs-nav__link docs-nav__link--page">Security</a></li>
+                        <li><a href="/admin/docs/operations" class="docs-nav__link docs-nav__link--page">Operations</a></li>
+                    </ul>
+                </div>
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">On This Page</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="#retrieval-flow" class="docs-nav__link">Complete Flow</a></li>
+                        <li><a href="#dense-sparse" class="docs-nav__link">Dense vs Sparse</a></li>
+                        <li><a href="#dynamic-threshold" class="docs-nav__link">Dynamic Thresholds</a></li>
+                        <li><a href="#graphrag" class="docs-nav__link">GraphRAG</a></li>
+                        <li><a href="#optimizations" class="docs-nav__link">Optimizations</a></li>
+                        <li><a href="#mermaid" class="docs-nav__link">Mermaid Diagrams</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="docs-content">
+                <h1>Retrieval System</h1>
+
+                <h2 id="retrieval-flow">Complete Retrieval Flow</h2>
+                <p>The following diagram shows the end-to-end retrieval pipeline from user query to AI response:</p>
+
+                <pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                              USER QUERY                                      │
+│                    "How do I configure RIO IP address?"                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         1. QUERY EMBEDDING                                   │
+│  ┌─────────────────────────┐    ┌─────────────────────────────────┐        │
+│  │  Voyage AI (voyage-3)   │    │  FastEmbed BM25                 │        │
+│  │  → 1024-dim dense vec   │    │  → sparse vector (term weights) │        │
+│  └─────────────────────────┘    └─────────────────────────────────┘        │
+│           (cached LRU 200)              (cached LRU 200)                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    2. PARALLEL SEARCH (3 collections)                        │
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
+│  │  docusaurus_docs │  │   gmail_cases    │  │   custom_docs    │          │
+│  │  (documentation) │  │ (support cases)  │  │ (admin-managed)  │          │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘          │
+│           │                     │                     │                     │
+│           └─────────────────────┼─────────────────────┘                     │
+│                                 ▼                                           │
+│                    asyncio.gather() - parallel                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      3. HYBRID SEARCH (per collection)                       │
+│                                                                              │
+│   Dense Search ──────────┐                                                  │
+│   (semantic similarity)  │                                                  │
+│                          ├──► RRF Fusion ──► Ranked Results                 │
+│   Sparse Search ─────────┘    (k=60)                                        │
+│   (keyword matching)                                                        │
+│                                                                              │
+│   RRF Score = Σ 1/(k + rank_dense) + 1/(k + rank_sparse)                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       4. DYNAMIC THRESHOLD FILTER                            │
+│                                                                              │
+│   Short query (≤2 words):  threshold 0.15 (permissive)                      │
+│   Medium query (3-5 words): threshold 0.20                                  │
+│   Long query (>5 words):    threshold 0.25 (strict)                         │
+│   Technical terms (rio, rcp): +0.05 boost                                   │
+│   Minimum 3 results always returned                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    5. GRAPHRAG ENRICHMENT (if Neo4j configured)             │
+│                                                                              │
+│   For each chunk, query Neo4j for related entities:                         │
+│   • Camera → COMPATIBLE_WITH → Products                                     │
+│   • Product → USES_PROTOCOL → Protocols                                     │
+│   • Issue → RESOLVED_BY → Solutions                                         │
+│                                                                              │
+│   Adds context: "Related: CI0 compatible with RIO, uses RCP protocol"       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      6. CLAUDE SYNTHESIS                                     │
+│                                                                              │
+│   Claude Sonnet 4 receives:                                                 │
+│   • User query                                                              │
+│   • Retrieved chunks (with source URLs)                                     │
+│   • Graph context (entities & relationships)                                │
+│   • System prompt (Cyanview expert persona)                                 │
+│                                                                              │
+│   Generates:                                                                │
+│   • Comprehensive answer                                                    │
+│   • Mermaid diagrams (for connections/topology)                             │
+│   • Source citations                                                        │
+│                                                                              │
+│   Streamed back to user via SSE                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         7. ANALYTICS LOGGING                                 │
+│                                                                              │
+│   Stored in SQLite (analytics.db):                                          │
+│   • Query text, timestamp                                                   │
+│   • Sources used, chunk IDs                                                 │
+│   • Response time, token usage                                              │
+└─────────────────────────────────────────────────────────────────────────────┘</code></pre>
+
+                <h2 id="dense-sparse">Dense vs Sparse Embeddings</h2>
+                <p>The system uses two complementary embedding types for optimal retrieval:</p>
+                <table>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Dense (Voyage AI)</th>
+                        <th>Sparse (BM25)</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Vector Type</strong></td>
+                        <td>1024 floats (continuous values)</td>
+                        <td>Millions of dimensions, mostly zeros</td>
+                    </tr>
+                    <tr>
+                        <td><strong>What It Captures</strong></td>
+                        <td>Semantic meaning, concepts</td>
+                        <td>Exact keyword matches</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Strength</strong></td>
+                        <td>"RIO configuration" finds "RCP IP setup"</td>
+                        <td>"RIO" finds exactly "RIO"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Weakness</strong></td>
+                        <td>May miss exact technical terms</td>
+                        <td>Misses synonyms/paraphrases</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Best For</strong></td>
+                        <td>Conceptual questions, how-to queries</td>
+                        <td>Product codes, model numbers, exact terms</td>
+                    </tr>
+                </table>
+
+                <h3>Why BM25 Instead of Voyage for Sparse?</h3>
+                <p><strong>Voyage AI doesn't offer sparse embeddings.</strong> Their models (voyage-3, voyage-context-3) only produce dense vectors. BM25 via FastEmbed is the industry-standard choice for sparse/keyword matching:</p>
+                <ul>
+                    <li><strong>Free</strong> - No API costs, runs locally</li>
+                    <li><strong>Fast</strong> - Local computation, no network latency</li>
+                    <li><strong>Proven</strong> - Classic TF-IDF based algorithm, decades of research</li>
+                    <li><strong>Complementary</strong> - Pairs perfectly with neural dense embeddings</li>
+                </ul>
+
+                <h2 id="dynamic-threshold">Dynamic Score Thresholds</h2>
+                <p>Search results are filtered using adaptive thresholds based on query characteristics:</p>
+                <table>
+                    <tr><th>Query Length</th><th>Base Threshold</th><th>Rationale</th></tr>
+                    <tr><td>≤2 words</td><td>0.15</td><td>Short queries need permissive matching</td></tr>
+                    <tr><td>3-5 words</td><td>0.20</td><td>Medium specificity</td></tr>
+                    <tr><td>&gt;5 words</td><td>0.25</td><td>Specific queries can be strict</td></tr>
+                </table>
+                <p>Technical terms (rio, rcp, firmware, etc.) add +0.05 to the threshold. The system always returns at least 3 results regardless of threshold.</p>
+
+                <h2 id="graphrag">GraphRAG Knowledge Graph</h2>
+
+                <h3>Overview</h3>
+                <p>GraphRAG extends the traditional RAG system with a Neo4j knowledge graph that captures relationships between entities. This provides richer context for Claude synthesis by understanding how cameras, products, protocols, and issues are interconnected.</p>
+
+                <h3>Integration Flow</h3>
+                <pre><code>┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│  USER QUERY   │     │    VECTOR     │     │    GRAPH      │
+│               │────▶│    SEARCH     │────▶│  ENRICHMENT   │
+│  "RIO + C70"  │     │   (Qdrant)    │     │   (Neo4j)     │
+└───────────────┘     └───────────────┘     └───────────────┘
+                              │                     │
+                              │  Top chunks         │  Related entities
+                              │                     │  + relationships
+                              ▼                     ▼
+                      ┌─────────────────────────────────────┐
+                      │         CLAUDE SYNTHESIS            │
+                      │  Context: chunks + graph context    │
+                      │  Output: enriched response          │
+                      └─────────────────────────────────────┘</code></pre>
+
+                <h3>Entity Types</h3>
+                <table>
+                    <tr><th>Entity</th><th>Description</th><th>Example</th></tr>
+                    <tr><td><code>Camera</code></td><td>Camera models with manufacturer info</td><td>Canon C70, Sony FX6</td></tr>
+                    <tr><td><code>Product</code></td><td>Cyanview products</td><td>RIO, RCP, CI0, VP4</td></tr>
+                    <tr><td><code>Protocol</code></td><td>Communication protocols</td><td>Serial, IP, GPIO, NDI</td></tr>
+                    <tr><td><code>Port</code></td><td>Physical connection ports</td><td>LANC, RS-422, USB</td></tr>
+                    <tr><td><code>Control</code></td><td>Controllable features</td><td>Iris, Focus, Zoom, ISO</td></tr>
+                    <tr><td><code>Issue</code></td><td>Known problems</td><td>Firmware bugs, connection issues</td></tr>
+                    <tr><td><code>Solution</code></td><td>Verified solutions</td><td>Workarounds, configuration fixes</td></tr>
+                    <tr><td><code>Firmware</code></td><td>Firmware versions</td><td>RIO v2.5.0, CI0 v1.3.2</td></tr>
+                    <tr><td><code>Chunk</code></td><td>Links to source chunks</td><td>References to Qdrant chunks</td></tr>
+                </table>
+
+                <h3>Relationships</h3>
+                <table>
+                    <tr><th>Relationship</th><th>From → To</th><th>Description</th></tr>
+                    <tr><td><code>COMPATIBLE_WITH</code></td><td>Camera → Product</td><td>Camera works with product</td></tr>
+                    <tr><td><code>USES_PROTOCOL</code></td><td>Camera/Product → Protocol</td><td>Uses this protocol</td></tr>
+                    <tr><td><code>HAS_PORT</code></td><td>Camera/Product → Port</td><td>Has this connection port</td></tr>
+                    <tr><td><code>SUPPORTS_CONTROL</code></td><td>Camera → Control</td><td>This control is available</td></tr>
+                    <tr><td><code>AFFECTS</code></td><td>Issue → Camera/Product</td><td>Issue affects this device</td></tr>
+                    <tr><td><code>RESOLVED_BY</code></td><td>Issue → Solution</td><td>Issue is fixed by solution</td></tr>
+                    <tr><td><code>MENTIONS</code></td><td>Chunk → Any Entity</td><td>Chunk references entity</td></tr>
+                    <tr><td><code>REQUIRES_FIRMWARE</code></td><td>Solution → Firmware</td><td>Solution needs this version</td></tr>
+                </table>
+
+                <h3>Graph Population</h3>
+                <p>The knowledge graph is populated from Qdrant chunks using Claude Haiku for entity extraction:</p>
+                <pre><code># Populate graph from all collections
+uv run populate-graph
+
+# Populate from specific collections only
+uv run populate-graph --collections docusaurus_docs gmail_cases
+
+# Limit chunks for testing
+uv run populate-graph --max-chunks 100</code></pre>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Entity Extraction</div>
+                    <p>Each chunk is analyzed by Claude Haiku to extract entities and relationships. The process is idempotent - running it multiple times will merge new entities with existing ones.</p>
+                </div>
+
+                <h3>Configuration</h3>
+                <pre><code># Neo4j Configuration
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_secure_password
+NEO4J_DATABASE=neo4j  # Optional, defaults to "neo4j"</code></pre>
+
+                <h3>Local Development</h3>
+                <p>The production Neo4j instance is bound to localhost only. For local development, use SSH tunneling:</p>
+                <pre><code># Create SSH tunnel to production Neo4j
+ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
+
+# Then set in local .env
+NEO4J_URI=bolt://localhost:7687</code></pre>
+
+                <h3>Graceful Degradation</h3>
+                <p>If Neo4j is not configured or unavailable:</p>
+                <ul>
+                    <li>The system falls back to standard RAG (vector search only)</li>
+                    <li>No errors are thrown - graph enrichment is simply skipped</li>
+                    <li>Check <code>NEO4J_PASSWORD</code> env var to enable GraphRAG</li>
+                </ul>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Graph Statistics</div>
+                    <p>View current graph stats at <a href="/api/admin/graph/stats">/api/admin/graph/stats</a> (requires authentication). Current production graph: ~5,500 nodes and ~3,600 relationships.</p>
+                </div>
+
+                <h2 id="optimizations">Performance Optimizations</h2>
+
+                <h3>Query Embedding Cache</h3>
+                <p>Both dense (Voyage AI) and sparse (BM25) query embeddings are cached using a thread-safe LRU cache:</p>
+                <ul>
+                    <li><strong>Cache size</strong>: 200 unique queries per embedding type</li>
+                    <li><strong>Benefits</strong>: Reduces Voyage AI API calls for repeated queries</li>
+                    <li><strong>Thread-safe</strong>: Safe for concurrent requests</li>
+                    <li><strong>Statistics</strong>: Hit rate tracking for monitoring</li>
+                </ul>
+
+                <h3>Paginated Document Listing</h3>
+                <p>Custom knowledge documents use cursor-based pagination:</p>
+                <ul>
+                    <li><strong>Incremental scrolling</strong>: Batches of 100 chunks instead of loading all</li>
+                    <li><strong>Early exit</strong>: Stops when enough documents collected</li>
+                    <li><strong>API response</strong>: Includes total count for pagination UI</li>
+                </ul>
+
+                <h2 id="mermaid">Mermaid Diagram Generation</h2>
+                <p>Claude autonomously generates Mermaid.js diagrams when explaining integration scenarios:</p>
+                <ul>
+                    <li><strong>Camera connections</strong> - How to connect cameras to RIO/RCP/CI0/VP4</li>
+                    <li><strong>Network topology</strong> - IP setup and network architecture</li>
+                    <li><strong>Signal flow</strong> - Video, control, and tally routing</li>
+                    <li><strong>Multi-device setups</strong> - Complex integration scenarios</li>
+                </ul>
+                <p>Diagrams are rendered client-side using Mermaid.js v11 ESM modules with Cyanview color theming (navy blue nodes, cyan connections).</p>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Key Code Paths</div>
+                    <p>
+                        <code>app.py:stream_search()</code> - orchestrates the flow<br>
+                        <code>vectorstore.py:hybrid_search()</code> - RRF fusion<br>
+                        <code>embeddings.py:embed_query()</code> - dense vectors<br>
+                        <code>sparse_embeddings.py:embed_query()</code> - BM25 vectors<br>
+                        <code>graph/enrichment.py</code> - Neo4j context<br>
+                        <code>app.py:_synthesize_response()</code> - Claude streaming
+                    </p>
+                </div>
+
+                <div class="page-nav">
+                    <a href="/admin/docs/architecture" class="page-nav__link">
+                        <span class="page-nav__label">Previous</span>
+                        <span class="page-nav__title">← Architecture</span>
+                    </a>
+                    <a href="/admin/docs/ingestion" class="page-nav__link page-nav__link--next">
+                        <span class="page-nav__label">Next</span>
+                        <span class="page-nav__title">Data Ingestion →</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
+        AI Search with Claude AI, Voyage AI &amp; Qdrant
+    </footer>
+
+    <script>
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
+                if (!data.authenticated) { window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname); return; }
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+            } catch (e) { window.location.href = '/admin/login'; }
+        }
+        checkAuth();
+        logoutBtn.addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST' }); window.location.href = '/admin/login'; });
+        document.querySelectorAll('.docs-nav__link[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => { e.preventDefault(); const id = link.getAttribute('href').slice(1); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); });
+        });
+    </script>
+</body>
+</html>
