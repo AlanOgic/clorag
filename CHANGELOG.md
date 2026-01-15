@@ -2,6 +2,50 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.5.5] - 2026-01-15
+
+### Added
+- **Support Cases SQLite Database**
+  - `SupportCaseDatabase` class for storing complete support case documents
+  - FTS5 full-text search with BM25 ranking across subject, problem, solution, document, keywords
+  - Thread-safe database with WAL mode and connection pooling
+  - Automatic FTS sync via SQLite triggers
+
+- **Support Cases Admin UI** (`/admin/support-cases`)
+  - Statistics grid showing total cases, breakdown by category/product/quality
+  - Full-text search with category and product filters
+  - Paginated table with subject, problem summary, category, product, quality stars, date
+  - Detail modal with 3 tabs: Summary, Full Document, Raw Thread
+  - Delete functionality
+
+- **Thread Content Cleaning** (`clean_thread_quotes()`)
+  - Removes quoted reply text (lines starting with `>`)
+  - Removes reply headers ("On [date], [person] wrote:" in EN/FR/DE)
+  - Removes forwarded message separators
+  - Removes email signatures ("Best regards", "Sent from my iPhone", etc.)
+  - Multi-message thread support with state reset at message boundaries
+
+- **New API Endpoints**
+  - `GET /api/admin/support-cases` - List cases with pagination and filters
+  - `GET /api/admin/support-cases/stats` - Statistics by category/product/quality
+  - `GET /api/admin/support-cases/search?q=` - FTS5 search
+  - `GET /api/admin/support-cases/{id}` - Get case details
+  - `GET /api/admin/support-cases/{id}/raw-thread` - Get cleaned raw thread
+  - `DELETE /api/admin/support-cases/{id}` - Delete case
+
+### Changed
+- Gmail ingestion now stores full cases in SQLite alongside Qdrant chunks
+- Raw thread content cleaned before storage (quotes and signatures removed)
+- Admin dashboard includes Support Cases card
+
+### Files
+- `src/clorag/core/support_case_db.py` - NEW: SQLite database for support cases
+- `src/clorag/utils/anonymizer.py` - Added `clean_thread_quotes()` function
+- `src/clorag/ingestion/curated_gmail.py` - Added SQLite storage step
+- `src/clorag/web/app.py` - Added support cases API endpoints
+- `src/clorag/web/templates/admin_support_cases.html` - NEW: Admin UI
+- `src/clorag/web/templates/admin_index.html` - Added Support Cases card
+
 ## [0.5.4] - 2026-01-15
 
 ### Added

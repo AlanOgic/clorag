@@ -115,6 +115,7 @@
                         <li><a href="#camera-api" class="docs-nav__link">Camera API</a></li>
                         <li><a href="#knowledge-api" class="docs-nav__link">Knowledge API</a></li>
                         <li><a href="#chunk-api" class="docs-nav__link">Chunk API</a></li>
+                        <li><a href="#support-cases-api" class="docs-nav__link">Support Cases API</a></li>
                         <li><a href="#analytics-api" class="docs-nav__link">Analytics API</a></li>
                         <li><a href="#draft-api" class="docs-nav__link">Draft API</a></li>
                         <li><a href="#errors" class="docs-nav__link">Error Handling</a></li>
@@ -333,6 +334,44 @@ curl https://cyanview.cloud/api/admin/search-stats \
                     <span class="endpoint__path">/api/admin/chunks/{id}</span>
                 </div>
                 <p>Delete a chunk from the vector store.</p>
+
+                <h2 id="support-cases-api">Support Cases API</h2>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/support-cases</span>
+                </div>
+                <p>List support cases with pagination. Query params: <code>category</code>, <code>product</code>, <code>limit</code>, <code>offset</code>.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/support-cases/stats</span>
+                </div>
+                <p>Get support case statistics: total count, breakdown by category, product, and resolution quality.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/support-cases/search?q={query}</span>
+                </div>
+                <p>Search support cases using FTS5 full-text search. Query param: <code>limit</code> (default: 20).</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/support-cases/{id}</span>
+                </div>
+                <p>Get full support case details including problem/solution summaries, document, and metadata.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/support-cases/{id}/raw-thread</span>
+                </div>
+                <p>Get the cleaned raw thread content for a case (quoted replies and signatures removed).</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--delete">DELETE</span>
+                    <span class="endpoint__path">/api/admin/support-cases/{id}</span>
+                </div>
+                <p>Delete a support case from the database.</p>
 
                 <h2 id="analytics-api">Analytics API</h2>
 

@@ -10,9 +10,10 @@ from clorag.config import get_settings
 from clorag.core.database import get_camera_database
 from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
+from clorag.core.support_case_db import get_support_case_database
 from clorag.core.vectorstore import VectorStore
 from clorag.ingestion.base import Document
-from clorag.ingestion.chunker import TextChunker
+from clorag.ingestion.chunker import ContentType, SemanticChunker
 from clorag.ingestion.gmail import GmailIngestionPipeline
 from clorag.models import (
     CaseStatus,
@@ -20,7 +21,11 @@ from clorag.models import (
     SupportCase,
 )
 from clorag.models.camera import CameraSource
-from clorag.utils.anonymizer import AnonymizationContext, TextAnonymizer
+from clorag.utils.anonymizer import (
+    AnonymizationContext,
+    TextAnonymizer,
+    clean_thread_quotes,
+)
 from clorag.utils.text_transforms import apply_product_name_transforms
 
 logger = structlog.get_logger(__name__)
@@ -73,7 +78,14 @@ class CuratedGmailPipeline:
         self._embeddings = EmbeddingsClient()
         self._sparse_embeddings = SparseEmbeddingsClient()
         self._vectorstore = VectorStore()
-        self._chunker = TextChunker()
+        # Use SemanticChunker for section-aware chunking of support cases
+        self._chunker = SemanticChunker(
+            chunk_size=1000,
+            chunk_overlap=100,
+            adaptive_threshold=800,  # Short cases stay as single chunk
+            preserve_code_blocks=True,
+            respect_headings=True,
+        )
         self._anonymizer = TextAnonymizer()
 
         self._sonnet_concurrent = sonnet_concurrent
@@ -162,11 +174,12 @@ class CuratedGmailPipeline:
 
         # Step 4: QC with Sonnet
         logger.info("Step 4: Quality control with Sonnet")
-        cases_for_qc = [
-            (analysis, doc_by_thread.get(analysis.thread_id, Document(id=analysis.thread_id, text="", metadata={})).text)
-            for analysis in resolved
-            if analysis.thread_id in doc_by_thread
-        ]
+        cases_for_qc = []
+        for analysis in resolved:
+            if analysis.thread_id in doc_by_thread:
+                fallback_doc = Document(id=analysis.thread_id, text="", metadata={})
+                doc_text = doc_by_thread.get(analysis.thread_id, fallback_doc).text
+                cases_for_qc.append((analysis, doc_text))
         qc_results = await self._qc.review_cases_batch(
             cases_for_qc,
             max_concurrent=self._sonnet_concurrent,
@@ -201,7 +214,11 @@ class CuratedGmailPipeline:
                 thread_id=analysis.thread_id,
                 subject=anonymized_subject,  # Use anonymized title instead of original
                 status=CaseStatus.RESOLVED,
-                resolution_quality=ResolutionQuality(analysis.resolution_quality) if analysis.resolution_quality else None,
+                resolution_quality=(
+                    ResolutionQuality(analysis.resolution_quality)
+                    if analysis.resolution_quality
+                    else None
+                ),
                 problem_summary=apply_product_name_transforms(qc_result.refined_problem),
                 solution_summary=apply_product_name_transforms(qc_result.refined_solution),
                 keywords=qc_result.refined_keywords,
@@ -210,12 +227,26 @@ class CuratedGmailPipeline:
                 document=final_document,
                 raw_thread=doc.text,
                 messages_count=doc.metadata.get("message_count", 0),
-                created_at=datetime.fromisoformat(doc.metadata["date"]) if doc.metadata.get("date") else None,
+                created_at=(
+                    datetime.fromisoformat(doc.metadata["date"])
+                    if doc.metadata.get("date")
+                    else None
+                ),
                 participants=[],  # Don't store participant emails (anonymization)
             )
             support_cases.append(case)
 
         logger.info("Built support cases", count=len(support_cases))
+
+        # Step 5.5: Store full documents in SQLite for easy retrieval
+        logger.info("Step 5.5: Storing full documents in SQLite")
+        support_case_db = get_support_case_database()
+        for case in support_cases:
+            doc = doc_by_thread.get(case.thread_id)
+            # Clean raw thread: remove quoted replies and signatures
+            raw_thread = clean_thread_quotes(doc.text) if doc else None
+            support_case_db.upsert_case(case, raw_thread=raw_thread)
+        logger.info("Stored support cases in SQLite", count=len(support_cases))
 
         # Step 6: Chunk and prepare for contextualized embedding
         logger.info("Step 6: Chunking and preparing embeddings")
@@ -226,20 +257,25 @@ class CuratedGmailPipeline:
         # Collect all chunks and their metadata for batched processing
         all_chunk_texts: list[str] = []
         documents_chunks: list[list[str]] = []
-        # (case, chunk_texts, sparse_start_idx, sparse_end_idx)
-        case_chunk_info: list[tuple[SupportCase, list[str], int, int]] = []
+        # (case, chunk_texts, chunk_metadata, sparse_start_idx, sparse_end_idx)
+        case_chunk_info: list[
+            tuple[SupportCase, list[str], list[dict[str, str | int | bool]], int, int]
+        ] = []
 
         for case in support_cases:
-            # Chunk the final document
-            chunks = self._chunker.chunk_text(case.document)
+            # Chunk the final document using section-aware chunking
+            chunks = self._chunker.chunk_text(case.document, content_type=ContentType.SUPPORT_CASE)
             chunk_texts = [chunk.text for chunk in chunks]
+            chunk_metadata_list = [chunk.metadata for chunk in chunks]  # Preserve section info
 
             if chunk_texts:
                 sparse_start = len(all_chunk_texts)
                 all_chunk_texts.extend(chunk_texts)
                 sparse_end = len(all_chunk_texts)
                 documents_chunks.append(chunk_texts)
-                case_chunk_info.append((case, chunk_texts, sparse_start, sparse_end))
+                case_chunk_info.append(
+                    (case, chunk_texts, chunk_metadata_list, sparse_start, sparse_end)
+                )
 
         if not all_chunk_texts:
             logger.warning("No chunks generated")
@@ -264,7 +300,9 @@ class CuratedGmailPipeline:
         logger.info("Step 7: Storing in Qdrant with hybrid vectors")
 
         total_stored = 0
-        for case_idx, (case, chunk_texts, sparse_start, sparse_end) in enumerate(case_chunk_info):
+        for case_idx, (case, chunk_texts, chunk_meta, sparse_start, sparse_end) in enumerate(
+            case_chunk_info
+        ):
             case_embeddings = embeddings[case_idx]
             # Slice pre-computed sparse vectors for this case
             sparse_vectors = all_sparse_vectors[sparse_start:sparse_end]
@@ -280,6 +318,8 @@ class CuratedGmailPipeline:
                     "chunk_index": chunk_idx,
                     "parent_case_id": case.id,
                     "text": text,
+                    # Include semantic chunk metadata (section name, etc.)
+                    **{k: v for k, v in chunk_meta[chunk_idx].items() if k != "chunk_index"},
                 }
                 for chunk_idx, text in enumerate(chunk_texts)
             ]

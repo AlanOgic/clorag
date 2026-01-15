@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Support Cases - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --danger: #dc3545;
+            --success: #28a745;
+            --warning: #ffc107;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: var(--cyanview-navy);
+            color: white;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+            filter: brightness(0) invert(1);
+        }
+
+        .navbar__badge {
+            background: var(--danger);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .navbar__link {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .navbar__link:hover {
+            color: white;
+        }
+
+        /* Main */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            color: var(--cyanview-navy);
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card__label {
+            font-size: 0.85rem;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .stat-card__value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--cyanview-navy);
+        }
+
+        .stat-card__breakdown {
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        /* Search Bar */
+        .search-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 300px;
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--cyan-blue);
+        }
+
+        .filter-select {
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--cyan-dark);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--cyan-blue);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #606770;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .btn-sm {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .btn-view {
+            background: #e8f4fd;
+            color: var(--cyan-dark);
+            border: 1px solid #d0e8f8;
+        }
+
+        .btn-view:hover {
+            background: #d0e8f8;
+        }
+
+        .btn-delete {
+            background: #f8f9fa;
+            color: var(--danger);
+            border: 1px solid #ddd;
+        }
+
+        .btn-delete:hover {
+            background: #fee;
+        }
+
+        /* Table */
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .cases-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .cases-table th,
+        .cases-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cases-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #606770;
+        }
+
+        .cases-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .cases-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .case-subject {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .case-summary {
+            font-size: 0.9rem;
+            color: #666;
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            background: #e8f4fd;
+            color: var(--cyan-dark);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .tag--category {
+            background: #e8f5e9;
+            color: var(--success);
+        }
+
+        .tag--product {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .tag--quality {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        /* Quality Stars */
+        .quality-stars {
+            color: #ffc107;
+        }
+
+        /* Actions */
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.5rem;
+        }
+
+        .pagination__info {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #666;
+        }
+
+        /* Alert */
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            color: var(--success);
+        }
+
+        .alert-error {
+            background: #fee;
+            color: var(--danger);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            max-width: 900px;
+            width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1.5rem;
+            gap: 1rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            color: var(--cyanview-navy);
+            flex: 1;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            flex-shrink: 0;
+        }
+
+        .modal-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-section__title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.25rem;
+        }
+
+        .modal-section__content {
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: inherit;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .modal-section__content--document {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .modal-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #eee;
+            margin-bottom: 1rem;
+        }
+
+        .modal-tab {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .modal-tab:hover {
+            color: var(--cyan-dark);
+        }
+
+        .modal-tab.active {
+            color: var(--cyan-dark);
+            border-bottom-color: var(--cyan-dark);
+            font-weight: 600;
+        }
+
+        .modal-tab-content {
+            display: none;
+        }
+
+        .modal-tab-content.active {
+            display: block;
+        }
+
+        /* Keywords */
+        .keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .cases-table {
+                display: block;
+                overflow-x: auto;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .search-bar {
+                flex-direction: column;
+            }
+            .search-input {
+                width: 100%;
+                min-width: unset;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2aWV3Qm94PSIwIDAgMjUxLjkgMTUwLjU4Ij48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6dXJsKCNsb2dvX2dyKTt9LmNscy0ye2ZpbGw6I2ZmZjt9LmNscy0ze2ZpbGw6IzZkYzlmMzt9PC9zdHlsZT48bGluZWFyR3JhZGllbnQgaWQ9ImxvZ29fZ3IiIHgxPSIyNTEuOSIgeTE9Ijc1LjI5IiB4Mj0iMCIgeTI9Ijc1LjI5IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMDA1ZmEwIi8+PHN0b3Agb2Zmc2V0PSIwLjI2IiBzdG9wLWNvbG9yPSIjMDA2NmE3Ii8+PHN0b3Agb2Zmc2V0PSIwLjYyIiBzdG9wLWNvbG9yPSIjMDA3OGI5Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDA5M2QzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHRpdGxlPkxvZ29fQ3lhbl9ncjwvdGl0bGU+PGcgaWQ9IkxheWVyXzIiIGRhdGEtbmFtZT0iTGF5ZXIgMiI+PGcgaWQ9IkxheWVyXzEtMiIgZGF0YS1uYW1lPSJMYXllciAxIj48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNzYuNjIsMEE3NSw3NSwwLDAsMCwxMjYsMTkuNiw3NS4yOSw3NS4yOSwwLDEsMCwxMjYsMTMxLDc1LjI5LDc1LjI5LDAsMSwwLDE3Ni42MiwwWiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTE1LjQxLDg0LjI0VjU5LjUzYzAtNy4zOCw0LjcxLTEyLjI5LDExLjY3LTEyLjI5LDYuNywwLDExLjI3LDUuMTIsMTEuNDcsMTMuMTFhLjc5Ljc5LDAsMCwxLS44OC44OEgzMy4zYS43OS43OSwwLDAsMS0uODktLjg4QzMyLjI3LDU1LjU3LDMwLjE2LDUzLDI3LDUzYy0zLjQyLDAtNS40LDIuMzItNS40LDYuMTVWODQuNThjMCwzLjgzLDIsNi4xNSw1LjQsNi4xNXM1LjU5LTIuOCw1LjczLTcuNzhhLjc5Ljc5LDAsMCwxLC44OS0uODlIMzhhLjg1Ljg1LDAsMCwxLC44OSwxYy0uMjgsOC4yNy00Ljg1LDEzLjUyLTExLjgyLDEzLjUyUzE1LjQxLDkxLjYyLDE1LjQxLDg0LjI0WiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTY1LjkzLDYyLjUzVjk5LjA2YzAsNi43Ni00LjIzLDExLjEzLTEwLjc5LDExLjEzLTYuMjEsMC0xMC4zNy00LjMtMTAuNzItMTFhLjguOCwwLDAsMSwuODktMWg0Yy41NSwwLC44Mi4yNy44OSwxLC4yLDMuNDEsMiw1LjM5LDQuOTEsNS4zOSwzLjE0LDAsNC45Mi0yLDQuOTItNS4zM1Y5Mi4zN2E3LjA5LDcuMDksMCwwLDEtNS4zOSwyLjQ2Yy02LDAtMTAuMzEtNC41OC0xMC4zMS0xMS4wNlY2Mi41M2EuODQuODQsMCwwLDEsMS0uODloNGEuODUuODUsMCwwLDEsMSwuODlWODRjMCwzLjE0LDEuODQsNS4zMyw0LjkxLDUuMzNzNC45Mi0yLjE5LDQuOTItNS4zM1Y2Mi41M2EuODUuODUsMCwwLDEsMS0uODloNEEuODguODgsMCwwLDEsNjUuOTMsNjIuNTNaIi8+PHBhdGggY2xhc3M9ImNscy0yIiBkPSJNNzIuMzUsODUuNDdjMC01LjY2LDQuMzctMTAsMTAuNzgtMTBoNS4xM1Y3MS42OGMwLTMuMDctMS44NS01LjE5LTQuOTItNS4xOS0yLjg3LDAtNC40NCwxLjkxLTQuNjQsNC43MS0uMDcuNjItLjM0LjgyLTEsLjgyaC00YS44OC44OCwwLDAsMS0uODktMWMuNDEtNS45NCw0LjQ0LTEwLjE4LDEwLjUyLTEwLjE4LDYuNDgsMCwxMC42NSw0LjY0LDEwLjY1LDExLjA2Vjg1LjY4YzAsNi4yOC00LjEsMTAuNzktMTAuNjUsMTAuNzlTNzIuMzUsOTEuODksNzIuMzUsODUuNDdabTE1LjkxLjIxdi01SDgzLjM0Yy0zLjIxLDAtNS4xMiwyLjEyLTUuMTIsNC43OCwwLDMuMjgsMS45MSw1LjQsNS4xMiw1LjRTODguMjYsODguODIsODguMjYsODUuNjhaIi8+PHBhdGggY2xhc3M9ImNscy0yIiBkPSJNMTAwLjYxLDk0LjgzVjcyYzAtNi40OSw0LjMtMTEuMTMsMTAuNjUtMTEuMTNTMTIxLjkxLDY1LjUzLDEyMS45MSw3MlY5NC44M2EuODYuODYsMCwwLDEtMSwxaC00YS44Ni44NiwwLDAsMS0xLTF2LTIzYzAtMy4yMS0xLjc3LTUuNC00Ljc4LTUuNHMtNC43OCwyLjE5LTQuNzgsNS40djIzYS44Ni44NiwwLDAsMS0xLDFoLTRBLjg2Ljg2LDAsMCwxLDEwMC42MSw5NC44M1oiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0xNTIuMjksNDguOTRsLTguMTIsNDQuNTlhMi43NSwyLjc1LDAsMCwxLTIuOTQsMi41M2gtMy43NWEyLjc1LDIuNzUsMCwwLDEtMi45NC0yLjUzbC04LjEyLTQ0LjU5YS43Ni43NiwwLDAsMSwuODItLjk1aDQuNDRhLjkzLjkzLDAsMCwxLDEsLjgybDYuNjksNDAsNi42OS00MGEuODYuODYsMCwwLDEsMS0uODJoNC40NEMxNTIuMDksNDgsMTUyLjQzLDQ4LjQsMTUyLjI5LDQ4Ljk0WiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTE1Ni44LDUzLjg2YTMuMzksMy4zOSwwLDAsMSwzLjQ4LTMuNTUsMy40OCwzLjQ4LDAsMCwxLDMuNTUsMy41NSwzLjU2LDMuNTYsMCwwLDEtMy41NSwzLjQ4QTMuMzcsMy4zNywwLDAsMSwxNTYuOCw1My44NlptLjU0LDQxVjYyLjUzYS44NS44NSwwLDAsMSwxLS44OWg0YS44NS44NSwwLDAsMSwxLC44OXYzMi4zYS44Ny44NywwLDAsMS0xLDFoLTRBLjg3Ljg3LDAsMCwxLDE1Ny4zNCw5NC44M1oiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0xNjkuNSw4NS4zNFY3MmMuMDctNi40OCw0LjMtMTEsMTAuODUtMTFhMTAuNCwxMC40LDAsMCwxLDEwLjkzLDEwLjc5YzAsNi00LjM3LDEwLjMxLTEwLjg2LDEwLjMxaC01djMuNTVjMCwzLjE0LDEuODQsNS4zMiw1LDUuMzIsMi44LDAsNC42NS0yLDQuODUtNS4wNWEuODguODgsMCwwLDEsMS0uODloNGEuODMuODMsMCwwLDEsLjg4Ljg5Yy0uMzQsNi4zNS00LjY0LDEwLjU5LTEwLjc4LDEwLjU5QzE3My44Nyw5Ni40NywxNjkuNSw5MiwxNjkuNSw4NS4zNFptMTAuOTItOC42MWMzLjE0LDAsNS0yLDUtNC44NCwwLTMuMjgtMS45Mi01LjQtNS4wNi01LjRzLTUsMi4xMi01LDUuNHY0Ljg0WiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTIxNSw5Mi4zN2E4Ljc1LDguNzUsMCwwLDEtNy4zOCw0LjE2Yy02LjIxLDAtMTAuMzEtNC42NC0xMC4zMS0xMS4xM1Y2Mi42YS44Ny44NywwLDAsMSwxLTFoMy44OWEuODcuODcsMCwwLDEsMSwxdjIzYzAsMy4yMSwxLjYzLDUuMzIsNC41LDUuMzJzNC40NC0yLjExLDQuNDQtNS4zMnYtMjNhLjg3Ljg3LDAsMCwxLDEtMWg0YS44NC44NCwwLDAsMSwuODgsMXYyM2MwLDMuMjEsMS42NCw1LjMyLDQuNTEsNS4zMnM0LjQ0LTIuMTEsNC40NC01LjMydi0yM2EuODYuODYsMCwwLDEsMS0xaDRhLjg1Ljg1LDAsMCwxLC44OSwxVjg1LjRjMCw2LjQ5LTQsMTEuMTMtMTAuMjQsMTEuMTNBOC42NSw4LjY1LDAsMCwxLDIxNSw5Mi4zN1oiLz48L2c+PC9nPjwvc3ZnPg==" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Dashboard</a>
+            <a href="/" class="navbar__link">AI Search</a>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">Support Cases</h1>
+        </div>
+
+        <!-- Alert container -->
+        <div id="alertContainer"></div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-card__label">Total Cases</div>
+                <div class="stat-card__value" id="statTotal">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">By Category</div>
+                <div class="stat-card__breakdown" id="statCategories">Loading...</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">By Product</div>
+                <div class="stat-card__breakdown" id="statProducts">Loading...</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">By Quality</div>
+                <div class="stat-card__breakdown" id="statQuality">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Search & Filters -->
+        <div class="search-bar">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search cases (full-text)...">
+            <select class="filter-select" id="filterCategory">
+                <option value="">All Categories</option>
+            </select>
+            <select class="filter-select" id="filterProduct">
+                <option value="">All Products</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadCases()">Search</button>
+            <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container">
+            <table class="cases-table">
+                <thead>
+                    <tr>
+                        <th>Subject</th>
+                        <th>Problem</th>
+                        <th>Category</th>
+                        <th>Product</th>
+                        <th>Quality</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="casesBody">
+                    <tr><td colspan="7" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination">
+            <button class="btn btn-secondary btn-sm" id="prevBtn" onclick="prevPage()" disabled>Previous</button>
+            <span class="pagination__info" id="paginationInfo">Page 1</span>
+            <button class="btn btn-secondary btn-sm" id="nextBtn" onclick="nextPage()" disabled>Next</button>
+        </div>
+    </main>
+
+    <!-- View Case Modal -->
+    <div class="modal" id="caseModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Support Case</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+
+            <div class="modal-meta" id="modalMeta"></div>
+
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-tab="summary">Summary</button>
+                <button class="modal-tab" data-tab="document">Full Document</button>
+                <button class="modal-tab" data-tab="thread">Raw Thread</button>
+            </div>
+
+            <div id="tab-summary" class="modal-tab-content active">
+                <div class="modal-section">
+                    <div class="modal-section__title">Problem</div>
+                    <div class="modal-section__content" id="modalProblem"></div>
+                </div>
+
+                <div class="modal-section">
+                    <div class="modal-section__title">Solution</div>
+                    <div class="modal-section__content" id="modalSolution"></div>
+                </div>
+
+                <div class="modal-section">
+                    <div class="modal-section__title">Keywords</div>
+                    <div class="keywords" id="modalKeywords"></div>
+                </div>
+            </div>
+
+            <div id="tab-document" class="modal-tab-content">
+                <div class="modal-section">
+                    <div class="modal-section__title">Full Structured Document</div>
+                    <div class="modal-section__content modal-section__content--document" id="modalDocument"></div>
+                </div>
+            </div>
+
+            <div id="tab-thread" class="modal-tab-content">
+                <div class="modal-section">
+                    <div class="modal-section__title">Raw Anonymized Thread</div>
+                    <div class="modal-section__content modal-section__content--document" id="modalThread"></div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                <button class="btn btn-delete" onclick="deleteCase(currentCaseId)">Delete Case</button>
+                <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 0;
+        let pageSize = 20;
+        let totalCases = 0;
+        let currentCaseId = null;
+        let categories = new Set();
+        let products = new Set();
+
+        // Session check
+        async function checkSession() {
+            try {
+                const response = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch (error) {
+                window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+            }
+        }
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/admin/support-cases/stats', { credentials: 'include' });
+                const stats = await response.json();
+
+                document.getElementById('statTotal').textContent = stats.total || 0;
+
+                // By category
+                const catEl = document.getElementById('statCategories');
+                const catSelect = document.getElementById('filterCategory');
+                if (stats.by_category && Object.keys(stats.by_category).length > 0) {
+                    catEl.innerHTML = Object.entries(stats.by_category)
+                        .slice(0, 5)
+                        .map(([k, v]) => `${k || 'Unknown'}: ${v}`)
+                        .join('<br>');
+                    // Populate filter
+                    catSelect.innerHTML = '<option value="">All Categories</option>' +
+                        Object.keys(stats.by_category).map(k =>
+                            `<option value="${k}">${k || 'Unknown'}</option>`
+                        ).join('');
+                } else {
+                    catEl.textContent = 'No data';
+                }
+
+                // By product
+                const prodEl = document.getElementById('statProducts');
+                const prodSelect = document.getElementById('filterProduct');
+                if (stats.by_product && Object.keys(stats.by_product).length > 0) {
+                    prodEl.innerHTML = Object.entries(stats.by_product)
+                        .slice(0, 5)
+                        .map(([k, v]) => `${k || 'Unknown'}: ${v}`)
+                        .join('<br>');
+                    // Populate filter
+                    prodSelect.innerHTML = '<option value="">All Products</option>' +
+                        Object.keys(stats.by_product).map(k =>
+                            `<option value="${k}">${k || 'Unknown'}</option>`
+                        ).join('');
+                } else {
+                    prodEl.textContent = 'No data';
+                }
+
+                // By quality
+                const qualEl = document.getElementById('statQuality');
+                if (stats.by_quality && Object.keys(stats.by_quality).length > 0) {
+                    qualEl.innerHTML = Object.entries(stats.by_quality)
+                        .sort((a, b) => b[0] - a[0])
+                        .map(([k, v]) => `${'★'.repeat(parseInt(k))}${'☆'.repeat(5 - parseInt(k))}: ${v}`)
+                        .join('<br>');
+                } else {
+                    qualEl.textContent = 'No data';
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        // Load cases
+        async function loadCases() {
+            const searchQuery = document.getElementById('searchInput').value.trim();
+            const category = document.getElementById('filterCategory').value;
+            const product = document.getElementById('filterProduct').value;
+
+            let url;
+            if (searchQuery) {
+                // Use FTS search endpoint
+                url = `/api/admin/support-cases/search?q=${encodeURIComponent(searchQuery)}&limit=${pageSize}`;
+            } else {
+                // Use list endpoint with filters
+                url = `/api/admin/support-cases?limit=${pageSize}&offset=${currentPage * pageSize}`;
+                if (category) url += `&category=${encodeURIComponent(category)}`;
+                if (product) url += `&product=${encodeURIComponent(product)}`;
+            }
+
+            try {
+                const response = await fetch(url, { credentials: 'include' });
+                const result = await response.json();
+                const cases = result.cases || [];
+                totalCases = result.total || cases.length;
+
+                const tbody = document.getElementById('casesBody');
+                if (cases.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No support cases found.</td></tr>';
+                    updatePagination();
+                    return;
+                }
+
+                tbody.innerHTML = cases.map(c => `
+                    <tr data-id="${c.id}">
+                        <td class="case-subject" title="${escapeHtml(c.subject)}">${escapeHtml(c.subject)}</td>
+                        <td class="case-summary" title="${escapeHtml(c.problem_summary)}">${escapeHtml(c.problem_summary || '-')}</td>
+                        <td>${c.category ? `<span class="tag tag--category">${escapeHtml(c.category)}</span>` : '-'}</td>
+                        <td>${c.product ? `<span class="tag tag--product">${escapeHtml(c.product)}</span>` : '-'}</td>
+                        <td class="quality-stars">${c.resolution_quality ? '★'.repeat(c.resolution_quality) + '☆'.repeat(5 - c.resolution_quality) : '-'}</td>
+                        <td>${c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}</td>
+                        <td class="actions">
+                            <button class="btn btn-sm btn-view" onclick="viewCase('${c.id}')">View</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                updatePagination();
+            } catch (error) {
+                showAlert('Failed to load cases: ' + error.message, 'error');
+            }
+        }
+
+        // Update pagination
+        function updatePagination() {
+            const searchQuery = document.getElementById('searchInput').value.trim();
+            const totalPages = Math.ceil(totalCases / pageSize);
+
+            document.getElementById('paginationInfo').textContent =
+                searchQuery ? `${totalCases} results` : `Page ${currentPage + 1} of ${totalPages || 1}`;
+
+            document.getElementById('prevBtn').disabled = currentPage === 0 || searchQuery;
+            document.getElementById('nextBtn').disabled = (currentPage + 1) >= totalPages || searchQuery;
+        }
+
+        function prevPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                loadCases();
+            }
+        }
+
+        function nextPage() {
+            currentPage++;
+            loadCases();
+        }
+
+        function clearFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterCategory').value = '';
+            document.getElementById('filterProduct').value = '';
+            currentPage = 0;
+            loadCases();
+        }
+
+        // View case
+        async function viewCase(caseId) {
+            currentCaseId = caseId;
+            try {
+                const response = await fetch(`/api/admin/support-cases/${caseId}`, { credentials: 'include' });
+                const c = await response.json();
+
+                document.getElementById('modalTitle').textContent = c.subject;
+
+                // Meta tags
+                const meta = [];
+                if (c.category) meta.push(`<span class="tag tag--category">${escapeHtml(c.category)}</span>`);
+                if (c.product) meta.push(`<span class="tag tag--product">${escapeHtml(c.product)}</span>`);
+                if (c.resolution_quality) {
+                    meta.push(`<span class="tag tag--quality">${'★'.repeat(c.resolution_quality)}${'☆'.repeat(5 - c.resolution_quality)}</span>`);
+                }
+                if (c.created_at) {
+                    meta.push(`<span class="tag">Created: ${new Date(c.created_at).toLocaleDateString()}</span>`);
+                }
+                if (c.messages_count) {
+                    meta.push(`<span class="tag">${c.messages_count} messages</span>`);
+                }
+                document.getElementById('modalMeta').innerHTML = meta.join('');
+
+                // Summary tab
+                document.getElementById('modalProblem').textContent = c.problem_summary || 'No problem summary available.';
+                document.getElementById('modalSolution').textContent = c.solution_summary || 'No solution summary available.';
+
+                const keywords = c.keywords || [];
+                document.getElementById('modalKeywords').innerHTML = keywords.length > 0
+                    ? keywords.map(k => `<span class="tag">${escapeHtml(k)}</span>`).join('')
+                    : '<span class="tag">No keywords</span>';
+
+                // Document tab
+                document.getElementById('modalDocument').textContent = c.document || 'No document available.';
+
+                // Raw thread tab - fetch separately
+                document.getElementById('modalThread').textContent = 'Loading...';
+                try {
+                    const threadResponse = await fetch(`/api/admin/support-cases/${caseId}/raw-thread`, { credentials: 'include' });
+                    if (threadResponse.ok) {
+                        const threadData = await threadResponse.json();
+                        document.getElementById('modalThread').textContent = threadData.raw_thread || 'No raw thread stored.';
+                    } else {
+                        document.getElementById('modalThread').textContent = 'Raw thread not available.';
+                    }
+                } catch {
+                    document.getElementById('modalThread').textContent = 'Failed to load raw thread.';
+                }
+
+                // Reset to summary tab
+                document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+                document.querySelector('.modal-tab[data-tab="summary"]').classList.add('active');
+                document.getElementById('tab-summary').classList.add('active');
+
+                document.getElementById('caseModal').classList.add('active');
+            } catch (error) {
+                showAlert('Failed to load case: ' + error.message, 'error');
+            }
+        }
+
+        // Delete case
+        async function deleteCase(caseId) {
+            if (!confirm('Delete this support case permanently? This cannot be undone.')) return;
+
+            try {
+                const response = await fetch(`/api/admin/support-cases/${caseId}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                });
+
+                if (response.ok) {
+                    showAlert('Case deleted successfully', 'success');
+                    closeModal();
+                    loadCases();
+                    loadStats();
+                } else {
+                    showAlert('Failed to delete case', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('caseModal').classList.remove('active');
+            currentCaseId = null;
+        }
+
+        // Modal tab switching
+        document.querySelectorAll('.modal-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.dataset.tab;
+                document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`tab-${tabId}`).classList.add('active');
+            });
+        });
+
+        // Show alert
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modal on outside click
+        document.getElementById('caseModal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                closeModal();
+            }
+        });
+
+        // Search on Enter
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                currentPage = 0;
+                loadCases();
+            }
+        });
+
+        // Initialize
+        checkSession().then(() => {
+            loadStats();
+            loadCases();
+        });
+    </script>
+</body>
+</html>

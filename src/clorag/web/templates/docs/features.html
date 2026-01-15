@@ -104,6 +104,7 @@
                     <ul class="docs-nav__list">
                         <li><a href="#draft-system" class="docs-nav__link">Draft Auto-Reply</a></li>
                         <li><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
+                        <li><a href="#support-cases" class="docs-nav__link">Support Cases</a></li>
                         <li><a href="#analytics" class="docs-nav__link">Analytics</a></li>
                     </ul>
                 </div>
@@ -273,6 +274,58 @@ uv run rebuild-fts
 
 # Check FTS index status
 uv run rebuild-fts --check</code></pre>
+
+                <h2 id="support-cases">Support Cases Database</h2>
+
+                <h3>Overview</h3>
+                <p>Support cases from Gmail are stored in SQLite for easy retrieval, searching, and browsing. The database stores the complete anonymized, analyzed content alongside raw thread data.</p>
+
+                <h3>Schema</h3>
+                <table>
+                    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                    <tr><td>id</td><td>TEXT</td><td>Primary key (UUID)</td></tr>
+                    <tr><td>thread_id</td><td>TEXT</td><td>Gmail thread ID (unique)</td></tr>
+                    <tr><td>subject</td><td>TEXT</td><td>Anonymized case title</td></tr>
+                    <tr><td>status</td><td>TEXT</td><td>Case status (resolved, pending, etc.)</td></tr>
+                    <tr><td>resolution_quality</td><td>INTEGER</td><td>Quality score (1-5)</td></tr>
+                    <tr><td>problem_summary</td><td>TEXT</td><td>LLM-extracted problem description</td></tr>
+                    <tr><td>solution_summary</td><td>TEXT</td><td>LLM-extracted solution steps</td></tr>
+                    <tr><td>keywords</td><td>JSON</td><td>Extracted technical keywords</td></tr>
+                    <tr><td>category</td><td>TEXT</td><td>Case category</td></tr>
+                    <tr><td>product</td><td>TEXT</td><td>Related Cyanview product</td></tr>
+                    <tr><td>document</td><td>TEXT</td><td>Full QC-refined document</td></tr>
+                    <tr><td>raw_thread</td><td>TEXT</td><td>Cleaned raw thread (no quotes/signatures)</td></tr>
+                </table>
+
+                <h3>FTS5 Full-Text Search</h3>
+                <p>The database includes an FTS5 virtual table for fast full-text search across:</p>
+                <ul>
+                    <li>Subject line</li>
+                    <li>Problem summary</li>
+                    <li>Solution summary</li>
+                    <li>Full document content</li>
+                    <li>Keywords</li>
+                </ul>
+
+                <h3>Thread Cleaning</h3>
+                <p>Raw threads are cleaned before storage to remove redundant content:</p>
+                <ul>
+                    <li><strong>Quoted text</strong> - Lines starting with <code>&gt;</code></li>
+                    <li><strong>Reply headers</strong> - "On [date], [person] wrote:" patterns</li>
+                    <li><strong>Forwarded headers</strong> - "---------- Original Message ----------"</li>
+                    <li><strong>Email signatures</strong> - "Best regards", "Sent from my iPhone", etc.</li>
+                </ul>
+                <p>Multi-language support includes English, French, and German reply header patterns.</p>
+
+                <h3>Admin Interface</h3>
+                <p>Access the support cases browser at <a href="/admin/support-cases">/admin/support-cases</a>:</p>
+                <ul>
+                    <li><strong>Statistics</strong> - Total cases, breakdown by category/product/quality</li>
+                    <li><strong>Search</strong> - Full-text search with BM25 ranking</li>
+                    <li><strong>Filters</strong> - Filter by category or product</li>
+                    <li><strong>Detail View</strong> - Modal with tabs for Summary, Full Document, Raw Thread</li>
+                    <li><strong>Quality Stars</strong> - Visual display of resolution quality scores</li>
+                </ul>
 
                 <h2 id="analytics">Analytics System</h2>
 

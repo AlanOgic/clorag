@@ -42,7 +42,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Neo4j enrichment → 
 
 ### Source Layout
 
-**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion), `embeddings.py` (voyage-context-3 with contextualized embedding), `sparse_embeddings.py` (BM25), `retriever.py` (MultiSourceRetriever), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite), `analytics_db.py`
+**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion), `embeddings.py` (voyage-context-3 with contextualized embedding), `sparse_embeddings.py` (BM25), `retriever.py` (MultiSourceRetriever), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5)
 
 **Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler), `chunker.py`, `base.py`
 
@@ -56,7 +56,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Neo4j enrichment → 
 
 **Drafts** (`drafts/`): `gmail_service.py`, `draft_generator.py`, `draft_pipeline.py`
 
-**Web** (`web/app.py`): FastAPI with streaming, admin UI at `/admin/{cameras,knowledge,analytics,drafts,chunks,graph}`, REST APIs at `/api/`
+**Web** (`web/app.py`): FastAPI with streaming, admin UI at `/admin/{cameras,knowledge,analytics,drafts,chunks,graph,support-cases}`, REST APIs at `/api/`
 
 **Models** (`models/`): `camera.py`, `custom_document.py` (10 categories), `support_case.py`
 
@@ -101,6 +101,12 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Comparison**: Side-by-side comparison of up to 5 cameras with highlighted common specs
 - **Related cameras**: Similarity scoring based on manufacturer, device_type, ports, protocols
 - **CSV import/export**: Bulk data management with upsert logic (name + manufacturer)
+
+### Support Cases Database
+- **SQLite storage**: Full document storage with problem/solution summaries, keywords, categories
+- **FTS5 search**: Full-text search across subject, problem, solution, document, keywords
+- **Thread cleaning**: `clean_thread_quotes()` removes quoted replies, headers, signatures (EN/FR/DE)
+- **Admin UI**: Browse/search cases at `/admin/support-cases` with detail modal (Summary/Document/Raw tabs)
 
 ### Security
 - Session-based admin auth with brute force protection (5 attempts → 5min lockout per IP)

@@ -179,3 +179,143 @@ class TextAnonymizer:
             anonymized.append(anon_text)
 
         return anonymized, context
+
+
+def clean_thread_quotes(text: str, remove_signatures: bool = True) -> str:
+    """Remove quoted reply history and signatures from email thread content.
+
+    Cleans redundant content like:
+    - Lines starting with > (quoted text)
+    - "On [date], [person] wrote:" reply headers
+    - "---------- Original Message ----------" separators
+    - "From: ... Sent: ... To: ... Subject:" forwarded headers
+    - Gmail-style "Le [date] à [time], [person] a écrit :" (French)
+    - Email signatures (-- separator, "Best regards", "Sent from my iPhone", etc.)
+
+    Args:
+        text: Raw email thread text.
+        remove_signatures: Whether to remove email signatures.
+
+    Returns:
+        Cleaned text with quoted content and signatures removed.
+    """
+    lines = text.split("\n")
+    cleaned_lines: list[str] = []
+    skip_until_blank = False
+    in_quoted_block = False
+    in_signature = False
+
+    # Patterns for reply headers
+    reply_header_patterns = [
+        # English: "On Jan 15, 2025, at 10:30 AM, User wrote:"
+        re.compile(r"^On .+wrote:\s*$", re.IGNORECASE),
+        # English: "On 15/01/2025 10:30, User wrote:"
+        re.compile(r"^On \d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}.+wrote:\s*$", re.IGNORECASE),
+        # French: "Le 15 janv. 2025 à 10:30, User a écrit :"
+        re.compile(r"^Le .+a écrit\s*:\s*$", re.IGNORECASE),
+        # German: "Am 15.01.2025 um 10:30 schrieb User:"
+        re.compile(r"^Am .+schrieb.+:\s*$", re.IGNORECASE),
+        # Outlook style: "From: User Sent: Monday..."
+        re.compile(r"^From:\s*.+$", re.IGNORECASE),
+    ]
+
+    # Patterns for separators
+    separator_patterns = [
+        re.compile(r"^-{3,}\s*(Original Message|Forwarded|Begin forwarded)", re.IGNORECASE),
+        re.compile(r"^_{3,}\s*$"),
+        re.compile(r"^={3,}\s*$"),
+        re.compile(r"^\*{3,}\s*$"),
+    ]
+
+    # Patterns for signature starts
+    signature_patterns = [
+        # Standard signature separator
+        re.compile(r"^--\s*$"),
+        # Common sign-offs
+        re.compile(r"^(Best|Kind|Warm)?\s*regards?,?\s*$", re.IGNORECASE),
+        re.compile(r"^(Many\s+)?thanks?,?\s*$", re.IGNORECASE),
+        re.compile(r"^Cheers,?\s*$", re.IGNORECASE),
+        re.compile(r"^Sincerely,?\s*$", re.IGNORECASE),
+        re.compile(r"^Cordialement,?\s*$", re.IGNORECASE),  # French
+        re.compile(r"^Mit freundlichen Grüßen,?\s*$", re.IGNORECASE),  # German
+        # Mobile signatures
+        re.compile(r"^Sent from my (iPhone|iPad|Android|Galaxy|Pixel)", re.IGNORECASE),
+        re.compile(r"^Envoyé de mon (iPhone|iPad)", re.IGNORECASE),  # French
+        re.compile(r"^Get Outlook for", re.IGNORECASE),
+    ]
+
+    # Patterns that indicate a new message is starting (reset signature state)
+    new_message_patterns = [
+        re.compile(r"^-{3,}\s*Message\s*\d*\s*-{3,}$", re.IGNORECASE),
+        re.compile(r"^-{3,}\s*$"),  # Simple separator
+    ]
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        # Check if this looks like a new message boundary
+        is_new_message = any(p.match(stripped) for p in new_message_patterns)
+        if is_new_message:
+            # Reset all states for new message
+            in_signature = False
+            in_quoted_block = False
+            skip_until_blank = False
+            # Keep the separator for context
+            cleaned_lines.append(line)
+            continue
+
+        # Skip empty lines in quoted blocks or signatures
+        if (in_quoted_block or in_signature) and not stripped:
+            continue
+
+        # Detect quoted lines (starting with >)
+        if stripped.startswith(">"):
+            in_quoted_block = True
+            continue
+
+        # End quoted block on non-quoted, non-empty line
+        if in_quoted_block and stripped and not stripped.startswith(">"):
+            in_quoted_block = False
+
+        # Check for signature starts (only if enabled)
+        if remove_signatures and not in_signature:
+            is_signature_start = any(p.match(stripped) for p in signature_patterns)
+            if is_signature_start:
+                in_signature = True
+                continue
+
+        # End signature on reply header (new message starts)
+        if in_signature:
+            is_reply_header = any(p.match(stripped) for p in reply_header_patterns)
+            if is_reply_header:
+                in_signature = False
+                skip_until_blank = True
+                continue
+            # Skip signature content
+            continue
+
+        # Check for reply headers
+        is_reply_header = any(p.match(stripped) for p in reply_header_patterns)
+        if is_reply_header:
+            skip_until_blank = True
+            continue
+
+        # Check for separators (Original Message, Forwarded, etc.)
+        is_separator = any(p.match(stripped) for p in separator_patterns)
+        if is_separator:
+            skip_until_blank = True
+            continue
+
+        # Skip lines after header until blank line
+        if skip_until_blank:
+            if not stripped:
+                skip_until_blank = False
+            continue
+
+        # Keep non-quoted, non-header, non-signature lines
+        cleaned_lines.append(line)
+
+    # Clean up excessive blank lines
+    result = "\n".join(cleaned_lines)
+    result = re.sub(r"\n{3,}", "\n\n", result)
+    return result.strip()

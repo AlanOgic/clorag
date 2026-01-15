@@ -8,7 +8,7 @@ import structlog
 from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import VectorStore
-from clorag.ingestion.chunker import TextChunker
+from clorag.ingestion.chunker import ContentType, SemanticChunker
 from clorag.models.custom_document import (
     CustomDocument,
     CustomDocumentCreate,
@@ -39,7 +39,15 @@ class CustomDocumentService:
         self._vectorstore = vectorstore or VectorStore()
         self._embeddings = embeddings or EmbeddingsClient()
         self._sparse_embeddings = sparse_embeddings or SparseEmbeddingsClient()
-        self._chunker = TextChunker(chunk_size=1000, chunk_overlap=100)
+        # Use SemanticChunker for code block and heading preservation
+        self._chunker = SemanticChunker(
+            chunk_size=1000,
+            chunk_overlap=100,
+            adaptive_threshold=800,  # Short docs stay as single chunk
+            preserve_code_blocks=True,
+            preserve_tables=True,
+            respect_headings=True,
+        )
 
     async def create_document(
         self,
@@ -62,14 +70,25 @@ class CustomDocumentService:
         doc_id = str(uuid4())
         now = datetime.utcnow()
 
-        # Chunk the content
-        chunks = self._chunker.chunk_text(doc.content)
+        # Chunk the content with semantic awareness
+        # Map document category to content type for optimal chunking
+        content_type = ContentType.GENERIC
+        if doc.category.value in ("troubleshooting", "configuration"):
+            content_type = ContentType.SUPPORT_CASE  # Similar structure to support cases
+        elif doc.category.value == "faq":
+            content_type = ContentType.FAQ
+        elif doc.category.value == "release_notes":
+            content_type = ContentType.RELEASE_NOTES
+
+        chunks = self._chunker.chunk_text(doc.content, content_type=content_type)
 
         if not chunks:
             # Single chunk for short content
             chunk_texts = [doc.content]
+            chunk_meta_list: list[dict[str, str | int | bool]] = [{}]
         else:
             chunk_texts = [chunk.text for chunk in chunks]
+            chunk_meta_list = [chunk.metadata for chunk in chunks]
 
         # Generate embeddings for all chunks
         # Dense embeddings
@@ -103,11 +122,15 @@ class CustomDocumentService:
         for i, chunk_text in enumerate(chunk_texts):
             chunk_id = f"{doc_id}_chunk_{i}"
             chunk_ids.append(chunk_id)
+            # Include semantic metadata (section, has_code, etc.)
+            semantic_meta = chunk_meta_list[i] if i < len(chunk_meta_list) else {}
             chunk_metadata.append({
                 **base_metadata,
                 "chunk_index": i,
                 "total_chunks": len(chunk_texts),
                 "text": chunk_text,
+                # Add semantic metadata, excluding chunk_index since we already have it
+                **{k: v for k, v in semantic_meta.items() if k != "chunk_index"},
             })
 
         # Store in Qdrant

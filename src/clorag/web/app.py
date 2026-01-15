@@ -1927,6 +1927,111 @@ async def api_get_conversations(
 
 
 # =============================================================================
+# Support Cases Routes (Admin)
+# =============================================================================
+
+
+@app.get("/api/admin/support-cases", tags=["Support Cases"])
+async def api_list_support_cases(
+    limit: int = 50,
+    offset: int = 0,
+    category: str | None = None,
+    product: str | None = None,
+    _: bool = Depends(verify_admin),
+):
+    """List support cases with optional filtering."""
+    from dataclasses import asdict
+
+    from clorag.core.support_case_db import get_support_case_database
+    db = get_support_case_database()
+    cases, total = db.list_cases(
+        category=category,
+        product=product,
+        limit=limit,
+        offset=offset,
+    )
+    return {
+        "cases": [asdict(case) for case in cases],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@app.get("/api/admin/support-cases/stats", tags=["Support Cases"])
+async def api_support_cases_stats(_: bool = Depends(verify_admin)):
+    """Get support case statistics."""
+    from clorag.core.support_case_db import get_support_case_database
+    db = get_support_case_database()
+    return db.get_stats()
+
+
+@app.get("/api/admin/support-cases/search", tags=["Support Cases"])
+async def api_search_support_cases(
+    q: str,
+    limit: int = 20,
+    _: bool = Depends(verify_admin),
+):
+    """Search support cases using full-text search."""
+    from dataclasses import asdict
+
+    from clorag.core.support_case_db import get_support_case_database
+    db = get_support_case_database()
+    cases = db.search_cases(q, limit=limit)
+    return {"cases": [asdict(case) for case in cases], "total": len(cases)}
+
+
+@app.get("/api/admin/support-cases/{case_id}", tags=["Support Cases"])
+async def api_get_support_case(
+    case_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Get a support case by ID with full document."""
+    from dataclasses import asdict
+
+    from clorag.core.support_case_db import get_support_case_database
+    db = get_support_case_database()
+    case = db.get_case_by_id(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Support case not found")
+    return asdict(case)
+
+
+@app.get("/api/admin/support-cases/{case_id}/raw-thread", tags=["Support Cases"])
+async def api_get_support_case_raw_thread(
+    case_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Get the raw anonymized thread content for a case."""
+    from clorag.core.support_case_db import get_support_case_database
+    db = get_support_case_database()
+    raw_thread = db.get_raw_thread(case_id)
+    if raw_thread is None:
+        raise HTTPException(status_code=404, detail="Raw thread not found")
+    return {"raw_thread": raw_thread}
+
+
+@app.delete("/api/admin/support-cases/{case_id}", tags=["Support Cases"])
+async def api_delete_support_case(
+    case_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Delete a support case."""
+    from clorag.core.support_case_db import get_support_case_database
+    db = get_support_case_database()
+    deleted = db.delete_case(case_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Support case not found")
+    return {"deleted": True, "case_id": case_id}
+
+
+@app.get("/admin/support-cases", response_class=HTMLResponse)
+async def admin_support_cases(request: Request):
+    """Admin support cases management page."""
+    return templates.TemplateResponse("admin_support_cases.html", {"request": request})
+
+
+# =============================================================================
 # Graph Stats Routes (Admin)
 # =============================================================================
 

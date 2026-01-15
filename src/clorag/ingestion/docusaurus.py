@@ -13,7 +13,7 @@ from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import VectorStore
 from clorag.ingestion.base import BaseIngestionPipeline, Document
-from clorag.ingestion.chunker import TextChunker
+from clorag.ingestion.chunker import ContentType, SemanticChunker
 from clorag.models.camera import CameraSource
 from clorag.utils.logger import get_logger
 from clorag.utils.text_transforms import apply_product_name_transforms
@@ -51,7 +51,15 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         self._embeddings = embeddings_client or EmbeddingsClient()
         self._sparse_embeddings = SparseEmbeddingsClient()
         self._vectorstore = vector_store or VectorStore()
-        self._chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        # Use SemanticChunker for code block and heading preservation
+        self._chunker = SemanticChunker(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            adaptive_threshold=800,  # Short pages stay as single chunk
+            preserve_code_blocks=True,
+            preserve_tables=True,
+            respect_headings=True,
+        )
         self._extract_cameras = extract_cameras
 
     async def fetch(self) -> list[Document]:
@@ -269,19 +277,27 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         processed: list[tuple[Document, list[Document]]] = []
 
         for doc in documents:
-            chunks = self._chunker.chunk_text(doc.text)
+            # Use semantic chunking with documentation content type
+            chunks = self._chunker.chunk_text(doc.text, content_type=ContentType.DOCUMENTATION)
             chunk_docs = []
 
             for chunk in chunks:
+                # Merge parent metadata with chunk-specific semantic metadata
+                chunk_metadata = {
+                    **doc.metadata,
+                    "chunk_index": chunk.chunk_index,
+                    "parent_id": doc.id,
+                }
+                # Include semantic metadata (section, heading_level, has_code, etc.)
+                for key, value in chunk.metadata.items():
+                    if key not in chunk_metadata:
+                        chunk_metadata[key] = value
+
                 chunk_docs.append(
                     Document(
                         id=str(uuid4()),  # Generate unique UUID for each chunk
                         text=chunk.text,
-                        metadata={
-                            **doc.metadata,
-                            "chunk_index": chunk.chunk_index,
-                            "parent_id": doc.id,
-                        },
+                        metadata=chunk_metadata,
                     )
                 )
 

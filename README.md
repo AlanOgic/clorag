@@ -11,6 +11,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 - **Camera Compatibility Database** - Structured camera info with automatic extraction from docs/support
 - **Camera Comparison** - Side-by-side comparison of up to 5 cameras with highlighted common specs
 - **FTS5 Full-Text Search** - SQLite FTS5 with BM25 ranking for fast camera search
+- **Support Cases Database** - SQLite storage for Gmail cases with FTS5 search and thread cleaning
 - **Search Analytics** - Track popular queries, response times, and usage patterns
 - **Session-Based Admin** - Secure login with signed cookies for all admin features
 - **Streaming Responses** - Real-time answer streaming for better UX
@@ -360,6 +361,7 @@ uv run rag-web
 | `/admin/knowledge` | Custom knowledge base: upload files or paste text |
 | `/admin/analytics` | Search analytics and statistics |
 | `/admin/drafts` | Draft auto-reply management |
+| `/admin/support-cases` | Browse and search ingested Gmail support cases |
 | `/admin/search-debug` | Debug RAG: view chunks, prompts, timing |
 | `/admin/docs` | Technical documentation |
 | `/admin/chunks` | Chunk editor: browse, search, edit, delete vectors |
@@ -448,6 +450,17 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 | PUT | `/api/admin/knowledge/{id}` | Update document |
 | DELETE | `/api/admin/knowledge/{id}` | Delete document |
 
+### Support Cases (Admin)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/support-cases` | List cases (paginated) |
+| GET | `/api/admin/support-cases/stats` | Statistics by category/product/quality |
+| GET | `/api/admin/support-cases/search?q=` | FTS5 full-text search |
+| GET | `/api/admin/support-cases/{id}` | Get case details |
+| GET | `/api/admin/support-cases/{id}/raw-thread` | Get cleaned raw thread |
+| DELETE | `/api/admin/support-cases/{id}` | Delete case |
+
 ### Graph (Admin)
 
 | Method | Endpoint | Description |
@@ -496,6 +509,7 @@ clorag/
          retriever.py      # Multi-source retriever
          database.py       # SQLite camera database
          analytics_db.py   # SQLite analytics database
+         support_case_db.py  # SQLite support cases database
       agent/
          tools.py          # MCP tools RAG
          prompts.py        # System prompts
@@ -531,6 +545,7 @@ clorag/
             admin_knowledge.html # Knowledge base (file upload)
             admin_analytics.html # Analytics dashboard
             admin_drafts.html    # Draft management
+            admin_support_cases.html # Support cases browser
             admin_search_debug.html  # Search debug
             admin_docs.html      # Technical documentation
             admin_chunks.html    # Chunk browser

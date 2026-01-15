@@ -522,7 +522,7 @@ wheels = [
 
 [[package]]
 name = "clorag"
-version = "0.5.3"
+version = "0.5.5"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
