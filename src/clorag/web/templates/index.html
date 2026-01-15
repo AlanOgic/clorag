@@ -13,43 +13,10 @@
     <!-- Mermaid diagram rendering (v11) -->
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        // Mermaid config - styling is handled by applyMermaidStyles() JavaScript function
         mermaid.initialize({
             startOnLoad: false,
-            theme: 'base',
-            themeVariables: {
-                // Primary: Default nodes - blue text matching stroke color
-                primaryColor: '#003366',
-                primaryTextColor: '#0077b6',
-                primaryBorderColor: '#0077b6',
-                // Secondary: Light blue background with dark text
-                secondaryColor: '#e8f4fc',
-                secondaryTextColor: '#003366',
-                secondaryBorderColor: '#0077b6',
-                // Tertiary: Light gray background with dark text
-                tertiaryColor: '#f5f5f5',
-                tertiaryTextColor: '#1c1e21',
-                tertiaryBorderColor: '#cccccc',
-                // Network wires in blue
-                lineColor: '#0077b6',
-                // General text colors - ensure dark text on light backgrounds
-                textColor: '#1c1e21',
-                mainBkg: '#ffffff',
-                // Node styling
-                nodeBorder: '#0077b6',
-                clusterBkg: '#f8f9fa',
-                clusterBorder: '#cccccc',
-                // Edge/link colors
-                edgeLabelBackground: '#ffffff',
-                // Note styling (for annotations)
-                noteBkgColor: '#fff8dc',
-                noteTextColor: '#1c1e21',
-                noteBorderColor: '#e6d9a8',
-                // Actor styling (for sequence diagrams)
-                actorBkg: '#003366',
-                actorTextColor: '#ffffff',
-                actorBorder: '#0077b6',
-                actorLineColor: '#0077b6'
-            },
+            theme: 'default',
             flowchart: {
                 useMaxWidth: true,
                 htmlLabels: true,
@@ -483,91 +450,11 @@
             color: #2e7d32;
         }
 
-        /* Mermaid diagram custom styling - Cameras (orange, rounded) */
-        .answer-content .mermaid-container svg .node.camera rect,
-        .answer-content .mermaid-container svg .node.camera polygon {
-            fill: #FFE0B2 !important;
-            stroke: #F57C00 !important;
-            rx: 10px;
-            ry: 10px;
-        }
-
-        .answer-content .mermaid-container svg .node.camera .nodeLabel {
-            color: #1c1e21 !important;
-            fill: #1c1e21 !important;
-        }
-
-        /* Cyanview devices (blue, default) - ensure white text */
-        .answer-content .mermaid-container svg .node.cyanview rect,
-        .answer-content .mermaid-container svg .node.cyanview polygon {
-            fill: #003366 !important;
-            stroke: #0077b6 !important;
-        }
-
-        .answer-content .mermaid-container svg .node.cyanview .nodeLabel,
-        .answer-content .mermaid-container svg .node.cyanview span {
-            color: #ffffff !important;
-            fill: #ffffff !important;
-        }
-
-        /* Network wires - blue solid stroke */
-        .answer-content .mermaid-container svg .edgePath.network path {
-            stroke: #0077b6 !important;
-            stroke-width: 2px !important;
-        }
-
-        /* Serial wires - orange solid stroke */
-        .answer-content .mermaid-container svg .edgePath.serial path {
-            stroke: #F57C00 !important;
-            stroke-width: 2px !important;
-        }
-
-        /* Control signal path (RCP to camera) - orange dotted stroke */
-        .answer-content .mermaid-container svg .edgePath.control path {
-            stroke: #F57C00 !important;
-            stroke-width: 2px !important;
-            stroke-dasharray: 5, 5 !important;
-        }
-
-        /* Default node styling - ensure readable text on all backgrounds */
-        .answer-content .mermaid-container svg .node rect,
-        .answer-content .mermaid-container svg .node polygon,
-        .answer-content .mermaid-container svg .node circle,
-        .answer-content .mermaid-container svg .node ellipse {
-            stroke-width: 2px !important;
-        }
-
-        /* Default node labels - dark text unless explicitly styled otherwise */
-        .answer-content .mermaid-container svg .node .nodeLabel {
-            color: #1c1e21 !important;
-            fill: #1c1e21 !important;
-        }
-
-        /* Navy/dark background nodes need white text */
-        .answer-content .mermaid-container svg .node[class*="primary"] .nodeLabel,
-        .answer-content .mermaid-container svg .node.default .nodeLabel {
-            color: #ffffff !important;
-            fill: #ffffff !important;
-        }
-
-        /* Subgraph/cluster labels */
-        .answer-content .mermaid-container svg .cluster-label .nodeLabel {
-            color: #1c1e21 !important;
-            fill: #1c1e21 !important;
-        }
-
-        /* Edge labels - ensure dark text on white background */
+        /* Mermaid styling is handled by applyMermaidStyles() in JavaScript */
+        /* Only keep edge label styling as CSS fallback */
         .answer-content .mermaid-container svg .edgeLabel {
-            background-color: #ffffff !important;
-            color: #1c1e21 !important;
-        }
-
-        .answer-content .mermaid-container svg .edgeLabel rect {
-            fill: #ffffff !important;
-        }
-
-        .answer-content .mermaid-container svg .edgeLabel span {
-            color: #1c1e21 !important;
+            background-color: #ffffff;
+            color: #1c1e21;
         }
 
         .results-header {
@@ -1309,42 +1196,54 @@
                                     'ptz', 'brc', 'aw-ue', 'cr-n'];
             const cyanviewKeywords = ['rcp', 'rio', 'ci0', 'vp4', 'cyanview'];
 
-            // Process all nodes
+            // Process all nodes - apply default navy styling first, then override for specific types
             const nodes = svg.querySelectorAll('.node');
             nodes.forEach(node => {
                 const label = node.querySelector('.nodeLabel');
                 const labelText = label ? label.textContent.toLowerCase() : '';
 
-                // Check if it's a camera node
+                // Find the shape element (rect, polygon, circle, ellipse)
+                const shape = node.querySelector('rect, polygon, circle, ellipse');
+
+                // Check if it's a camera or Cyanview node
                 const isCamera = cameraKeywords.some(kw => labelText.includes(kw));
                 const isCyanview = cyanviewKeywords.some(kw => labelText.includes(kw));
 
+                // Helper to style all text elements within a node
+                const styleNodeText = (node, color) => {
+                    // SVG text elements
+                    node.querySelectorAll('text, tspan, .nodeLabel').forEach(el => {
+                        el.setAttribute('fill', color);
+                        el.style.fill = color;
+                        el.style.color = color;
+                    });
+                    // HTML elements in foreignObject
+                    node.querySelectorAll('span, div, p, foreignObject *').forEach(el => {
+                        el.style.color = color;
+                        el.style.fill = color;
+                    });
+                };
+
                 if (isCamera && !isCyanview) {
-                    // Style as camera: light orange, black text, rounded
-                    const rect = node.querySelector('rect');
-                    if (rect) {
-                        rect.setAttribute('fill', '#FFE0B2');
-                        rect.setAttribute('stroke', '#F57C00');
-                        rect.setAttribute('stroke-width', '2');
-                        rect.setAttribute('rx', '10');
-                        rect.setAttribute('ry', '10');
+                    // Style as camera: light orange, dark text, rounded
+                    if (shape) {
+                        shape.setAttribute('fill', '#FFE0B2');
+                        shape.setAttribute('stroke', '#E65100');
+                        shape.setAttribute('stroke-width', '2');
+                        if (shape.tagName === 'rect') {
+                            shape.setAttribute('rx', '10');
+                            shape.setAttribute('ry', '10');
+                        }
                     }
-                    if (label) {
-                        label.style.fill = '#1c1e21';
-                        label.style.color = '#1c1e21';
+                    styleNodeText(node, '#1a1a1a');
+                } else {
+                    // Default style: dark navy background, white text
+                    if (shape) {
+                        shape.setAttribute('fill', '#1a2744');
+                        shape.setAttribute('stroke', '#0077b6');
+                        shape.setAttribute('stroke-width', '2');
                     }
-                } else if (isCyanview) {
-                    // Style as Cyanview device: blue, white text
-                    const rect = node.querySelector('rect');
-                    if (rect) {
-                        rect.setAttribute('fill', '#003366');
-                        rect.setAttribute('stroke', '#0077b6');
-                        rect.setAttribute('stroke-width', '2');
-                    }
-                    if (label) {
-                        label.style.fill = '#ffffff';
-                        label.style.color = '#ffffff';
-                    }
+                    styleNodeText(node, '#ffffff');
                 }
             });
 
