@@ -195,6 +195,34 @@ curl https://cyanview.cloud/api/admin/search-stats \
                 </div>
                 <p>Get a single camera by ID.</p>
 
+                <h3>Comparison & Related</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/cameras/compare</span>
+                </div>
+                <p>Compare multiple cameras side-by-side. Request body: <code>{"camera_ids": [1, 2, 3]}</code> (max 5).</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/cameras/{id}/related</span>
+                </div>
+                <p>Get cameras similar to the specified camera. Query param: <code>limit</code> (default: 5).</p>
+
+                <h3>Export/Import</h3>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/cameras/export.csv</span>
+                </div>
+                <p>Export cameras as CSV. Optional filters: <code>manufacturer</code>, <code>device_type</code>.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/cameras/import</span>
+                </div>
+                <p>Import cameras from CSV file (admin only). Uses multipart/form-data with <code>file</code> field. Upserts based on name + manufacturer.</p>
+
                 <h3>Admin Endpoints (Auth Required)</h3>
 
                 <div class="endpoint">

@@ -9,6 +9,8 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 - **Hybrid RAG Search** - Combines semantic (Voyage AI) and keyword (BM25) matching with RRF fusion
 - **Custom Knowledge Base** - Upload .txt, .md, .pdf files or paste text to add custom documents
 - **Camera Compatibility Database** - Structured camera info with automatic extraction from docs/support
+- **Camera Comparison** - Side-by-side comparison of up to 5 cameras with highlighted common specs
+- **FTS5 Full-Text Search** - SQLite FTS5 with BM25 ranking for fast camera search
 - **Search Analytics** - Track popular queries, response times, and usage patterns
 - **Session-Based Admin** - Secure login with signed cookies for all admin features
 - **Streaming Responses** - Real-time answer streaming for better UX
@@ -323,6 +325,16 @@ uv run draft-support --thread THREAD_ID
 uv run draft-support --max 20
 ```
 
+### Database Maintenance
+
+```bash
+# Rebuild camera FTS5 search index
+uv run rebuild-fts
+
+# Check FTS index status
+uv run rebuild-fts --check
+```
+
 ### Web Interface
 
 ```bash
@@ -381,9 +393,12 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/cameras` | List all cameras (with filters) |
-| GET | `/api/cameras/search?q=` | Search cameras |
+| GET | `/api/cameras/search?q=` | Search cameras (FTS5 with BM25 ranking) |
 | GET | `/api/cameras/{id}` | Get single camera |
+| GET | `/api/cameras/{id}/related` | Get similar cameras |
 | GET | `/api/cameras/stats` | Database statistics |
+| POST | `/api/cameras/compare` | Compare multiple cameras (max 5) |
+| GET | `/api/cameras/export.csv` | Export cameras as CSV |
 
 ### Cameras (Admin)
 
@@ -392,6 +407,7 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 | POST | `/api/admin/cameras` | Create camera |
 | PUT | `/api/admin/cameras/{id}` | Update camera |
 | DELETE | `/api/admin/cameras/{id}` | Delete camera |
+| POST | `/api/admin/cameras/import` | Import cameras from CSV |
 
 ### Analytics (Admin)
 

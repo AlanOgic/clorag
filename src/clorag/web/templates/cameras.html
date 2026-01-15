@@ -509,6 +509,340 @@
         .cameras-table tbody tr {
             cursor: pointer;
         }
+
+        /* Selected row highlight for keyboard navigation */
+        .cameras-table tbody tr.selected {
+            background: #e3f2fd !important;
+            outline: 2px solid var(--cyan-blue);
+            outline-offset: -2px;
+        }
+
+        /* Keyboard shortcuts hint bar */
+        .keyboard-hints {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            padding: 0.5rem 1rem;
+            background: #f0f4f8;
+            border-top: 1px solid #e0e0e0;
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .keyboard-hints kbd {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            font-family: monospace;
+            font-size: 0.7rem;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+            margin-right: 0.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .keyboard-hints {
+                display: none;
+            }
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+
+        .pagination__info {
+            margin-right: 1rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .pagination__btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            height: 36px;
+            padding: 0 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            color: #333;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .pagination__btn:hover:not(.pagination__btn--disabled) {
+            background: #f0f4f8;
+            border-color: var(--cyan-blue);
+            color: var(--cyan-blue);
+        }
+
+        .pagination__btn--active {
+            background: var(--cyan-blue);
+            border-color: var(--cyan-blue);
+            color: white;
+        }
+
+        .pagination__btn--active:hover {
+            background: var(--cyan-dark);
+        }
+
+        .pagination__btn--disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination__ellipsis {
+            color: #999;
+            padding: 0 0.25rem;
+        }
+
+        .pagination__size {
+            margin-left: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .pagination__size select {
+            padding: 0.25rem 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        /* Comparison Feature */
+        .compare-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--cyanview-navy);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 200;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
+        }
+
+        .compare-bar.visible {
+            transform: translateY(0);
+        }
+
+        .compare-bar__cameras {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .compare-bar__camera {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.15);
+            padding: 0.5rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .compare-bar__camera-remove {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 0;
+            font-size: 1.1rem;
+            line-height: 1;
+            opacity: 0.7;
+        }
+
+        .compare-bar__camera-remove:hover {
+            opacity: 1;
+        }
+
+        .compare-bar__actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .compare-bar__btn {
+            padding: 0.6rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .compare-bar__btn--primary {
+            background: var(--cyan-blue);
+            color: white;
+            border: none;
+        }
+
+        .compare-bar__btn--primary:hover {
+            background: #0095cc;
+        }
+
+        .compare-bar__btn--secondary {
+            background: transparent;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .compare-bar__btn--secondary:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .compare-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--cyan-blue);
+        }
+
+        /* Comparison Modal */
+        .compare-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .compare-modal.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .compare-modal__content {
+            background: white;
+            border-radius: 12px;
+            max-width: 95vw;
+            max-height: 90vh;
+            overflow: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .compare-modal__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+            border-radius: 12px 12px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .compare-modal__title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .compare-modal__close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0.25rem;
+            line-height: 1;
+        }
+
+        .compare-modal__close:hover {
+            color: #333;
+        }
+
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .compare-table th,
+        .compare-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+
+        .compare-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #666;
+            position: sticky;
+            left: 0;
+            min-width: 140px;
+        }
+
+        .compare-table td {
+            min-width: 200px;
+        }
+
+        .compare-table__camera-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--cyanview-navy);
+        }
+
+        .compare-table__manufacturer {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .compare-table__tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+
+        .compare-table__tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .compare-table__tag--match {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .compare-table__empty {
+            color: #999;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -525,6 +859,30 @@
             </div>
             <div class="modal-body" id="modalBody">
                 <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Comparison Bar (sticky bottom) -->
+    <div id="compareBar" class="compare-bar">
+        <div class="compare-bar__cameras" id="compareBarCameras">
+            <!-- Selected cameras appear here -->
+        </div>
+        <div class="compare-bar__actions">
+            <button class="compare-bar__btn compare-bar__btn--secondary" onclick="clearComparison()">Clear</button>
+            <button class="compare-bar__btn compare-bar__btn--primary" onclick="showComparison()">Compare</button>
+        </div>
+    </div>
+
+    <!-- Comparison Modal -->
+    <div id="compareModal" class="compare-modal" onclick="if(event.target === this) closeCompareModal()">
+        <div class="compare-modal__content">
+            <div class="compare-modal__header">
+                <h2 class="compare-modal__title">Camera Comparison</h2>
+                <button class="compare-modal__close" onclick="closeCompareModal()">&times;</button>
+            </div>
+            <div id="compareModalBody">
+                <!-- Comparison table populated by JavaScript -->
             </div>
         </div>
     </div>
@@ -603,6 +961,7 @@
             <table class="cameras-table" id="camerasTable">
                 <thead>
                     <tr>
+                        <th style="width: 40px;"><input type="checkbox" class="compare-checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)" title="Select all for comparison"></th>
                         <th data-sort="type" onclick="sortTable('type')"></th>
                         <th data-sort="name" onclick="sortTable('name')">Device</th>
                         <th data-sort="ports" onclick="sortTable('ports')">Ports</th>
@@ -620,7 +979,10 @@
                         data-ports="{{ camera.ports | join(',') | lower }}"
                         data-protocols="{{ camera.protocols | join(',') | lower }}"
                         data-camera-id="{{ camera.id }}"
-                        onclick="openCameraModal({{ camera.id }})">
+                        onclick="if(event.target.type !== 'checkbox') openCameraModal({{ camera.id }})">
+                        <td onclick="event.stopPropagation()">
+                            <input type="checkbox" class="compare-checkbox" data-camera-id="{{ camera.id }}" onclick="toggleCompareCamera({{ camera.id }}, '{{ camera.name | e }}')">
+                        </td>
                         <td>
                             {% if camera.device_type %}
                             {% set dtype = camera.device_type.value %}
@@ -723,6 +1085,71 @@
                     {% endfor %}
                 </tbody>
             </table>
+            <!-- Pagination controls -->
+            {% if total_pages > 1 %}
+            <div class="pagination" id="pagination">
+                <span class="pagination__info">
+                    Showing {{ (page - 1) * page_size + 1 }}-{{ [page * page_size, total_count] | min }} of {{ total_count }}
+                </span>
+
+                <!-- Previous button -->
+                {% if page > 1 %}
+                <a href="javascript:void(0)" onclick="goToPage({{ page - 1 }})" class="pagination__btn" title="Previous page">‹</a>
+                {% else %}
+                <span class="pagination__btn pagination__btn--disabled">‹</span>
+                {% endif %}
+
+                <!-- Page numbers -->
+                {% set start_page = [1, page - 2] | max %}
+                {% set end_page = [total_pages, page + 2] | min %}
+
+                {% if start_page > 1 %}
+                <a href="javascript:void(0)" onclick="goToPage(1)" class="pagination__btn">1</a>
+                {% if start_page > 2 %}
+                <span class="pagination__ellipsis">…</span>
+                {% endif %}
+                {% endif %}
+
+                {% for p in range(start_page, end_page + 1) %}
+                {% if p == page %}
+                <span class="pagination__btn pagination__btn--active">{{ p }}</span>
+                {% else %}
+                <a href="javascript:void(0)" onclick="goToPage({{ p }})" class="pagination__btn">{{ p }}</a>
+                {% endif %}
+                {% endfor %}
+
+                {% if end_page < total_pages %}
+                {% if end_page < total_pages - 1 %}
+                <span class="pagination__ellipsis">…</span>
+                {% endif %}
+                <a href="javascript:void(0)" onclick="goToPage({{ total_pages }})" class="pagination__btn">{{ total_pages }}</a>
+                {% endif %}
+
+                <!-- Next button -->
+                {% if page < total_pages %}
+                <a href="javascript:void(0)" onclick="goToPage({{ page + 1 }})" class="pagination__btn" title="Next page">›</a>
+                {% else %}
+                <span class="pagination__btn pagination__btn--disabled">›</span>
+                {% endif %}
+
+                <!-- Page size selector -->
+                <div class="pagination__size">
+                    <label for="pageSizeSelect">Per page:</label>
+                    <select id="pageSizeSelect" onchange="changePageSize(this.value)">
+                        <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        <!-- Keyboard shortcuts hint bar -->
+        <div class="keyboard-hints">
+            <span><kbd>/</kbd> Search</span>
+            <span><kbd>j</kbd><kbd>k</kbd> Navigate</span>
+            <span><kbd>Enter</kbd> Open details</span>
+            <span><kbd>Esc</kbd> Close modal</span>
         </div>
         {% else %}
         <!-- Empty State -->
@@ -778,6 +1205,49 @@
             }
         }
 
+        // DOM helper functions for XSS-safe rendering
+        function createSection(labelText, contentFn) {
+            const section = document.createElement('div');
+            section.className = 'detail-section';
+
+            const label = document.createElement('div');
+            label.className = 'detail-label';
+            label.textContent = labelText;
+            section.appendChild(label);
+
+            contentFn(section);
+            return section;
+        }
+
+        function createTagsContainer(items, tagClass, emptyText) {
+            const container = document.createElement('div');
+            container.className = 'detail-tags';
+
+            if (items && items.length > 0) {
+                items.forEach(item => {
+                    const tag = document.createElement('span');
+                    tag.className = tagClass ? `tag ${tagClass}` : 'tag';
+                    tag.textContent = item;
+                    container.appendChild(tag);
+                });
+            } else {
+                const empty = document.createElement('span');
+                empty.className = 'detail-empty';
+                empty.textContent = emptyText || 'None specified';
+                container.appendChild(empty);
+            }
+            return container;
+        }
+
+        function createLink(href, text) {
+            const link = document.createElement('a');
+            link.href = href;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.textContent = text;
+            return link;
+        }
+
         function openCameraModal(cameraId) {
             const camera = camerasData[cameraId];
             if (!camera) return;
@@ -787,107 +1257,194 @@
             document.getElementById('modalManufacturer').textContent = camera.manufacturer || 'Unknown Manufacturer';
             document.getElementById('modalCodeModel').textContent = camera.code_model || '';
 
-            // Build modal body content
-            let html = '';
+            // Clear and build modal body using DOM APIs
+            const modalBody = document.getElementById('modalBody');
+            modalBody.innerHTML = '';
 
             // Device Type
             if (camera.device_type) {
                 const typeLabel = camera.device_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                html += `<div class="detail-section">
-                    <div class="detail-label">Device Type</div>
-                    <div class="detail-tags">
-                        <span class="tag tag--type">${escapeHtml(typeLabel)}</span>
-                    </div>
-                </div>`;
+                modalBody.appendChild(createSection('Device Type', section => {
+                    section.appendChild(createTagsContainer([typeLabel], 'tag--type'));
+                }));
             }
 
             // Ports
-            html += `<div class="detail-section">
-                <div class="detail-label">Ports</div>
-                <div class="detail-tags">`;
-            if (camera.ports && camera.ports.length > 0) {
-                camera.ports.forEach(port => {
-                    html += `<span class="tag">${escapeHtml(port)}</span>`;
-                });
-            } else {
-                html += `<span class="detail-empty">None specified</span>`;
-            }
-            html += `</div></div>`;
+            modalBody.appendChild(createSection('Ports', section => {
+                section.appendChild(createTagsContainer(camera.ports, '', 'None specified'));
+            }));
 
             // Protocols
-            html += `<div class="detail-section">
-                <div class="detail-label">Protocols</div>
-                <div class="detail-tags">`;
-            if (camera.protocols && camera.protocols.length > 0) {
-                camera.protocols.forEach(protocol => {
-                    html += `<span class="tag tag--protocol">${escapeHtml(protocol)}</span>`;
-                });
-            } else {
-                html += `<span class="detail-empty">None specified</span>`;
-            }
-            html += `</div></div>`;
+            modalBody.appendChild(createSection('Protocols', section => {
+                section.appendChild(createTagsContainer(camera.protocols, 'tag--protocol', 'None specified'));
+            }));
 
             // Supported Controls
             const controlCount = camera.supported_controls ? camera.supported_controls.length : 0;
-            html += `<div class="detail-section">
-                <div class="detail-label">Supported Controls (${controlCount})</div>
-                <div class="detail-tags">`;
-            if (camera.supported_controls && camera.supported_controls.length > 0) {
-                camera.supported_controls.forEach(control => {
-                    html += `<span class="tag tag--control">${escapeHtml(control)}</span>`;
-                });
-            } else {
-                html += `<span class="detail-empty">None specified</span>`;
-            }
-            html += `</div></div>`;
+            modalBody.appendChild(createSection(`Supported Controls (${controlCount})`, section => {
+                section.appendChild(createTagsContainer(camera.supported_controls, 'tag--control', 'None specified'));
+            }));
 
             // Notes
             const noteCount = camera.notes ? camera.notes.length : 0;
-            html += `<div class="detail-section">
-                <div class="detail-label">Notes (${noteCount})</div>`;
-            if (camera.notes && camera.notes.length > 0) {
-                html += `<ul class="detail-notes">`;
-                camera.notes.forEach(note => {
-                    html += `<li>${escapeHtml(note)}</li>`;
-                });
-                html += `</ul>`;
-            } else {
-                html += `<span class="detail-empty">No notes</span>`;
-            }
-            html += `</div>`;
+            modalBody.appendChild(createSection(`Notes (${noteCount})`, section => {
+                if (camera.notes && camera.notes.length > 0) {
+                    const notesList = document.createElement('ul');
+                    notesList.className = 'detail-notes';
+                    camera.notes.forEach(note => {
+                        const li = document.createElement('li');
+                        li.textContent = note;
+                        notesList.appendChild(li);
+                    });
+                    section.appendChild(notesList);
+                } else {
+                    const empty = document.createElement('span');
+                    empty.className = 'detail-empty';
+                    empty.textContent = 'No notes';
+                    section.appendChild(empty);
+                }
+            }));
 
             // Documentation Links (validate URLs before rendering)
             const hasDocUrl = isSafeUrl(camera.doc_url);
             const hasMfrUrl = isSafeUrl(camera.manufacturer_url);
             if (hasDocUrl || hasMfrUrl) {
-                html += `<div class="detail-section">
-                    <div class="detail-label">Documentation</div>
-                    <div class="detail-links">`;
-                if (hasDocUrl) {
-                    html += `<a href="${escapeHtml(camera.doc_url)}" target="_blank" rel="noopener">Cyanview Docs</a>`;
-                }
-                if (hasMfrUrl) {
-                    html += `<a href="${escapeHtml(camera.manufacturer_url)}" target="_blank" rel="noopener">Manufacturer Site</a>`;
-                }
-                html += `</div></div>`;
+                modalBody.appendChild(createSection('Documentation', section => {
+                    const linksContainer = document.createElement('div');
+                    linksContainer.className = 'detail-links';
+                    if (hasDocUrl) {
+                        linksContainer.appendChild(createLink(camera.doc_url, 'Cyanview Docs'));
+                    }
+                    if (hasMfrUrl) {
+                        linksContainer.appendChild(createLink(camera.manufacturer_url, 'Manufacturer Site'));
+                    }
+                    section.appendChild(linksContainer);
+                }));
             }
 
-            document.getElementById('modalBody').innerHTML = html;
             cameraModal.classList.remove('hidden');
+
+            // Focus trap: focus close button for accessibility
+            document.querySelector('.modal-close').focus();
         }
 
         function closeModal() {
             cameraModal.classList.add('hidden');
+            // Return focus to selected row or table
+            const selectedRow = document.querySelector('#camerasTable tbody tr.selected');
+            if (selectedRow) {
+                selectedRow.focus();
+            }
         }
 
-        // Close modal on Escape key
+        // Keyboard navigation state
+        let selectedRowIndex = -1;
+        let currentSort = { column: null, direction: 'asc' };
+
+        function getVisibleRows() {
+            return Array.from(document.querySelectorAll('#camerasTable tbody tr'))
+                .filter(row => row.style.display !== 'none');
+        }
+
+        function selectRow(index) {
+            const rows = getVisibleRows();
+            if (rows.length === 0) return;
+
+            // Clear previous selection
+            rows.forEach(row => row.classList.remove('selected'));
+
+            // Clamp index to valid range
+            if (index < 0) index = 0;
+            if (index >= rows.length) index = rows.length - 1;
+
+            selectedRowIndex = index;
+            const row = rows[index];
+            row.classList.add('selected');
+
+            // Scroll row into view if needed
+            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+
+        function openSelectedCamera() {
+            const rows = getVisibleRows();
+            if (selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
+                const cameraId = rows[selectedRowIndex].dataset.cameraId;
+                if (cameraId) {
+                    openCameraModal(parseInt(cameraId));
+                }
+            }
+        }
+
+        // Comprehensive keyboard shortcuts
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && !cameraModal.classList.contains('hidden')) {
-                closeModal();
+            const modalOpen = !cameraModal.classList.contains('hidden');
+            const searchInput = document.getElementById('searchInput');
+            const isTyping = document.activeElement.tagName === 'INPUT' ||
+                             document.activeElement.tagName === 'TEXTAREA' ||
+                             document.activeElement.tagName === 'SELECT';
+
+            // Escape: Close modal or clear search
+            if (e.key === 'Escape') {
+                if (modalOpen) {
+                    closeModal();
+                    e.preventDefault();
+                } else if (isTyping && searchInput === document.activeElement) {
+                    searchInput.blur();
+                    searchInput.value = '';
+                    filterTable();
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            // Don't handle navigation shortcuts when typing
+            if (isTyping) return;
+
+            // / : Focus search input
+            if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+                return;
+            }
+
+            // j or ArrowDown: Next row
+            if (e.key === 'j' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectRow(selectedRowIndex + 1);
+                return;
+            }
+
+            // k or ArrowUp: Previous row
+            if (e.key === 'k' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectRow(selectedRowIndex - 1);
+                return;
+            }
+
+            // Enter or o: Open selected camera modal
+            if (e.key === 'Enter' || e.key === 'o') {
+                e.preventDefault();
+                openSelectedCamera();
+                return;
+            }
+
+            // g then g: Go to top
+            if (e.key === 'g') {
+                // Simple version: just go to top on single g
+                e.preventDefault();
+                selectRow(0);
+                return;
+            }
+
+            // G (shift+g): Go to bottom
+            if (e.key === 'G') {
+                e.preventDefault();
+                const rows = getVisibleRows();
+                selectRow(rows.length - 1);
+                return;
             }
         });
-
-        let currentSort = { column: null, direction: 'asc' };
 
         function filterTable() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -918,7 +1475,38 @@
                 }
 
                 row.style.display = visible ? '' : 'none';
+                row.classList.remove('selected');
             });
+
+            // Reset selection when filtering
+            selectedRowIndex = -1;
+        }
+
+        // Get current URL params for preserving state
+        function getCurrentParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                manufacturer: params.get('manufacturer') || '',
+                device_type: params.get('device_type') || '',
+                port: params.get('port') || '',
+                protocol: params.get('protocol') || '',
+                page_size: params.get('page_size') || '50',
+            };
+        }
+
+        function buildUrl(overrides = {}) {
+            const current = getCurrentParams();
+            const merged = { ...current, ...overrides };
+
+            const params = [];
+            if (merged.manufacturer) params.push('manufacturer=' + encodeURIComponent(merged.manufacturer));
+            if (merged.device_type) params.push('device_type=' + encodeURIComponent(merged.device_type));
+            if (merged.port) params.push('port=' + encodeURIComponent(merged.port));
+            if (merged.protocol) params.push('protocol=' + encodeURIComponent(merged.protocol));
+            if (merged.page && merged.page !== '1') params.push('page=' + encodeURIComponent(merged.page));
+            if (merged.page_size && merged.page_size !== '50') params.push('page_size=' + encodeURIComponent(merged.page_size));
+
+            return '/cameras' + (params.length ? '?' + params.join('&') : '');
         }
 
         function applyFilters() {
@@ -927,14 +1515,23 @@
             const port = document.getElementById('portFilter').value;
             const protocol = document.getElementById('protocolFilter').value;
 
-            // Server-side filters (manufacturer, device_type)
-            const params = [];
-            if (manufacturer) params.push('manufacturer=' + encodeURIComponent(manufacturer));
-            if (deviceType) params.push('device_type=' + encodeURIComponent(deviceType));
-            if (port) params.push('port=' + encodeURIComponent(port));
-            if (protocol) params.push('protocol=' + encodeURIComponent(protocol));
+            // Reset to page 1 when filters change
+            window.location.href = buildUrl({
+                manufacturer: manufacturer,
+                device_type: deviceType,
+                port: port,
+                protocol: protocol,
+                page: '1',
+            });
+        }
 
-            window.location.href = '/cameras' + (params.length ? '?' + params.join('&') : '');
+        function goToPage(page) {
+            window.location.href = buildUrl({ page: String(page) });
+        }
+
+        function changePageSize(size) {
+            // Reset to page 1 when page size changes
+            window.location.href = buildUrl({ page_size: size, page: '1' });
         }
 
         function sortTable(column) {
@@ -1039,6 +1636,256 @@
             link.click();
             URL.revokeObjectURL(link.href);
         }
+
+        // ==========================================
+        // Camera Comparison Feature
+        // ==========================================
+
+        const selectedCameras = new Map(); // id -> name
+
+        function toggleCompareCamera(cameraId, cameraName) {
+            if (selectedCameras.has(cameraId)) {
+                selectedCameras.delete(cameraId);
+            } else {
+                if (selectedCameras.size >= 5) {
+                    alert('Maximum 5 cameras can be compared at once');
+                    // Uncheck the checkbox
+                    const checkbox = document.querySelector(`input[data-camera-id="${cameraId}"]`);
+                    if (checkbox) checkbox.checked = false;
+                    return;
+                }
+                selectedCameras.set(cameraId, cameraName);
+            }
+            updateCompareBar();
+        }
+
+        function updateCompareBar() {
+            const compareBar = document.getElementById('compareBar');
+            const camerasContainer = document.getElementById('compareBarCameras');
+
+            if (selectedCameras.size === 0) {
+                compareBar.classList.remove('visible');
+                return;
+            }
+
+            compareBar.classList.add('visible');
+
+            // Update cameras list
+            camerasContainer.innerHTML = '';
+            selectedCameras.forEach((name, id) => {
+                const chip = document.createElement('span');
+                chip.className = 'compare-bar__camera';
+                chip.innerHTML = `
+                    ${name}
+                    <button class="compare-bar__camera-remove" onclick="removeFromComparison(${id})">&times;</button>
+                `;
+                camerasContainer.appendChild(chip);
+            });
+        }
+
+        function removeFromComparison(cameraId) {
+            selectedCameras.delete(cameraId);
+            // Uncheck the checkbox
+            const checkbox = document.querySelector(`input[data-camera-id="${cameraId}"]`);
+            if (checkbox) checkbox.checked = false;
+            updateCompareBar();
+        }
+
+        function clearComparison() {
+            selectedCameras.clear();
+            // Uncheck all checkboxes
+            document.querySelectorAll('.compare-checkbox').forEach(cb => cb.checked = false);
+            updateCompareBar();
+        }
+
+        function toggleSelectAll(masterCheckbox) {
+            const visibleRows = Array.from(document.querySelectorAll('#camerasTable tbody tr'))
+                .filter(row => row.style.display !== 'none')
+                .slice(0, 5); // Limit to 5
+
+            if (masterCheckbox.checked) {
+                clearComparison();
+                visibleRows.forEach(row => {
+                    const cameraId = parseInt(row.dataset.cameraId);
+                    const nameEl = row.querySelector('.camera-name');
+                    const cameraName = nameEl ? nameEl.textContent.trim() : `Camera ${cameraId}`;
+                    const checkbox = row.querySelector('.compare-checkbox');
+                    if (checkbox && selectedCameras.size < 5) {
+                        checkbox.checked = true;
+                        selectedCameras.set(cameraId, cameraName);
+                    }
+                });
+            } else {
+                clearComparison();
+            }
+            updateCompareBar();
+        }
+
+        async function showComparison() {
+            if (selectedCameras.size < 2) {
+                alert('Select at least 2 cameras to compare');
+                return;
+            }
+
+            const cameraIds = Array.from(selectedCameras.keys());
+
+            try {
+                const response = await fetch('/api/cameras/compare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cameraIds)
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch cameras');
+
+                const cameras = await response.json();
+                renderComparisonTable(cameras);
+                document.getElementById('compareModal').classList.add('visible');
+                document.body.style.overflow = 'hidden';
+            } catch (error) {
+                console.error('Comparison error:', error);
+                alert('Failed to load comparison data');
+            }
+        }
+
+        function closeCompareModal() {
+            document.getElementById('compareModal').classList.remove('visible');
+            document.body.style.overflow = '';
+        }
+
+        function renderComparisonTable(cameras) {
+            const modalBody = document.getElementById('compareModalBody');
+
+            // Find common values for highlighting
+            const allPorts = cameras.map(c => new Set(c.ports || []));
+            const allProtocols = cameras.map(c => new Set(c.protocols || []));
+            const allControls = cameras.map(c => new Set(c.supported_controls || []));
+
+            const commonPorts = findCommonValues(allPorts);
+            const commonProtocols = findCommonValues(allProtocols);
+            const commonControls = findCommonValues(allControls);
+
+            // Build comparison table (transposed - specs as rows, cameras as columns)
+            let html = '<table class="compare-table"><tbody>';
+
+            // Camera names row
+            html += '<tr><th>Camera</th>';
+            cameras.forEach(cam => {
+                html += `<td>
+                    <div class="compare-table__camera-name">${escapeHtml(cam.name)}</div>
+                    <div class="compare-table__manufacturer">${escapeHtml(cam.manufacturer || '')}</div>
+                </td>`;
+            });
+            html += '</tr>';
+
+            // Code Model row
+            html += '<tr><th>Code Model</th>';
+            cameras.forEach(cam => {
+                html += `<td>${cam.code_model ? escapeHtml(cam.code_model) : '<span class="compare-table__empty">-</span>'}</td>`;
+            });
+            html += '</tr>';
+
+            // Device Type row
+            html += '<tr><th>Device Type</th>';
+            cameras.forEach(cam => {
+                const dtype = cam.device_type ? cam.device_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : '-';
+                html += `<td>${dtype}</td>`;
+            });
+            html += '</tr>';
+
+            // Ports row
+            html += '<tr><th>Ports</th>';
+            cameras.forEach(cam => {
+                if (cam.ports && cam.ports.length > 0) {
+                    html += '<td><div class="compare-table__tags">';
+                    cam.ports.forEach(port => {
+                        const isCommon = commonPorts.has(port);
+                        html += `<span class="compare-table__tag ${isCommon ? 'compare-table__tag--match' : ''}">${escapeHtml(port)}</span>`;
+                    });
+                    html += '</div></td>';
+                } else {
+                    html += '<td><span class="compare-table__empty">None</span></td>';
+                }
+            });
+            html += '</tr>';
+
+            // Protocols row
+            html += '<tr><th>Protocols</th>';
+            cameras.forEach(cam => {
+                if (cam.protocols && cam.protocols.length > 0) {
+                    html += '<td><div class="compare-table__tags">';
+                    cam.protocols.forEach(protocol => {
+                        const isCommon = commonProtocols.has(protocol);
+                        html += `<span class="compare-table__tag ${isCommon ? 'compare-table__tag--match' : ''}">${escapeHtml(protocol)}</span>`;
+                    });
+                    html += '</div></td>';
+                } else {
+                    html += '<td><span class="compare-table__empty">None</span></td>';
+                }
+            });
+            html += '</tr>';
+
+            // Controls row
+            html += '<tr><th>Controls</th>';
+            cameras.forEach(cam => {
+                if (cam.supported_controls && cam.supported_controls.length > 0) {
+                    html += '<td><div class="compare-table__tags">';
+                    cam.supported_controls.forEach(control => {
+                        const isCommon = commonControls.has(control);
+                        html += `<span class="compare-table__tag ${isCommon ? 'compare-table__tag--match' : ''}">${escapeHtml(control)}</span>`;
+                    });
+                    html += '</div></td>';
+                } else {
+                    html += '<td><span class="compare-table__empty">None</span></td>';
+                }
+            });
+            html += '</tr>';
+
+            // Notes row
+            html += '<tr><th>Notes</th>';
+            cameras.forEach(cam => {
+                if (cam.notes && cam.notes.length > 0) {
+                    html += `<td><ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem;">`;
+                    cam.notes.forEach(note => {
+                        html += `<li>${escapeHtml(note)}</li>`;
+                    });
+                    html += '</ul></td>';
+                } else {
+                    html += '<td><span class="compare-table__empty">-</span></td>';
+                }
+            });
+            html += '</tr>';
+
+            html += '</tbody></table>';
+            modalBody.innerHTML = html;
+        }
+
+        function findCommonValues(sets) {
+            if (sets.length === 0) return new Set();
+            const common = new Set(sets[0]);
+            for (let i = 1; i < sets.length; i++) {
+                for (const val of common) {
+                    if (!sets[i].has(val)) {
+                        common.delete(val);
+                    }
+                }
+            }
+            return common;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close comparison modal on Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('compareModal').classList.contains('visible')) {
+                closeCompareModal();
+                e.preventDefault();
+            }
+        });
     </script>
 </body>
 </html>

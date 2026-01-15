@@ -2,6 +2,49 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.5.4] - 2026-01-15
+
+### Added
+- **Camera Database Performance (Phase 3)**
+  - FTS5 full-text search with BM25 ranking and Porter stemming for fast camera search
+  - Thread-safe TTL cache (100 entries, 5-minute TTL) for list/search/stats queries
+  - SQLite connection pool (5 connections) with WAL mode and 64MB cache
+  - Covering index for optimized list query patterns
+  - Automatic FTS index corruption recovery
+
+- **Camera Features (Phase 4)**
+  - Camera comparison: Select up to 5 cameras for side-by-side spec comparison
+  - Comparison modal with highlighted common values (green tags)
+  - Related cameras API: Find similar cameras based on manufacturer, device type, ports, protocols
+  - CSV export: Download all cameras or filtered subset as CSV
+  - CSV import: Bulk upload cameras via CSV file (admin only, upsert on name+manufacturer)
+
+- **New CLI Command**
+  - `uv run rebuild-fts` - Rebuild camera FTS5 search index
+  - `uv run rebuild-fts --check` - Check FTS index status without rebuilding
+
+- **New API Endpoints**
+  - `GET /api/cameras/{id}/related` - Get similar cameras
+  - `POST /api/cameras/compare` - Compare multiple cameras (max 5)
+  - `GET /api/cameras/export.csv` - Export cameras as CSV
+  - `POST /api/admin/cameras/import` - Import cameras from CSV (admin)
+
+- **New Database Methods**
+  - `CameraDatabase.get_cameras_by_ids()` - Get multiple cameras by ID list
+  - `CameraDatabase.find_related_cameras()` - Similarity-based camera search
+  - `CameraDatabase.rebuild_fts_index()` - Rebuild FTS5 index with corruption recovery
+
+### Changed
+- Camera search now uses FTS5 with BM25 ranking (fallback to LIKE for unsupported queries)
+- Admin camera list now uses server-side pagination (50 cameras per page)
+- Camera list/search/stats queries are cached with automatic invalidation on writes
+
+### Files
+- `src/clorag/core/database.py` - Added TTLCache, ConnectionPool, FTS5, new query methods
+- `src/clorag/scripts/rebuild_fts.py` - New CLI script for FTS index maintenance
+- `src/clorag/web/app.py` - New camera API endpoints
+- `src/clorag/web/templates/cameras.html` - Comparison UI with checkboxes and modal
+
 ## [0.5.3] - 2026-01-14
 
 ### Fixed

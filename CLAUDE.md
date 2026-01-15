@@ -25,6 +25,7 @@ uv run import-docs ./folder --category pre_sales  # Bulk import custom docs
 uv run enrich-cameras                      # Extract camera info from docs
 uv run populate-graph                      # Build Neo4j knowledge graph
 uv run draft-support                       # Auto-reply drafts (--preview)
+uv run rebuild-fts                         # Rebuild camera FTS5 index
 
 # Quality
 uv run ruff check src/ && uv run mypy src/clorag --strict
@@ -92,6 +93,14 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Anonymization**: Gmail threads use placeholders (`[SERIAL:XXX-N]`, `[EMAIL-N]`) before LLM processing
 - **Human edits preserved**: Admin-modified chunks/cameras are NOT overwritten by automated ingestion
 - **Camera extraction**: Haiku extracts camera info during ingestion; upsert merges multiple sources
+
+### Camera Database
+- **FTS5 search**: Full-text search with BM25 ranking and Porter stemming via SQLite FTS5 virtual table
+- **TTL cache**: Thread-safe LRU cache (100 entries, 5-min TTL) for list/search/stats queries
+- **Connection pool**: 5-connection pool with WAL mode, 64MB cache, automatic corruption recovery
+- **Comparison**: Side-by-side comparison of up to 5 cameras with highlighted common specs
+- **Related cameras**: Similarity scoring based on manufacturer, device_type, ports, protocols
+- **CSV import/export**: Bulk data management with upsert logic (name + manufacturer)
 
 ### Security
 - Session-based admin auth with brute force protection (5 attempts → 5min lockout per IP)

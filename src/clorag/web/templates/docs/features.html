@@ -200,6 +200,7 @@ uv run draft-support --max 20</code></pre>
                     <tr><td>name</td><td>TEXT</td><td>Camera model name</td></tr>
                     <tr><td>manufacturer</td><td>TEXT</td><td>Manufacturer (Canon, Sony, etc.)</td></tr>
                     <tr><td>device_type</td><td>TEXT</td><td>Type (cinema, broadcast, PTZ, etc.)</td></tr>
+                    <tr><td>code_model</td><td>TEXT</td><td>Internal model code</td></tr>
                     <tr><td>ports</td><td>JSON</td><td>Physical connection ports</td></tr>
                     <tr><td>protocols</td><td>JSON</td><td>Communication protocols</td></tr>
                     <tr><td>supported_controls</td><td>JSON</td><td>Controllable features</td></tr>
@@ -208,6 +209,15 @@ uv run draft-support --max 20</code></pre>
                     <tr><td>manufacturer_url</td><td>TEXT</td><td>Manufacturer product page</td></tr>
                     <tr><td>source</td><td>TEXT</td><td>Data source (documentation, support_case, manual)</td></tr>
                 </table>
+
+                <h3>Performance Features</h3>
+                <p>The camera database includes several performance optimizations:</p>
+                <ul>
+                    <li><strong>FTS5 Full-Text Search</strong> - SQLite FTS5 virtual table with BM25 ranking and Porter stemming for fast search</li>
+                    <li><strong>TTL Cache</strong> - Thread-safe LRU cache (100 entries, 5-minute TTL) for query results</li>
+                    <li><strong>Connection Pool</strong> - 5-connection pool with WAL mode and 64MB SQLite cache</li>
+                    <li><strong>Covering Index</strong> - Optimized index for common list query patterns</li>
+                </ul>
 
                 <h3>Data Sources</h3>
                 <p>Camera data is extracted from multiple sources:</p>
@@ -221,15 +231,48 @@ uv run draft-support --max 20</code></pre>
                 <p>Access the camera manager at <a href="/admin/cameras">/admin/cameras</a>:</p>
                 <ul>
                     <li>Browse all cameras with filtering by manufacturer and type</li>
+                    <li>Server-side pagination with 50 cameras per page</li>
+                    <li>Full-text search with BM25 relevance ranking</li>
                     <li>Add new camera entries manually</li>
                     <li>Edit existing camera information</li>
                     <li>Delete outdated entries</li>
                 </ul>
 
-                <h3>Enrichment Command</h3>
+                <h3>Camera Comparison</h3>
+                <p>The comparison feature allows side-by-side comparison of up to 5 cameras:</p>
+                <ul>
+                    <li><strong>Selection</strong> - Check boxes in the camera table to select cameras for comparison</li>
+                    <li><strong>Comparison Bar</strong> - Sticky bottom bar showing selected cameras with quick actions</li>
+                    <li><strong>Comparison Modal</strong> - Side-by-side view showing all specifications</li>
+                    <li><strong>Common Values</strong> - Shared specifications highlighted with green tags</li>
+                </ul>
+
+                <h3>Related Cameras</h3>
+                <p>The related cameras feature finds similar cameras based on:</p>
+                <ul>
+                    <li>Same manufacturer (+3 similarity score)</li>
+                    <li>Same device type (+3 similarity score)</li>
+                    <li>Shared ports (+1 per matching port)</li>
+                    <li>Shared protocols (+1 per matching protocol)</li>
+                </ul>
+
+                <h3>CSV Import/Export</h3>
+                <p>Bulk data management via CSV:</p>
+                <ul>
+                    <li><strong>Export</strong> - Download all cameras (or filtered subset) as CSV</li>
+                    <li><strong>Import</strong> - Upload CSV file to create or update cameras (admin only)</li>
+                    <li>Import uses upsert logic based on name + manufacturer</li>
+                </ul>
+
+                <h3>CLI Commands</h3>
                 <pre><code># Enrich camera model codes from documentation
-uv run enrich-cameras</code></pre>
-                <p>This command scans documentation for camera model codes and enriches existing database entries with additional information.</p>
+uv run enrich-cameras
+
+# Rebuild FTS5 search index (after upgrade or corruption)
+uv run rebuild-fts
+
+# Check FTS index status
+uv run rebuild-fts --check</code></pre>
 
                 <h2 id="analytics">Analytics System</h2>
 

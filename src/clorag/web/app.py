@@ -1148,14 +1148,36 @@ async def cameras_list(
     device_type: str | None = None,
     port: str | None = None,
     protocol: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
 ):
-    """Render the public camera compatibility list."""
+    """Render the public camera compatibility list with pagination."""
     db = get_camera_database()
+
+    # Clamp page_size to reasonable limits
+    page_size = max(10, min(100, page_size))
+    page = max(1, page)
+
+    # Get total count for pagination
+    total_count = db.count_cameras(
+        manufacturer=manufacturer,
+        device_type=device_type,
+        port=port,
+        protocol=protocol,
+    )
+    total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
+    # Clamp page to valid range
+    page = min(page, total_pages)
+    offset = (page - 1) * page_size
+
     cameras = db.list_cameras(
         manufacturer=manufacturer,
         device_type=device_type,
         port=port,
         protocol=protocol,
+        offset=offset,
+        limit=page_size,
     )
     manufacturers = db.get_manufacturers()
     device_types = db.get_device_types()
@@ -1177,19 +1199,47 @@ async def cameras_list(
             "selected_port": port,
             "selected_protocol": protocol,
             "stats": stats,
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count,
+            "total_pages": total_pages,
         },
     )
 
 
 @app.get("/api/cameras", response_model=list[Camera])
+@limiter.limit("60/minute")
 async def api_cameras_list(
+    request: Request,
     manufacturer: str | None = None,
     device_type: str | None = None,
     port: str | None = None,
     protocol: str | None = None,
+    page: int | None = None,
+    page_size: int = 50,
 ):
-    """Get all cameras as JSON."""
+    """Get cameras as JSON with optional pagination.
+
+    If page is not specified, returns all cameras.
+    If page is specified, returns paginated results.
+    """
     db = get_camera_database()
+
+    if page is not None:
+        # Paginated request
+        page_size = max(10, min(100, page_size))
+        page = max(1, page)
+        offset = (page - 1) * page_size
+        return db.list_cameras(
+            manufacturer=manufacturer,
+            device_type=device_type,
+            port=port,
+            protocol=protocol,
+            offset=offset,
+            limit=page_size,
+        )
+
+    # Non-paginated (all cameras)
     return db.list_cameras(
         manufacturer=manufacturer,
         device_type=device_type,
@@ -1199,27 +1249,118 @@ async def api_cameras_list(
 
 
 @app.get("/api/cameras/search", response_model=list[Camera])
-async def api_cameras_search(q: str):
+@limiter.limit("60/minute")
+async def api_cameras_search(request: Request, q: str):
     """Search cameras by name or manufacturer."""
     db = get_camera_database()
     return db.search_cameras(q)
 
 
 @app.get("/api/cameras/stats")
-async def api_cameras_stats():
+@limiter.limit("60/minute")
+async def api_cameras_stats(request: Request):
     """Get camera database statistics."""
     db = get_camera_database()
     return db.get_stats()
 
 
 @app.get("/api/cameras/{camera_id}", response_model=Camera)
-async def api_camera_get(camera_id: int):
+@limiter.limit("120/minute")
+async def api_camera_get(request: Request, camera_id: int):
     """Get a single camera by ID."""
     db = get_camera_database()
     camera = db.get_camera(camera_id)
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
     return camera
+
+
+@app.get("/api/cameras/{camera_id}/related", response_model=list[Camera], tags=["Cameras"])
+@limiter.limit("60/minute")
+async def api_camera_related(request: Request, camera_id: int, limit: int = 5):
+    """Get cameras related to the specified camera.
+
+    Finds cameras with similar manufacturer, device type, ports, or protocols.
+    """
+    db = get_camera_database()
+    camera = db.get_camera(camera_id)
+    if not camera:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    return db.find_related_cameras(camera_id, limit=min(limit, 10))
+
+
+@app.post("/api/cameras/compare", response_model=list[Camera], tags=["Cameras"])
+@limiter.limit("60/minute")
+async def api_cameras_compare(request: Request, camera_ids: list[int]):
+    """Get multiple cameras for comparison.
+
+    Accepts a list of camera IDs and returns the camera objects in order.
+    Maximum 5 cameras can be compared at once.
+    """
+    if not camera_ids:
+        raise HTTPException(status_code=400, detail="No camera IDs provided")
+    if len(camera_ids) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 cameras can be compared")
+
+    db = get_camera_database()
+    cameras = db.get_cameras_by_ids(camera_ids)
+    if not cameras:
+        raise HTTPException(status_code=404, detail="No cameras found")
+    return cameras
+
+
+@app.get("/api/cameras/export.csv", tags=["Cameras"])
+@limiter.limit("10/minute")
+async def api_cameras_export_csv(
+    request: Request,
+    manufacturer: str | None = None,
+    device_type: str | None = None,
+):
+    """Export cameras to CSV format.
+
+    Optionally filter by manufacturer or device type.
+    """
+    import csv
+    import io
+
+    db = get_camera_database()
+    cameras = db.list_cameras(manufacturer=manufacturer, device_type=device_type)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header row
+    writer.writerow([
+        "ID", "Name", "Manufacturer", "Code Model", "Device Type",
+        "Ports", "Protocols", "Supported Controls", "Notes",
+        "Doc URL", "Manufacturer URL", "Source", "Confidence"
+    ])
+
+    # Data rows
+    for cam in cameras:
+        writer.writerow([
+            cam.id,
+            cam.name,
+            cam.manufacturer or "",
+            cam.code_model or "",
+            cam.device_type.value if cam.device_type else "",
+            "|".join(cam.ports),
+            "|".join(cam.protocols),
+            "|".join(cam.supported_controls),
+            "|".join(cam.notes),
+            cam.doc_url or "",
+            cam.manufacturer_url or "",
+            cam.source.value if cam.source else "",
+            cam.confidence,
+        ])
+
+    # Return as downloadable CSV
+    from starlette.responses import Response
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=cameras.csv"}
+    )
 
 
 # Admin routes (protected)
@@ -1548,6 +1689,182 @@ async def api_camera_delete(
     if not db.delete_camera(camera_id):
         raise HTTPException(status_code=404, detail="Camera not found")
     return {"status": "deleted", "id": camera_id}
+
+
+# =============================================================================
+# Camera Review Queue Routes (Admin)
+# =============================================================================
+
+
+@app.get("/admin/cameras/review", response_class=HTMLResponse)
+async def admin_cameras_review(
+    request: Request,
+    page: int = 1,
+    page_size: int = 25,
+):
+    """Admin page for reviewing low-confidence camera extractions."""
+    db = get_camera_database()
+
+    # Get total count for pagination
+    total_count = db.count_cameras_needing_review()
+    total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
+    # Clamp page to valid range
+    page = max(1, min(page, total_pages))
+    offset = (page - 1) * page_size
+
+    cameras = db.list_cameras_needing_review(offset=offset, limit=page_size)
+
+    return templates.TemplateResponse(
+        "admin_cameras_review.html",
+        {
+            "request": request,
+            "cameras": cameras,
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count,
+            "total_pages": total_pages,
+        },
+    )
+
+
+@app.get("/api/admin/cameras/review", response_model=list[Camera], tags=["Cameras"])
+async def api_cameras_needing_review(
+    request: Request,
+    page: int = 1,
+    page_size: int = 25,
+    _: bool = Depends(verify_admin),
+):
+    """Get cameras needing review."""
+    db = get_camera_database()
+    page_size = max(10, min(100, page_size))
+    page = max(1, page)
+    offset = (page - 1) * page_size
+    return db.list_cameras_needing_review(offset=offset, limit=page_size)
+
+
+@app.get("/api/admin/cameras/review/count", tags=["Cameras"])
+async def api_cameras_review_count(
+    request: Request,
+    _: bool = Depends(verify_admin),
+):
+    """Get count of cameras needing review."""
+    db = get_camera_database()
+    return {"count": db.count_cameras_needing_review()}
+
+
+@app.post("/api/admin/cameras/{camera_id}/approve", response_model=Camera, tags=["Cameras"])
+@limiter.limit("30/minute")
+async def api_camera_approve(
+    camera_id: int,
+    request: Request,
+    _: bool = Depends(verify_admin),
+):
+    """Approve a camera (clear needs_review flag)."""
+    db = get_camera_database()
+    camera = db.approve_camera(camera_id)
+    if not camera:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    return camera
+
+
+@app.post("/api/admin/cameras/import", tags=["Cameras"])
+@limiter.limit("5/minute")
+async def api_cameras_import_csv(
+    request: Request,
+    file: UploadFile,
+    _: bool = Depends(verify_admin),
+):
+    """Import cameras from CSV file.
+
+    CSV format should have headers:
+    Name, Manufacturer, Code Model, Device Type, Ports, Protocols, Supported Controls, Notes
+
+    Ports, Protocols, Controls, and Notes should be pipe-separated (|).
+    Existing cameras with same name will be updated (merged).
+    """
+    import csv
+    import io
+
+    from clorag.models.camera import CameraCreate, CameraSource, DeviceType
+
+    if not file.filename or not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+
+    content = await file.read()
+    try:
+        text = content.decode('utf-8')
+    except UnicodeDecodeError:
+        text = content.decode('latin-1')
+
+    reader = csv.DictReader(io.StringIO(text))
+
+    db = get_camera_database()
+    imported = 0
+    updated = 0
+    errors = []
+
+    for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
+        try:
+            name = row.get('Name', '').strip()
+            if not name:
+                errors.append(f"Row {row_num}: Missing name")
+                continue
+
+            # Parse fields
+            manufacturer = row.get('Manufacturer', '').strip() or None
+            code_model = row.get('Code Model', '').strip() or None
+
+            # Parse device type
+            device_type_str = row.get('Device Type', '').strip()
+            device_type = None
+            if device_type_str:
+                try:
+                    device_type = DeviceType(device_type_str)
+                except ValueError:
+                    pass  # Invalid device type, leave as None
+
+            # Parse pipe-separated lists
+            ports = [p.strip() for p in row.get('Ports', '').split('|') if p.strip()]
+            protocols = [p.strip() for p in row.get('Protocols', '').split('|') if p.strip()]
+            controls = [c.strip() for c in row.get('Supported Controls', '').split('|') if c.strip()]
+            notes = [n.strip() for n in row.get('Notes', '').split('|') if n.strip()]
+
+            # URLs
+            doc_url = row.get('Doc URL', '').strip() or None
+            manufacturer_url = row.get('Manufacturer URL', '').strip() or None
+
+            camera_data = CameraCreate(
+                name=name,
+                manufacturer=manufacturer,
+                code_model=code_model,
+                device_type=device_type,
+                ports=ports,
+                protocols=protocols,
+                supported_controls=controls,
+                notes=notes,
+                doc_url=doc_url,
+                manufacturer_url=manufacturer_url,
+            )
+
+            # Check if camera exists
+            existing = db.get_camera_by_name(name)
+            if existing:
+                db.upsert_camera(camera_data, CameraSource.MANUAL)
+                updated += 1
+            else:
+                db.create_camera(camera_data, CameraSource.MANUAL)
+                imported += 1
+
+        except Exception as e:
+            errors.append(f"Row {row_num}: {str(e)}")
+
+    return {
+        "imported": imported,
+        "updated": updated,
+        "errors": errors[:10],  # Return first 10 errors
+        "total_errors": len(errors),
+    }
 
 
 # =============================================================================

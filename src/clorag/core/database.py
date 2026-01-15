@@ -4,17 +4,133 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
+import time
+from collections import OrderedDict
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Generator
+from typing import Any
 
 from clorag.config import get_settings
 from clorag.models.camera import Camera, CameraCreate, CameraSource, CameraUpdate, DeviceType
 from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+class TTLCache:
+    """Thread-safe LRU cache with TTL expiration."""
+
+    def __init__(self, maxsize: int = 100, ttl_seconds: float = 300.0) -> None:
+        """Initialize cache.
+
+        Args:
+            maxsize: Maximum number of items to store.
+            ttl_seconds: Time-to-live for cached items in seconds.
+        """
+        self._cache: OrderedDict[str, tuple[float, Any]] = OrderedDict()
+        self._maxsize = maxsize
+        self._ttl = ttl_seconds
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> Any | None:
+        """Get a value from cache if not expired."""
+        with self._lock:
+            if key not in self._cache:
+                return None
+            timestamp, value = self._cache[key]
+            if time.time() - timestamp > self._ttl:
+                del self._cache[key]
+                return None
+            # Move to end (LRU)
+            self._cache.move_to_end(key)
+            return value
+
+    def set(self, key: str, value: Any) -> None:
+        """Set a value in cache."""
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+            self._cache[key] = (time.time(), value)
+            # Evict oldest if over capacity
+            while len(self._cache) > self._maxsize:
+                self._cache.popitem(last=False)
+
+    def invalidate(self, pattern: str | None = None) -> None:
+        """Invalidate cache entries.
+
+        Args:
+            pattern: If provided, only invalidate keys containing this pattern.
+                    If None, invalidate all entries.
+        """
+        with self._lock:
+            if pattern is None:
+                self._cache.clear()
+            else:
+                keys_to_delete = [k for k in self._cache if pattern in k]
+                for key in keys_to_delete:
+                    del self._cache[key]
+
+
+class ConnectionPool:
+    """Simple SQLite connection pool for thread-safe access."""
+
+    def __init__(self, db_path: str, pool_size: int = 5) -> None:
+        """Initialize connection pool.
+
+        Args:
+            db_path: Path to SQLite database.
+            pool_size: Number of connections to maintain.
+        """
+        self._db_path = db_path
+        self._pool_size = pool_size
+        self._connections: list[sqlite3.Connection] = []
+        self._lock = threading.Lock()
+        self._condition = threading.Condition(self._lock)
+
+    def _create_connection(self) -> sqlite3.Connection:
+        """Create a new database connection with optimal settings."""
+        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        # Enable WAL mode for better concurrent read performance
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA cache_size=-64000")  # 64MB cache
+        conn.execute("PRAGMA temp_store=MEMORY")
+        return conn
+
+    @contextmanager
+    def get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+        """Get a connection from the pool."""
+        conn: sqlite3.Connection | None = None
+        with self._condition:
+            while not self._connections and len(self._connections) >= self._pool_size:
+                self._condition.wait(timeout=5.0)
+
+            if self._connections:
+                conn = self._connections.pop()
+            else:
+                conn = self._create_connection()
+
+        try:
+            yield conn
+        finally:
+            with self._condition:
+                if len(self._connections) < self._pool_size:
+                    self._connections.append(conn)
+                else:
+                    conn.close()
+                self._condition.notify()
+
+    def close_all(self) -> None:
+        """Close all connections in the pool."""
+        with self._lock:
+            for conn in self._connections:
+                conn.close()
+            self._connections.clear()
 
 # Whitelist of allowed columns for UPDATE operations (SQL injection protection)
 ALLOWED_UPDATE_COLUMNS = frozenset(
@@ -29,6 +145,8 @@ ALLOWED_UPDATE_COLUMNS = frozenset(
         "notes",
         "doc_url",
         "manufacturer_url",
+        "confidence",
+        "needs_review",
         "updated_at",
     }
 )
@@ -50,17 +168,22 @@ class CameraDatabase:
         db_dir = Path(self._db_path).parent
         db_dir.mkdir(parents=True, exist_ok=True)
 
+        # Initialize connection pool and cache
+        self._pool = ConnectionPool(self._db_path, pool_size=5)
+        self._cache = TTLCache(maxsize=200, ttl_seconds=300.0)  # 5 minute TTL
+
         self._ensure_schema()
 
     @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
-        """Get a database connection with row factory."""
-        conn = sqlite3.connect(self._db_path)
-        conn.row_factory = sqlite3.Row
-        try:
+        """Get a database connection from the pool."""
+        with self._pool.get_connection() as conn:
             yield conn
-        finally:
-            conn.close()
+
+    def close(self) -> None:
+        """Close all database connections."""
+        self._pool.close_all()
+        self._cache.invalidate()
 
     def _ensure_schema(self) -> None:
         """Create tables if they don't exist."""
@@ -103,6 +226,71 @@ class CameraDatabase:
 
             # Index on code_model for fast lookups (after migration ensures column exists)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cameras_code_model ON cameras(code_model)")
+
+            # Add confidence column if it doesn't exist (migration)
+            try:
+                conn.execute("ALTER TABLE cameras ADD COLUMN confidence REAL DEFAULT 1.0")
+                conn.commit()
+                logger.info("Added confidence column to cameras table")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+            # Add needs_review column if it doesn't exist (migration)
+            try:
+                conn.execute("ALTER TABLE cameras ADD COLUMN needs_review INTEGER DEFAULT 0")
+                conn.commit()
+                logger.info("Added needs_review column to cameras table")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+            # Index on needs_review for fast filtering of review queue
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_cameras_needs_review ON cameras(needs_review)")
+
+            # Covering index for common list queries (manufacturer + name sort)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_cameras_list_cover
+                ON cameras(manufacturer, name, id, device_type, ports, protocols)
+            """)
+
+            # FTS5 virtual table for full-text search
+            conn.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS cameras_fts USING fts5(
+                    name,
+                    manufacturer,
+                    code_model,
+                    ports,
+                    protocols,
+                    notes,
+                    content='cameras',
+                    content_rowid='id',
+                    tokenize='porter unicode61'
+                )
+            """)
+
+            # Triggers to keep FTS index in sync
+            conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS cameras_ai AFTER INSERT ON cameras BEGIN
+                    INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
+                    VALUES (new.id, new.name, new.manufacturer, new.code_model, new.ports, new.protocols, new.notes);
+                END
+            """)
+
+            conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS cameras_ad AFTER DELETE ON cameras BEGIN
+                    INSERT INTO cameras_fts(cameras_fts, rowid, name, manufacturer, code_model, ports, protocols, notes)
+                    VALUES ('delete', old.id, old.name, old.manufacturer, old.code_model, old.ports, old.protocols, old.notes);
+                END
+            """)
+
+            conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS cameras_au AFTER UPDATE ON cameras BEGIN
+                    INSERT INTO cameras_fts(cameras_fts, rowid, name, manufacturer, code_model, ports, protocols, notes)
+                    VALUES ('delete', old.id, old.name, old.manufacturer, old.code_model, old.ports, old.protocols, old.notes);
+                    INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
+                    VALUES (new.id, new.name, new.manufacturer, new.code_model, new.ports, new.protocols, new.notes);
+                END
+            """)
+
             conn.commit()
             logger.debug("Database schema ensured", db_path=self._db_path)
 
@@ -115,6 +303,16 @@ class CameraDatabase:
                 device_type = DeviceType(row["device_type"])
             except ValueError:
                 pass  # Invalid device_type value, leave as None
+
+        # Parse confidence (handle missing column gracefully)
+        confidence = 1.0
+        if "confidence" in row.keys() and row["confidence"] is not None:
+            confidence = float(row["confidence"])
+
+        # Parse needs_review (stored as INTEGER 0/1)
+        needs_review = False
+        if "needs_review" in row.keys() and row["needs_review"]:
+            needs_review = bool(row["needs_review"])
 
         return Camera(
             id=row["id"],
@@ -129,6 +327,8 @@ class CameraDatabase:
             source=CameraSource(row["source"]) if row["source"] else CameraSource.MANUAL,
             doc_url=row["doc_url"],
             manufacturer_url=row["manufacturer_url"],
+            confidence=confidence,
+            needs_review=needs_review,
             created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
             updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None,
         )
@@ -139,6 +339,8 @@ class CameraDatabase:
         device_type: str | None = None,
         port: str | None = None,
         protocol: str | None = None,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> list[Camera]:
         """List all cameras, optionally filtered by manufacturer, device_type, port, and/or protocol.
 
@@ -147,13 +349,21 @@ class CameraDatabase:
             device_type: Filter by device type (e.g., 'camera_cinema', 'lens').
             port: Filter by port (e.g., 'RS-422', 'Ethernet').
             protocol: Filter by protocol (e.g., 'VISCA', 'Sony RCP').
+            offset: Number of records to skip (for pagination).
+            limit: Maximum number of records to return (None for all).
 
         Returns:
             List of Camera objects.
         """
+        # Check cache for common queries
+        cache_key = f"list:{manufacturer}:{device_type}:{port}:{protocol}:{offset}:{limit}"
+        cached: list[Camera] | None = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         with self._get_connection() as conn:
             conditions = []
-            params: list[str] = []
+            params: list[str | int] = []
 
             if manufacturer:
                 conditions.append("manufacturer = ? COLLATE NOCASE")
@@ -174,8 +384,123 @@ class CameraDatabase:
                 query += " WHERE " + " AND ".join(conditions)
             query += " ORDER BY manufacturer, name"
 
+            if limit is not None:
+                query += " LIMIT ? OFFSET ?"
+                params.extend([limit, offset])
+
             cursor = conn.execute(query, params)
+            results = [self._row_to_camera(row) for row in cursor.fetchall()]
+
+            # Cache the results
+            self._cache.set(cache_key, results)
+            return results
+
+    def count_cameras(
+        self,
+        manufacturer: str | None = None,
+        device_type: str | None = None,
+        port: str | None = None,
+        protocol: str | None = None,
+    ) -> int:
+        """Count cameras matching the given filters.
+
+        Args:
+            manufacturer: Filter by manufacturer name (case-insensitive).
+            device_type: Filter by device type.
+            port: Filter by port.
+            protocol: Filter by protocol.
+
+        Returns:
+            Total count of matching cameras.
+        """
+        with self._get_connection() as conn:
+            conditions = []
+            params: list[str] = []
+
+            if manufacturer:
+                conditions.append("manufacturer = ? COLLATE NOCASE")
+                params.append(manufacturer)
+            if device_type:
+                conditions.append("device_type = ?")
+                params.append(device_type)
+            if port:
+                conditions.append("ports LIKE ?")
+                params.append(f'%"{port}"%')
+            if protocol:
+                conditions.append("protocols LIKE ?")
+                params.append(f'%"{protocol}"%')
+
+            query = "SELECT COUNT(*) FROM cameras"
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            result = conn.execute(query, params).fetchone()
+            return int(result[0]) if result else 0
+
+    def list_cameras_needing_review(
+        self,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[Camera]:
+        """List cameras flagged for human review.
+
+        Args:
+            offset: Number of records to skip (for pagination).
+            limit: Maximum number of records to return.
+
+        Returns:
+            List of Camera objects needing review, ordered by confidence (lowest first).
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT * FROM cameras
+                WHERE needs_review = 1
+                ORDER BY confidence ASC, created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (limit, offset),
+            )
             return [self._row_to_camera(row) for row in cursor.fetchall()]
+
+    def count_cameras_needing_review(self) -> int:
+        """Count cameras needing review.
+
+        Returns:
+            Total count of cameras flagged for review.
+        """
+        with self._get_connection() as conn:
+            result = conn.execute(
+                "SELECT COUNT(*) FROM cameras WHERE needs_review = 1"
+            ).fetchone()
+            return int(result[0]) if result else 0
+
+    def approve_camera(self, camera_id: int) -> Camera | None:
+        """Approve a camera (clear needs_review flag, set confidence to 1.0).
+
+        Args:
+            camera_id: Camera database ID.
+
+        Returns:
+            Updated Camera object or None if not found.
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE cameras
+                SET needs_review = 0, confidence = 1.0, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (camera_id,),
+            )
+            conn.commit()
+            logger.info("Approved camera", id=camera_id)
+
+            # Invalidate caches
+            self._cache.invalidate("list:")
+            self._cache.invalidate("review:")
+
+            return self.get_camera(camera_id)
 
     def get_camera(self, camera_id: int) -> Camera | None:
         """Get a single camera by ID.
@@ -205,6 +530,97 @@ class CameraDatabase:
             row = cursor.fetchone()
             return self._row_to_camera(row) if row else None
 
+    def get_cameras_by_ids(self, camera_ids: list[int]) -> list[Camera]:
+        """Get multiple cameras by their IDs.
+
+        Args:
+            camera_ids: List of camera database IDs.
+
+        Returns:
+            List of Camera objects (preserves order, excludes not found).
+        """
+        if not camera_ids:
+            return []
+
+        with self._get_connection() as conn:
+            placeholders = ",".join("?" * len(camera_ids))
+            cursor = conn.execute(
+                f"SELECT * FROM cameras WHERE id IN ({placeholders})",
+                camera_ids,
+            )
+            # Build a dict for ordering
+            cameras_by_id = {row["id"]: self._row_to_camera(row) for row in cursor.fetchall()}
+            # Return in original order
+            return [cameras_by_id[cid] for cid in camera_ids if cid in cameras_by_id]
+
+    def find_related_cameras(
+        self,
+        camera_id: int,
+        limit: int = 5,
+    ) -> list[Camera]:
+        """Find cameras with similar characteristics.
+
+        Finds cameras that share the same manufacturer, device type, ports, or protocols.
+
+        Args:
+            camera_id: Reference camera ID.
+            limit: Maximum number of related cameras to return.
+
+        Returns:
+            List of related Camera objects, scored by similarity.
+        """
+        camera = self.get_camera(camera_id)
+        if not camera:
+            return []
+
+        with self._get_connection() as conn:
+            # Score cameras by similarity factors
+            # Higher score = more similar
+            scores: dict[int, int] = {}
+
+            # Same manufacturer (high weight)
+            if camera.manufacturer:
+                cursor = conn.execute(
+                    "SELECT id FROM cameras WHERE manufacturer = ? AND id != ?",
+                    (camera.manufacturer, camera_id),
+                )
+                for row in cursor.fetchall():
+                    scores[row["id"]] = scores.get(row["id"], 0) + 3
+
+            # Same device type (high weight)
+            if camera.device_type:
+                cursor = conn.execute(
+                    "SELECT id FROM cameras WHERE device_type = ? AND id != ?",
+                    (camera.device_type.value, camera_id),
+                )
+                for row in cursor.fetchall():
+                    scores[row["id"]] = scores.get(row["id"], 0) + 3
+
+            # Shared ports (medium weight)
+            for port in camera.ports:
+                cursor = conn.execute(
+                    "SELECT id FROM cameras WHERE ports LIKE ? AND id != ?",
+                    (f'%"{port}"%', camera_id),
+                )
+                for row in cursor.fetchall():
+                    scores[row["id"]] = scores.get(row["id"], 0) + 1
+
+            # Shared protocols (medium weight)
+            for protocol in camera.protocols:
+                cursor = conn.execute(
+                    "SELECT id FROM cameras WHERE protocols LIKE ? AND id != ?",
+                    (f'%"{protocol}"%', camera_id),
+                )
+                for row in cursor.fetchall():
+                    scores[row["id"]] = scores.get(row["id"], 0) + 1
+
+            if not scores:
+                return []
+
+            # Sort by score (descending) and get top results
+            sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)[:limit]
+            return self.get_cameras_by_ids(sorted_ids)
+
     def create_camera(self, camera: CameraCreate, source: CameraSource = CameraSource.MANUAL) -> Camera:
         """Create a new camera entry.
 
@@ -218,8 +634,9 @@ class CameraDatabase:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO cameras (name, manufacturer, code_model, device_type, ports, protocols, supported_controls, notes, source, doc_url, manufacturer_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO cameras (name, manufacturer, code_model, device_type, ports, protocols,
+                    supported_controls, notes, source, doc_url, manufacturer_url, confidence, needs_review)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     camera.name,
@@ -233,10 +650,18 @@ class CameraDatabase:
                     source.value,
                     camera.doc_url,
                     camera.manufacturer_url,
+                    camera.confidence,
+                    1 if camera.needs_review else 0,
                 ),
             )
             conn.commit()
             logger.info("Created camera", name=camera.name, id=cursor.lastrowid)
+
+            # Invalidate list and search caches
+            self._cache.invalidate("list:")
+            self._cache.invalidate("search:")
+            self._cache.invalidate("stats")
+
             return self.get_camera(cursor.lastrowid)  # type: ignore
 
     def update_camera(self, camera_id: int, updates: CameraUpdate) -> Camera | None:
@@ -307,6 +732,12 @@ class CameraDatabase:
             )
             conn.commit()
             logger.info("Updated camera", id=camera_id)
+
+            # Invalidate caches
+            self._cache.invalidate("list:")
+            self._cache.invalidate("search:")
+            self._cache.invalidate("stats")
+
             return self.get_camera(camera_id)
 
     def delete_camera(self, camera_id: int) -> bool:
@@ -324,6 +755,10 @@ class CameraDatabase:
             deleted = cursor.rowcount > 0
             if deleted:
                 logger.info("Deleted camera", id=camera_id)
+                # Invalidate caches
+                self._cache.invalidate("list:")
+                self._cache.invalidate("search:")
+                self._cache.invalidate("stats")
             return deleted
 
     def upsert_camera(self, camera: CameraCreate, source: CameraSource) -> Camera:
@@ -432,33 +867,187 @@ class CameraDatabase:
             row = cursor.fetchone()
             return self._row_to_camera(row) if row else None
 
-    def search_cameras(self, query: str) -> list[Camera]:
-        """Search cameras by name or manufacturer.
+    def search_cameras(self, query: str, use_fts: bool = True) -> list[Camera]:
+        """Search cameras using FTS5 full-text search.
 
         Args:
             query: Search query string.
+            use_fts: Whether to use FTS5 (faster) or fallback to LIKE (more flexible).
 
         Returns:
-            List of matching Camera objects.
+            List of matching Camera objects, ranked by relevance.
         """
+        if not query or not query.strip():
+            return []
+
+        # Check cache first
+        cache_key = f"search:{query}:{use_fts}"
+        cached: list[Camera] | None = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        query = query.strip()
+
         with self._get_connection() as conn:
+            if use_fts:
+                try:
+                    # FTS5 search with BM25 ranking
+                    # Escape special FTS5 characters and add wildcard suffix
+                    fts_query = self._prepare_fts_query(query)
+                    cursor = conn.execute(
+                        """
+                        SELECT c.*, bm25(cameras_fts) as rank
+                        FROM cameras c
+                        JOIN cameras_fts fts ON c.id = fts.rowid
+                        WHERE cameras_fts MATCH ?
+                        ORDER BY rank
+                        LIMIT 100
+                        """,
+                        (fts_query,),
+                    )
+                    results = [self._row_to_camera(row) for row in cursor.fetchall()]
+                    self._cache.set(cache_key, results)
+                    return results
+                except sqlite3.OperationalError as e:
+                    # FTS table might not be populated yet, fall back to LIKE
+                    logger.warning("FTS search failed, falling back to LIKE", error=str(e))
+
+            # Fallback to LIKE search
             cursor = conn.execute(
                 """
                 SELECT * FROM cameras
                 WHERE name LIKE ? COLLATE NOCASE
                    OR manufacturer LIKE ? COLLATE NOCASE
+                   OR code_model LIKE ? COLLATE NOCASE
                 ORDER BY name
+                LIMIT 100
                 """,
-                (f"%{query}%", f"%{query}%"),
+                (f"%{query}%", f"%{query}%", f"%{query}%"),
             )
-            return [self._row_to_camera(row) for row in cursor.fetchall()]
+            results = [self._row_to_camera(row) for row in cursor.fetchall()]
+            self._cache.set(cache_key, results)
+            return results
 
-    def get_stats(self) -> dict:
+    def _prepare_fts_query(self, query: str) -> str:
+        """Prepare a query string for FTS5.
+
+        Handles escaping and adds prefix matching for better UX.
+
+        Args:
+            query: Raw user query.
+
+        Returns:
+            FTS5-safe query string.
+        """
+        # Remove FTS5 special characters that could cause syntax errors
+        special_chars = ['"', "'", "(", ")", "*", ":", "^", "-", "+"]
+        clean_query = query
+        for char in special_chars:
+            clean_query = clean_query.replace(char, " ")
+
+        # Split into terms and add prefix matching
+        terms = clean_query.split()
+        if not terms:
+            return '""'  # Empty query
+
+        # Add wildcard suffix to each term for prefix matching
+        # This allows "son" to match "Sony"
+        fts_terms = [f'"{term}"*' for term in terms if term]
+        return " OR ".join(fts_terms)
+
+    def rebuild_fts_index(self) -> int:
+        """Rebuild the FTS5 index from the cameras table.
+
+        Use this after bulk imports or if the FTS index gets out of sync.
+        Will recreate the FTS table if it's corrupted.
+
+        Returns:
+            Number of cameras indexed.
+        """
+        with self._get_connection() as conn:
+            try:
+                # Try to delete all FTS data
+                conn.execute("DELETE FROM cameras_fts")
+            except sqlite3.DatabaseError:
+                # FTS table is corrupted - drop and recreate it
+                logger.warning("FTS table corrupted, recreating...")
+
+                # Drop the corrupted table and triggers
+                conn.execute("DROP TABLE IF EXISTS cameras_fts")
+                conn.execute("DROP TRIGGER IF EXISTS cameras_ai")
+                conn.execute("DROP TRIGGER IF EXISTS cameras_ad")
+                conn.execute("DROP TRIGGER IF EXISTS cameras_au")
+                conn.commit()
+
+                # Recreate FTS5 table
+                conn.execute("""
+                    CREATE VIRTUAL TABLE cameras_fts USING fts5(
+                        name,
+                        manufacturer,
+                        code_model,
+                        ports,
+                        protocols,
+                        notes,
+                        content='cameras',
+                        content_rowid='id',
+                        tokenize='porter unicode61'
+                    )
+                """)
+
+                # Recreate triggers
+                conn.execute("""
+                    CREATE TRIGGER cameras_ai AFTER INSERT ON cameras BEGIN
+                        INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
+                        VALUES (new.id, new.name, new.manufacturer, new.code_model, new.ports, new.protocols, new.notes);
+                    END
+                """)
+
+                conn.execute("""
+                    CREATE TRIGGER cameras_ad AFTER DELETE ON cameras BEGIN
+                        INSERT INTO cameras_fts(cameras_fts, rowid, name, manufacturer, code_model, ports, protocols, notes)
+                        VALUES ('delete', old.id, old.name, old.manufacturer, old.code_model, old.ports, old.protocols, old.notes);
+                    END
+                """)
+
+                conn.execute("""
+                    CREATE TRIGGER cameras_au AFTER UPDATE ON cameras BEGIN
+                        INSERT INTO cameras_fts(cameras_fts, rowid, name, manufacturer, code_model, ports, protocols, notes)
+                        VALUES ('delete', old.id, old.name, old.manufacturer, old.code_model, old.ports, old.protocols, old.notes);
+                        INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
+                        VALUES (new.id, new.name, new.manufacturer, new.code_model, new.ports, new.protocols, new.notes);
+                    END
+                """)
+                conn.commit()
+
+            # Rebuild from cameras table
+            conn.execute("""
+                INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
+                SELECT id, name, manufacturer, code_model, ports, protocols, notes
+                FROM cameras
+            """)
+            conn.commit()
+
+            # Get count
+            count = conn.execute("SELECT COUNT(*) FROM cameras_fts").fetchone()[0]
+            logger.info("Rebuilt FTS index", indexed_count=count)
+
+            # Invalidate search cache
+            self._cache.invalidate("search:")
+
+            return int(count)
+
+    def get_stats(self) -> dict[str, Any]:
         """Get database statistics.
 
         Returns:
             Dictionary with counts and stats.
         """
+        # Check cache
+        cache_key = "stats"
+        cached: dict[str, Any] | None = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         with self._get_connection() as conn:
             total = conn.execute("SELECT COUNT(*) FROM cameras").fetchone()[0]
             by_source = dict(
@@ -470,11 +1059,14 @@ class CameraDatabase:
                 "SELECT COUNT(DISTINCT manufacturer) FROM cameras WHERE manufacturer IS NOT NULL"
             ).fetchone()[0]
 
-            return {
+            stats = {
                 "total_cameras": total,
                 "by_source": by_source,
                 "manufacturers": manufacturers,
             }
+
+            self._cache.set(cache_key, stats)
+            return stats
 
 
     def clean_camera_names(self) -> int:

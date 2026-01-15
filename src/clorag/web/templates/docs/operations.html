@@ -161,7 +161,13 @@ uv run ingest-curated --max-threads 300
 uv run ingest-curated --offset 300 --max-threads 300
 
 # Enrich camera model codes from documentation
-uv run enrich-cameras</code></pre>
+uv run enrich-cameras
+
+# Rebuild camera FTS5 search index
+uv run rebuild-fts
+
+# Check FTS index status
+uv run rebuild-fts --check</code></pre>
 
                 <h3>Knowledge Graph</h3>
                 <pre><code># Populate Neo4j knowledge graph from Qdrant chunks

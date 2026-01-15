@@ -11,7 +11,13 @@ import anthropic
 import httpx
 
 from clorag.config import get_settings
-from clorag.models.camera import CameraCreate, CameraEnrichment
+from clorag.models.camera import (
+    CameraCreate,
+    CameraEnrichment,
+    infer_device_type,
+    normalize_camera_create,
+    validate_camera_extraction,
+)
 from clorag.utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -249,6 +255,7 @@ class CameraExtractor:
                 if not model:
                     continue
 
+                # Create initial camera object
                 camera = CameraCreate(
                     name=model,
                     manufacturer=manufacturer,
@@ -258,6 +265,30 @@ class CameraExtractor:
                     notes=cam_data.get("notes", []),
                     doc_url=doc_url,
                 )
+
+                # Validate extraction
+                validation = validate_camera_extraction(camera)
+
+                # Skip invalid extractions (likely hallucinations)
+                if not validation.is_valid:
+                    logger.debug(
+                        "Skipping invalid camera extraction",
+                        name=camera.name,
+                        issues=validation.issues,
+                    )
+                    continue
+
+                # Update camera with validation results
+                camera.confidence = validation.confidence
+                camera.needs_review = validation.needs_review
+
+                # Infer device type if not already set
+                if camera.device_type is None:
+                    camera.device_type = infer_device_type(camera.name, camera.manufacturer)
+
+                # Normalize ports, protocols, and controls
+                camera = normalize_camera_create(camera)
+
                 cameras.append(camera)
 
             logger.info(
