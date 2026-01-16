@@ -1003,11 +1003,11 @@
                     clearFile();
                 } else {
                     let errorMsg = 'Failed to upload document';
+                    const text = await response.text();
                     try {
-                        const err = await response.json();
+                        const err = JSON.parse(text);
                         errorMsg = err.detail || errorMsg;
                     } catch {
-                        const text = await response.text();
                         errorMsg = `Server error (${response.status}): ${text || 'Unknown error'}`;
                     }
                     showAlert(errorMsg, 'error');
