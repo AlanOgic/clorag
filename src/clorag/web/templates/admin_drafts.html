@@ -29,7 +29,7 @@
             align-items: center;
             justify-content: space-between;
             padding: 0.5rem 1rem;
-            background: #fff;
+            background: var(--cyanview-navy);
             box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
             position: sticky;
             top: 0;
@@ -42,12 +42,22 @@
             align-items: center;
             gap: 0.5rem;
             text-decoration: none;
-            color: inherit;
+            color: white;
             font-weight: 700;
             font-size: 1.1rem;
         }
 
         .navbar__logo { height: 32px; }
+
+        .navbar__badge {
+            background: #dc2626;
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
 
         .navbar__links {
             display: flex;
@@ -56,14 +66,20 @@
         }
 
         .navbar__link {
-            color: #606770;
+            color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
             font-size: 0.9rem;
             transition: color 0.2s;
         }
 
-        .navbar__link:hover { color: var(--cyan-blue); }
-        .navbar__link--active { color: var(--cyan-blue); font-weight: 600; }
+        .navbar__link:hover { color: white; }
+        .navbar__link--active { color: white; font-weight: 600; }
+
+        .navbar__divider {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.3);
+        }
 
         .hero {
             background: var(--hero-bg);
@@ -100,7 +116,8 @@
 
         .btn-logout {
             background: transparent;
-            border: 1px solid #ddd;
+            color: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 6px;
             padding: 0.5rem 1rem;
             font-size: 0.85rem;
@@ -109,8 +126,9 @@
         }
 
         .btn-logout:hover {
-            background: #f5f5f5;
-            border-color: #ccc;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: white;
         }
 
         .stats-grid {
@@ -571,15 +589,17 @@
 <body>
     <!-- Navbar -->
     <nav class="navbar">
-        <a href="/" class="navbar__brand">
+        <a href="/admin" class="navbar__brand">
             <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
             <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
         </a>
         <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Dashboard</a>
+            <a href="/admin/docs" class="navbar__link">Docs</a>
+            <span class="navbar__divider"></span>
             <a href="/" class="navbar__link">AI Search</a>
             <a href="/cameras" class="navbar__link">Cameras</a>
-            <a href="/admin" class="navbar__link">Admin</a>
-            <a href="/admin/drafts" class="navbar__link navbar__link--active">Drafts</a>
             <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
         </div>
     </nav>
