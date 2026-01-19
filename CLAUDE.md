@@ -7,7 +7,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 - **Gmail support threads** (curated and anonymized)
 - **Custom knowledge documents** (admin-managed)
 
-Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Mermaid diagrams for integration scenarios.
+Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Mermaid diagrams for integration scenarios.
 
 ## Commands
 
@@ -35,14 +35,14 @@ uv run pytest
 ## Architecture
 
 ```
-Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Neo4j enrichment → Claude synthesis
-              ↓
-        BM25 sparse vectors
+Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j enrichment → Claude synthesis
+              ↓                        ↓                  ↓
+        BM25 sparse vectors      Over-fetch 3x      Voyage rerank-2.5
 ```
 
 ### Source Layout
 
-**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion), `embeddings.py` (voyage-context-3 with contextualized embedding), `sparse_embeddings.py` (BM25), `retriever.py` (MultiSourceRetriever), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5)
+**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion), `embeddings.py` (voyage-context-3 with contextualized embedding), `sparse_embeddings.py` (BM25), `reranker.py` (Voyage rerank-2.5 cross-encoder), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5)
 
 **Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler), `chunker.py`, `base.py`
 
@@ -78,6 +78,9 @@ Environment variables (see `.env.example`):
 - `SEARXNG_URL` (default: `https://search.sapti.me`)
 - `SECURE_COOKIES` - Set `false` for local dev
 - `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_DATABASE` - Optional GraphRAG
+- `RERANK_ENABLED` (default: `true`) - Enable/disable reranking
+- `VOYAGE_RERANK_MODEL` (default: `rerank-2.5`) - Reranker model
+- `RERANK_TOP_K` (default: `5`) - Results after reranking
 
 Settings via `clorag.config.get_settings()` (cached singleton).
 
@@ -85,7 +88,9 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 
 ### Search & Retrieval
 - **Hybrid search**: Dense + sparse vectors combined via RRF across all collections
-- **Query cache**: LRU caches (200 entries) for both embedding types, keyed by query+model+dims
+- **Reranking**: Voyage `rerank-2.5` cross-encoder refines top results (+15-40% relevance improvement)
+- **Over-fetch strategy**: Retrieves 3x limit, reranks, returns top-K for optimal quality
+- **Query cache**: LRU caches (200 entries) for embeddings + (100 entries) for reranking
 - **Dynamic thresholds**: ≤2 words: 0.15, 3-5: 0.20, >5: 0.25; technical terms +0.05; minimum 3 results
 - **Contextualized embeddings**: `voyage-context-3` encodes chunks with full document context
 

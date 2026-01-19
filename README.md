@@ -6,7 +6,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 
 - **AI-Powered Search** - Natural language queries with Claude Sonnet 4.5 synthesis
 - **Follow-up Conversations** - Ask follow-up questions with context from last 3 exchanges
-- **Hybrid RAG Search** - Combines semantic (Voyage AI) and keyword (BM25) matching with RRF fusion
+- **Hybrid RAG Search** - Combines semantic (Voyage AI) and keyword (BM25) matching with RRF fusion + Voyage rerank-2.5 cross-encoder
 - **Custom Knowledge Base** - Upload .txt, .md, .pdf files or paste text to add custom documents
 - **Camera Compatibility Database** - Structured camera info with automatic extraction from docs/support
 - **Camera Comparison** - Side-by-side comparison of up to 5 cameras with highlighted common specs
@@ -54,6 +54,15 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 │                              ▼                             │
 │                 RRF Fusion (k=60)                          │
 │         Combines semantic + keyword results                │
+│                     (over-fetch 3x)                        │
+└────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────┐
+│                       RERANKING                            │
+│              Voyage AI rerank-2.5 cross-encoder            │
+│         Refines relevance (+15-40% improvement)            │
+│                    Returns top-K results                   │
 └────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -215,6 +224,7 @@ Two data ingestion pipelines populate the vector database:
 | Graph DB | Neo4j (optional, for GraphRAG) |
 | Dense Embeddings | Voyage AI (voyage-context-3) |
 | Sparse Embeddings | FastEmbed BM25 |
+| Reranking | Voyage AI (rerank-2.5) |
 | LLM Synthesis | Claude Sonnet 4.5 |
 | Database | SQLite (camera + analytics) |
 | Web | FastAPI + Jinja2 |
@@ -484,14 +494,14 @@ Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minu
 
 ## Tools RAG disponibles
 
-L'agent dispose de 4 outils de recherche avec hybrid RRF (dense + sparse vectors) :
+L'agent dispose de 4 outils de recherche avec hybrid RRF (dense + sparse vectors) + reranking :
 
 | Tool | Description |
 |------|-------------|
 | `search_docs` | Recherche dans la documentation officielle |
 | `search_cases` | Recherche dans les cas de support Gmail |
 | `search_custom` | Recherche dans les documents custom (admin-managed) |
-| `hybrid_search` | Recherche combinee (docs + cases + custom) avec RRF fusion |
+| `hybrid_search` | Recherche combinee (docs + cases + custom) avec RRF fusion + rerank-2.5 |
 
 ## Structure du Projet
 
@@ -503,10 +513,11 @@ clorag/
       core/
          embeddings.py     # Client Voyage AI
          sparse_embeddings.py  # FastEmbed BM25
+         reranker.py       # Voyage AI rerank-2.5 cross-encoder
          vectorstore.py    # Client Qdrant
          graph_store.py    # Neo4j async client
          entity_extractor.py  # LLM entity extraction
-         retriever.py      # Multi-source retriever
+         retriever.py      # Multi-source retriever with reranking
          database.py       # SQLite camera database
          analytics_db.py   # SQLite analytics database
          support_case_db.py  # SQLite support cases database

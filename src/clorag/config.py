@@ -38,6 +38,20 @@ class Settings(BaseSettings):
     voyage_model: str = Field(default="voyage-context-3", description="Voyage embedding model")
     voyage_dimensions: int = Field(default=1024, description="Embedding dimensions")
 
+    # Reranking
+    rerank_enabled: bool = Field(
+        default=True,
+        description="Enable reranking after hybrid search for improved relevance",
+    )
+    voyage_rerank_model: str = Field(
+        default="rerank-2.5",
+        description="Voyage AI reranking model (rerank-2.5, rerank-2.5-lite)",
+    )
+    rerank_top_k: int = Field(
+        default=5,
+        description="Number of top results to return after reranking",
+    )
+
     # Docusaurus
     docusaurus_url: str | None = Field(default=None, description="Docusaurus documentation URL")
 

@@ -207,6 +207,10 @@ async def hybrid_search(args: dict[str, Any]) -> dict[str, Any]:
 
     # Include cache stats for debugging (can be removed in production)
     cache_stats = retriever.get_cache_stats()
+    rerank_status = "on" if retriever.rerank_enabled else "off"
+    dense_hit = cache_stats["dense"]["hit_rate_percent"]
+    sparse_hit = cache_stats["sparse"]["hit_rate_percent"]
+    rerank_hit = cache_stats["rerank"]["hit_rate_percent"]
 
     return {
         "content": [
@@ -215,8 +219,8 @@ async def hybrid_search(args: dict[str, Any]) -> dict[str, Any]:
                 "text": (
                     f"Found {result.total_found} relevant results "
                     f"(docs + cases + custom):\n\n{context}\n\n"
-                    f"[Cache: dense={cache_stats['dense']['hit_rate_percent']}% hit, "
-                    f"sparse={cache_stats['sparse']['hit_rate_percent']}% hit]"
+                    f"[Rerank: {rerank_status} | Cache: dense={dense_hit}%, "
+                    f"sparse={sparse_hit}%, rerank={rerank_hit}%]"
                 ),
             }
         ]

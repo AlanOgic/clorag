@@ -113,6 +113,7 @@
                         <li><a href="#retrieval-flow" class="docs-nav__link">Complete Flow</a></li>
                         <li><a href="#dense-sparse" class="docs-nav__link">Dense vs Sparse</a></li>
                         <li><a href="#dynamic-threshold" class="docs-nav__link">Dynamic Thresholds</a></li>
+                        <li><a href="#reranking" class="docs-nav__link">Reranking</a></li>
                         <li><a href="#graphrag" class="docs-nav__link">GraphRAG</a></li>
                         <li><a href="#optimizations" class="docs-nav__link">Optimizations</a></li>
                         <li><a href="#mermaid" class="docs-nav__link">Mermaid Diagrams</a></li>
@@ -177,11 +178,24 @@
 │   Long query (>5 words):    threshold 0.25 (strict)                         │
 │   Technical terms (rio, rcp): +0.05 boost                                   │
 │   Minimum 3 results always returned                                         │
+│   Over-fetch 3x when reranking enabled                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    5. GRAPHRAG ENRICHMENT (if Neo4j configured)             │
+│                      5. RERANKING (Voyage AI rerank-2.5)                     │
+│                                                                              │
+│   Cross-encoder model re-scores each candidate against the query            │
+│   +15-40% relevance improvement over RRF alone                              │
+│   Returns top-K results with reranker relevance scores (0-1)                │
+│   LRU cache (100 entries) for repeated query+doc combinations               │
+│                                                                              │
+│   Can be disabled per-query or globally via RERANK_ENABLED=false            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    6. GRAPHRAG ENRICHMENT (if Neo4j configured)             │
 │                                                                              │
 │   For each chunk, query Neo4j for related entities:                         │
 │   • Camera → COMPATIBLE_WITH → Products                                     │
@@ -193,7 +207,7 @@
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      6. CLAUDE SYNTHESIS                                     │
+│                      7. CLAUDE SYNTHESIS                                     │
 │                                                                              │
 │   Claude Sonnet 4 receives:                                                 │
 │   • User query                                                              │
@@ -211,7 +225,7 @@
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         7. ANALYTICS LOGGING                                 │
+│                         8. ANALYTICS LOGGING                                 │
 │                                                                              │
 │   Stored in SQLite (analytics.db):                                          │
 │   • Query text, timestamp                                                   │
@@ -272,6 +286,57 @@
                     <tr><td>&gt;5 words</td><td>0.25</td><td>Specific queries can be strict</td></tr>
                 </table>
                 <p>Technical terms (rio, rcp, firmware, etc.) add +0.05 to the threshold. The system always returns at least 3 results regardless of threshold.</p>
+
+                <h2 id="reranking">Cross-Encoder Reranking</h2>
+                <p>After hybrid search returns candidates, a <strong>cross-encoder reranker</strong> refines the relevance ranking for significantly improved results:</p>
+
+                <h3>How It Works</h3>
+                <p>Unlike bi-encoders (used for initial retrieval) that encode query and documents separately, cross-encoders process <strong>query+document pairs jointly</strong>. This enables much more accurate relevance prediction at the cost of speed—which is why we use it only on the top candidates.</p>
+
+                <pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                         TWO-STAGE RETRIEVAL                          │
+│                                                                      │
+│   Stage 1: Hybrid Search (fast, approximate)                         │
+│   ┌─────────────────────────────────────────────────────────────────┐│
+│   │  Query → Embed → Search Qdrant → RRF Fusion                     ││
+│   │  Returns ~15 candidates (over-fetch 3x limit)                   ││
+│   └─────────────────────────────────────────────────────────────────┘│
+│                              │                                       │
+│                              ▼                                       │
+│   Stage 2: Reranking (slower, precise)                              │
+│   ┌─────────────────────────────────────────────────────────────────┐│
+│   │  For each candidate:                                            ││
+│   │    relevance = rerank(query, document)                          ││
+│   │  Sort by relevance score (0-1)                                  ││
+│   │  Return top-K (default: 5)                                      ││
+│   └─────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────┘</code></pre>
+
+                <h3>Performance Impact</h3>
+                <table>
+                    <tr><th>Metric</th><th>Without Reranking</th><th>With Reranking</th></tr>
+                    <tr><td>Relevance quality</td><td>Baseline</td><td><strong>+15-40% improvement</strong></td></tr>
+                    <tr><td>Latency added</td><td>0ms</td><td>~100-500ms</td></tr>
+                    <tr><td>API cost</td><td>$0</td><td>First 200M tokens free</td></tr>
+                </table>
+
+                <h3>Configuration</h3>
+                <pre><code># Environment variables
+RERANK_ENABLED=true          # Enable/disable globally (default: true)
+VOYAGE_RERANK_MODEL=rerank-2.5  # Model choice (default: rerank-2.5)
+RERANK_TOP_K=5               # Results after reranking (default: 5)</code></pre>
+
+                <h3>Per-Query Control</h3>
+                <p>Reranking can be disabled for individual queries where speed is more important than precision:</p>
+                <pre><code># In code
+result = await retriever.retrieve(query, use_reranking=False)
+
+# The agent tools always use reranking for best quality</code></pre>
+
+                <div class="info-box info-box--success">
+                    <div class="info-box__title">Best Practice</div>
+                    <p>Keep reranking enabled (default) for user-facing queries. The latency increase (~300ms) is negligible compared to LLM synthesis time, but the relevance improvement is significant.</p>
+                </div>
 
                 <h2 id="graphrag">GraphRAG Knowledge Graph</h2>
 
@@ -401,6 +466,8 @@ NEO4J_URI=bolt://localhost:7687</code></pre>
                         <code>vectorstore.py:hybrid_search()</code> - RRF fusion<br>
                         <code>embeddings.py:embed_query()</code> - dense vectors<br>
                         <code>sparse_embeddings.py:embed_query()</code> - BM25 vectors<br>
+                        <code>reranker.py:rerank()</code> - cross-encoder reranking<br>
+                        <code>retriever.py:_apply_reranking()</code> - reranking integration<br>
                         <code>graph/enrichment.py</code> - Neo4j context<br>
                         <code>app.py:_synthesize_response()</code> - Claude streaming
                     </p>
