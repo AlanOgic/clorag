@@ -138,6 +138,9 @@ ssh root@server "cd /opt/clorag && docker compose build && docker compose up -d"
                     <tr><td><code>DOCUSAURUS_URL</code></td><td>No</td><td>Documentation site to scrape</td></tr>
                     <tr><td><code>GMAIL_LABEL</code></td><td>No</td><td>Gmail label for support threads</td></tr>
                     <tr><td><code>SEARXNG_URL</code></td><td>No</td><td>SearXNG instance URL for web searches</td></tr>
+                    <tr><td><code>RERANK_ENABLED</code></td><td>No</td><td>Enable reranking after hybrid search (default: true)</td></tr>
+                    <tr><td><code>VOYAGE_RERANK_MODEL</code></td><td>No</td><td>Voyage AI reranker model (default: rerank-2.5)</td></tr>
+                    <tr><td><code>RERANK_TOP_K</code></td><td>No</td><td>Number of results after reranking (default: 5)</td></tr>
                 </table>
 
                 <h2 id="commands">CLI Commands</h2>
