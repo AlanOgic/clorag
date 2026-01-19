@@ -6,125 +6,11 @@
     <meta name="robots" content="noindex, nofollow">
     <title>Admin - Cyanview</title>
     <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
     <style>
-        :root {
-            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-            --cyan-blue: #00a8e8;
-            --cyan-dark: #0077b6;
-            --cyanview-navy: #003366;
-            --hero-bg: #003366;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: var(--ifm-font-family-base);
-            line-height: 1.65;
-            color: #1c1e21;
-            background: #f8f9fa;
-        }
-
-        /* Navbar */
-        .navbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.5rem 1rem;
-            background: var(--cyanview-navy);
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            height: 60px;
-        }
-
-        .navbar__brand {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            color: white;
-            font-weight: 700;
-            font-size: 1.1rem;
-        }
-
-        .navbar__logo {
-            height: 32px;
-        }
-
-        .navbar__badge {
-            background: #dc2626;
-            color: white;
-            font-size: 0.65rem;
-            padding: 0.15rem 0.4rem;
-            border-radius: 4px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-
-        .navbar__links {
-            display: flex;
-            gap: 1.5rem;
-            align-items: center;
-        }
-
-        .navbar__link {
-            color: rgba(255, 255, 255, 0.85);
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: color 0.2s;
-        }
-
-        .navbar__link:hover {
-            color: white;
-        }
-
-        .navbar__link--active {
-            color: white;
-            font-weight: 600;
-        }
-
-        .navbar__divider {
-            width: 1px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        /* Hero Section */
-        .hero {
-            background: var(--hero-bg);
-            padding: 2rem;
-            text-align: center;
-            color: white;
-        }
-
-        .hero__title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .hero__subtitle {
-            font-size: 1rem;
-            opacity: 0.9;
-        }
-
-        /* Main Content */
-        .main {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        /* Admin Cards */
+        /* Page-specific: 3-column grid for dashboard */
         .admin-grid {
-            display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
         }
 
         @media (max-width: 900px) {
@@ -139,73 +25,18 @@
             }
         }
 
-        .admin-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            text-decoration: none;
-            color: inherit;
-            transition: transform 0.2s, box-shadow 0.2s;
-            display: block;
-        }
+        /* Page-specific: Icon color variants */
+        .admin-card__icon--cameras { background: #e8f5e9; }
+        .admin-card__icon--analytics { background: #fff3e0; }
+        .admin-card__icon--debug { background: #fce4ec; }
 
-        .admin-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-        }
-
-        .admin-card__icon {
-            width: 48px;
-            height: 48px;
-            background: #e3f2fd;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1rem;
-            font-size: 1.5rem;
-        }
-
-        .admin-card__icon--cameras {
-            background: #e8f5e9;
-        }
-
-        .admin-card__icon--analytics {
-            background: #fff3e0;
-        }
-
-        .admin-card__icon--debug {
-            background: #fce4ec;
-        }
-
-        .admin-card__title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--cyanview-navy);
-            margin-bottom: 0.5rem;
-        }
-
-        .admin-card__description {
-            font-size: 0.9rem;
-            color: #606770;
-            line-height: 1.5;
-        }
-
-        /* Public Links Section */
-        .section {
+        /* Page-specific: Public links section */
+        .section--links {
             margin-top: 2rem;
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
-        .section__title {
+        .section--links .section__title {
             font-size: 1rem;
-            font-weight: 600;
-            color: #606770;
-            margin-bottom: 1rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -233,25 +64,7 @@
             background: #e3f2fd;
         }
 
-        /* Logout button */
-        .btn-logout {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.85rem;
-            background: transparent;
-            color: rgba(255, 255, 255, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-logout:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.5);
-            color: white;
-        }
-
-        /* Loading overlay */
+        /* Page-specific: Auth loading overlay */
         .auth-loading {
             position: fixed;
             inset: 0;
@@ -432,7 +245,7 @@
         </div>
 
         <!-- Public Pages -->
-        <div class="section">
+        <div class="section section--links">
             <h3 class="section__title">Public Pages</h3>
             <div class="public-links">
                 <a href="/" class="public-link">

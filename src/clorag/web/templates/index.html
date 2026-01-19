@@ -1225,7 +1225,7 @@
                 };
 
                 if (isCamera && !isCyanview) {
-                    // Style as camera: light orange, dark text, rounded
+                    // Style as camera: light orange, black text, rounded
                     if (shape) {
                         shape.setAttribute('fill', '#FFE0B2');
                         shape.setAttribute('stroke', '#E65100');
@@ -1237,13 +1237,13 @@
                     }
                     styleNodeText(node, '#1a1a1a');
                 } else {
-                    // Default style: dark navy background, white text
+                    // Default style (Cyanview devices): light cyan background, black text
                     if (shape) {
-                        shape.setAttribute('fill', '#1a2744');
+                        shape.setAttribute('fill', '#E0F4FF');
                         shape.setAttribute('stroke', '#0077b6');
                         shape.setAttribute('stroke-width', '2');
                     }
-                    styleNodeText(node, '#ffffff');
+                    styleNodeText(node, '#1a1a1a');
                 }
             });
 

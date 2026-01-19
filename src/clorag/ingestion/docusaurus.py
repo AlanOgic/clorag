@@ -24,8 +24,12 @@ logger = get_logger(__name__)
 class DocusaurusIngestionPipeline(BaseIngestionPipeline):
     """Pipeline for ingesting Docusaurus documentation.
 
-    Uses the sitemap.xml to discover pages and Crawl4AI for scraping.
+    Uses the sitemap.xml to discover pages and Jina Reader for content extraction.
+    Falls back to BeautifulSoup if Jina is disabled or fails.
     """
+
+    # Jina Reader base URL
+    JINA_READER_URL = "https://r.jina.ai/"
 
     def __init__(
         self,
@@ -35,6 +39,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         chunk_size: int = 1000,
         chunk_overlap: int = 100,
         extract_cameras: bool = True,
+        use_jina: bool | None = None,
     ) -> None:
         """Initialize the pipeline.
 
@@ -45,6 +50,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
             chunk_size: Size of text chunks.
             chunk_overlap: Overlap between chunks.
             extract_cameras: Whether to extract camera compatibility info.
+            use_jina: Use Jina Reader API for extraction. Defaults to USE_JINA_READER env var.
         """
         settings = get_settings()
         self._base_url = base_url or settings.docusaurus_url
@@ -61,6 +67,14 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
             respect_headings=True,
         )
         self._extract_cameras = extract_cameras
+
+        # Jina Reader configuration
+        self._use_jina = use_jina if use_jina is not None else settings.use_jina_reader
+        self._jina_api_key = (
+            settings.jina_api_key.get_secret_value() if settings.jina_api_key else None
+        )
+        self._jina_success_count = 0
+        self._jina_fallback_count = 0
 
     async def fetch(self) -> list[Document]:
         """Fetch pages from Docusaurus using sitemap.xml with parallel requests.
@@ -90,9 +104,11 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
 
             logger.info("Found pages in sitemap", count=len(url_entries))
 
-            # Fetch pages in parallel batches for better performance
+            # Fetch pages in parallel batches
+            # Jina free tier: ~20 requests/min, so use smaller batches with delays
             documents: list[Document] = []
-            batch_size = 10
+            batch_size = 5 if self._use_jina else 10
+            batch_delay = 3.0 if self._use_jina and not self._jina_api_key else 0.0
 
             for i in range(0, len(url_entries), batch_size):
                 batch_entries = url_entries[i : i + batch_size]
@@ -105,6 +121,19 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
                         documents.append(result)
                     elif isinstance(result, Exception):
                         logger.warning("Failed to fetch page", error=str(result))
+
+                # Rate limit delay for Jina free tier
+                if batch_delay > 0 and i + batch_size < len(url_entries):
+                    await asyncio.sleep(batch_delay)
+
+        # Log Jina Reader stats
+        if self._use_jina:
+            logger.info(
+                "Jina Reader stats",
+                success=self._jina_success_count,
+                fallback=self._jina_fallback_count,
+                total=len(documents),
+            )
 
         logger.info("Fetched documents", count=len(documents))
         return documents
@@ -155,6 +184,8 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
     ) -> Document | None:
         """Fetch a single page and extract content.
 
+        Uses Jina Reader API if enabled, falls back to BeautifulSoup.
+
         Args:
             client: HTTP client.
             url: Page URL.
@@ -163,29 +194,39 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         Returns:
             Document with page content, or None if failed.
         """
-        try:
-            response = await client.get(url, timeout=30.0)
-            response.raise_for_status()
-        except httpx.HTTPError:
-            return None
+        text: str | None = None
+        title: str | None = None
+        used_jina = False
 
-        # Extract text content (basic HTML parsing)
-        # In production, use Crawl4AI for better extraction
-        html = response.text
-        text = self._extract_text_from_html(html)
-        title = self._extract_title_from_html(html)
+        # Try Jina Reader first if enabled
+        if self._use_jina:
+            jina_result = await self._fetch_with_jina(client, url)
+            if jina_result:
+                text, title = jina_result
+                used_jina = True
+                self._jina_success_count += 1
+
+        # Fallback to BeautifulSoup
+        if not text:
+            if self._use_jina:
+                self._jina_fallback_count += 1
+            bs_result = await self._fetch_with_beautifulsoup(client, url)
+            if bs_result:
+                text, title = bs_result
 
         if not text or len(text) < 100:  # Skip very short pages
             return None
 
         # Apply product name transformations (RIO-Live -> RIO +LAN, RIO -> RIO +WAN)
         text = self._apply_text_transformations(text)
-        title = self._apply_text_transformations(title)
+        if title:
+            title = self._apply_text_transformations(title)
 
         metadata = {
             "source": "docusaurus",
             "url": url,
-            "title": title,
+            "title": title or "Untitled",
+            "extractor": "jina" if used_jina else "beautifulsoup",
         }
         if lastmod:
             metadata["lastmod"] = lastmod
@@ -195,6 +236,119 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
             text=text,
             metadata=metadata,
         )
+
+    async def _fetch_with_jina(
+        self, client: httpx.AsyncClient, url: str, max_retries: int = 2
+    ) -> tuple[str, str | None] | None:
+        """Fetch page content using Jina Reader API with retry on rate limit.
+
+        Args:
+            client: HTTP client.
+            url: Page URL to fetch.
+            max_retries: Max retries on 429 rate limit errors.
+
+        Returns:
+            Tuple of (text, title) or None if failed.
+        """
+        jina_url = f"{self.JINA_READER_URL}{url}"
+
+        headers = {
+            "Accept": "text/plain",
+            "X-Return-Format": "markdown",
+            "X-No-Cache": "true",  # Fresh content for ingestion
+        }
+
+        # Add API key if available (for higher rate limits)
+        if self._jina_api_key:
+            headers["Authorization"] = f"Bearer {self._jina_api_key}"
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = await client.get(jina_url, headers=headers, timeout=60.0)
+
+                # Retry on rate limit with exponential backoff
+                if response.status_code == 429:
+                    if attempt < max_retries:
+                        delay = 2 ** (attempt + 1)  # 2s, 4s
+                        logger.debug("Jina rate limited, retrying", url=url, delay=delay)
+                        await asyncio.sleep(delay)
+                        continue
+                    return None
+
+                response.raise_for_status()
+
+                content = response.text.strip()
+                if not content or len(content) < 50:
+                    return None
+
+                # Extract title from Jina markdown (first # heading)
+                title = self._extract_title_from_markdown(content)
+
+                # Clean up Jina output (remove URL line at start if present)
+                lines = content.split("\n")
+                if lines and lines[0].startswith("URL:"):
+                    content = "\n".join(lines[1:]).strip()
+
+                return (content, title)
+
+            except httpx.HTTPError as e:
+                logger.debug("Jina Reader failed", url=url, error=str(e))
+                return None
+            except Exception as e:
+                logger.debug("Jina Reader error", url=url, error=str(e))
+                return None
+
+        return None
+
+    async def _fetch_with_beautifulsoup(
+        self, client: httpx.AsyncClient, url: str
+    ) -> tuple[str, str | None] | None:
+        """Fetch page content using BeautifulSoup (fallback method).
+
+        Args:
+            client: HTTP client.
+            url: Page URL to fetch.
+
+        Returns:
+            Tuple of (text, title) or None if failed.
+        """
+        try:
+            response = await client.get(url, timeout=30.0)
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return None
+
+        html = response.text
+        text = self._extract_text_from_html(html)
+        title = self._extract_title_from_html(html)
+
+        if not text:
+            return None
+
+        return (text, title)
+
+    def _extract_title_from_markdown(self, markdown: str) -> str | None:
+        """Extract title from markdown content (first # heading).
+
+        Args:
+            markdown: Markdown content.
+
+        Returns:
+            Title string or None.
+        """
+        import re
+
+        # Look for first H1 heading
+        match = re.search(r"^#\s+(.+)$", markdown, re.MULTILINE)
+        if match:
+            return match.group(1).strip()
+
+        # Try H2 as fallback
+        match = re.search(r"^##\s+(.+)$", markdown, re.MULTILINE)
+        if match:
+            return match.group(1).strip()
+
+        return None
 
     def _extract_text_from_html(self, html: str) -> str:
         """Extract main content from Docusaurus HTML, excluding navigation."""

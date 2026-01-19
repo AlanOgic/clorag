@@ -55,6 +55,16 @@ class Settings(BaseSettings):
     # Docusaurus
     docusaurus_url: str | None = Field(default=None, description="Docusaurus documentation URL")
 
+    # Jina Reader (for optimized web content extraction)
+    jina_api_key: SecretStr | None = Field(
+        default=None,
+        description="Jina AI API key for higher rate limits (optional, free tier available)",
+    )
+    use_jina_reader: bool = Field(
+        default=True,
+        description="Use Jina Reader API for web content extraction (r.jina.ai)",
+    )
+
     # Gmail
     gmail_label: str = Field(default="supports", description="Gmail label for support threads")
     google_credentials_path: Path = Field(

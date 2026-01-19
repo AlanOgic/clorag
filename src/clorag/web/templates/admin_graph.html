@@ -6,122 +6,9 @@
     <meta name="robots" content="noindex, nofollow">
     <title>Knowledge Graph - Cyanview Admin</title>
     <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
     <style>
-        :root {
-            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-            --cyan-blue: #00a8e8;
-            --cyan-dark: #0077b6;
-            --cyanview-navy: #003366;
-            --danger: #dc3545;
-            --success: #28a745;
-            --warning: #ffc107;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: var(--ifm-font-family-base);
-            line-height: 1.65;
-            color: #1c1e21;
-            background: #f8f9fa;
-        }
-
-        /* Navbar */
-        .navbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.5rem 1rem;
-            background: var(--cyanview-navy);
-            color: white;
-            height: 60px;
-        }
-
-        .navbar__brand {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            color: white;
-            font-weight: 700;
-            font-size: 1.1rem;
-        }
-
-        .navbar__logo {
-            height: 32px;
-            filter: brightness(0) invert(1);
-        }
-
-        .navbar__badge {
-            background: var(--danger);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .navbar__links {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .navbar__link {
-            color: rgba(255, 255, 255, 0.8);
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-
-        .navbar__link:hover {
-            color: white;
-        }
-
-        .navbar__divider {
-            width: 1px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .btn-logout {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.85rem;
-            background: transparent;
-            color: rgba(255, 255, 255, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-logout:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.5);
-            color: white;
-        }
-
-        /* Main */
-        .main {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .page-title {
-            font-size: 1.5rem;
-            color: var(--cyanview-navy);
-        }
-
-        /* Unavailable Notice */
+        /* Page-specific: Unavailable Notice */
         .unavailable-notice {
             background: #fff3cd;
             border: 1px solid #ffc107;
@@ -141,7 +28,7 @@
             margin: 0;
         }
 
-        /* Tabs */
+        /* Page-specific: Tabs */
         .tabs {
             display: flex;
             gap: 0;
@@ -179,34 +66,7 @@
             display: block;
         }
 
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-
-        .stat-card__number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--cyanview-navy);
-        }
-
-        .stat-card__label {
-            font-size: 0.85rem;
-            color: #666;
-            margin-top: 0.25rem;
-        }
-
+        /* Page-specific: Stats with health indicator */
         .stat-card--health {
             border-left: 4px solid var(--success);
         }
@@ -215,7 +75,7 @@
             border-left-color: var(--danger);
         }
 
-        /* Filter Bar */
+        /* Page-specific: Filter bar */
         .filter-bar {
             display: flex;
             gap: 1rem;
@@ -248,112 +108,12 @@
             min-width: 150px;
         }
 
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.2s;
-        }
-
-        .btn-primary {
-            background: var(--cyan-dark);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--cyan-blue);
-        }
-
-        .btn-secondary {
-            background: #f8f9fa;
-            color: #606770;
-            border: 1px solid #ddd;
-        }
-
-        .btn-secondary:hover {
-            background: #e8e8e8;
-        }
-
-        .btn-sm {
-            padding: 0.4rem 0.75rem;
-            font-size: 0.85rem;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #c82333;
-        }
-
-        .btn-warning {
-            background: var(--warning);
-            color: #212529;
-        }
-
-        .btn-warning:hover {
-            background: #e0a800;
-        }
-
         .actions-cell {
             display: flex;
             gap: 0.5rem;
         }
 
-        /* Table */
-        .table-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .data-table th,
-        .data-table td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-
-        .data-table th {
-            background: #f8f9fa;
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            color: #606770;
-        }
-
-        .data-table tr:hover {
-            background: #f8f9fa;
-        }
-
-        .data-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        /* Tags */
-        .tag {
-            display: inline-block;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
+        /* Page-specific: Entity tags by type */
         .tag--camera { background: #e3f2fd; color: #1565c0; }
         .tag--product { background: #e8f5e9; color: #2e7d32; }
         .tag--protocol { background: #fff3e0; color: #e65100; }
@@ -364,7 +124,7 @@
         .tag--firmware { background: #fce4ec; color: #ad1457; }
         .tag--chunk { background: #eceff1; color: #546e7a; }
 
-        /* Entity Name */
+        /* Page-specific: Entity name */
         .entity-name {
             font-weight: 600;
             color: var(--cyanview-navy);
@@ -374,89 +134,14 @@
             white-space: nowrap;
         }
 
-        /* Relationship Arrow */
+        /* Page-specific: Relationship arrow */
         .rel-arrow {
             color: var(--cyan-dark);
             font-weight: 600;
             padding: 0 0.5rem;
         }
 
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 3rem;
-            color: #666;
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #666;
-        }
-
-        /* Pagination */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin-top: 1.5rem;
-            align-items: center;
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal__content {
-            background: white;
-            border-radius: 8px;
-            max-width: 700px;
-            width: 90%;
-            max-height: 80vh;
-            overflow: auto;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .modal__header {
-            padding: 1.5rem;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal__title {
-            font-size: 1.25rem;
-            color: var(--cyanview-navy);
-        }
-
-        .modal__close {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #666;
-        }
-
-        .modal__body {
-            padding: 1.5rem;
-        }
-
+        /* Page-specific: Property list in modal */
         .property-list {
             margin-bottom: 1.5rem;
         }
@@ -497,15 +182,6 @@
 
         /* Responsive */
         @media (max-width: 768px) {
-            .data-table {
-                display: block;
-                overflow-x: auto;
-            }
-
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
             .tabs {
                 flex-wrap: wrap;
             }

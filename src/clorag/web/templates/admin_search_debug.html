@@ -6,121 +6,16 @@
     <meta name="robots" content="noindex, nofollow">
     <title>Search Debug - Admin - Cyanview</title>
     <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
     <style>
-        :root {
-            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-            --cyan-blue: #00a8e8;
-            --cyan-dark: #0077b6;
-            --cyanview-navy: #003366;
-            --hero-bg: #003366;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: var(--ifm-font-family-base);
-            line-height: 1.65;
-            color: #1c1e21;
-            background: #f8f9fa;
-        }
-
-        /* Navbar */
+        /* Page-specific: Navbar sticky */
         .navbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.5rem 1rem;
-            background: var(--cyanview-navy);
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
             position: sticky;
             top: 0;
             z-index: 100;
-            height: 60px;
         }
 
-        .navbar__brand {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            color: white;
-            font-weight: 700;
-            font-size: 1.1rem;
-        }
-
-        .navbar__logo {
-            height: 32px;
-        }
-
-        .navbar__badge {
-            background: #dc2626;
-            color: white;
-            font-size: 0.65rem;
-            padding: 0.15rem 0.4rem;
-            border-radius: 4px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-
-        .navbar__links {
-            display: flex;
-            gap: 1.5rem;
-            align-items: center;
-        }
-
-        .navbar__link {
-            color: rgba(255, 255, 255, 0.85);
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: color 0.2s;
-        }
-
-        .navbar__link:hover {
-            color: white;
-        }
-
-        .navbar__link--active {
-            color: white;
-            font-weight: 600;
-        }
-
-        .navbar__divider {
-            width: 1px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        /* Hero Section */
-        .hero {
-            background: var(--hero-bg);
-            padding: 2rem;
-            text-align: center;
-            color: white;
-        }
-
-        .hero__title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .hero__subtitle {
-            font-size: 1rem;
-            opacity: 0.9;
-        }
-
-        /* Main Content */
-        .main {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        /* Auth Form */
+        /* Page-specific: Auth form */
         .auth-form {
             max-width: 400px;
             margin: 2rem auto;
@@ -160,7 +55,7 @@
             background: var(--cyan-blue);
         }
 
-        /* Search Form */
+        /* Page-specific: Search form */
         .search-form {
             background: white;
             padding: 1.5rem;
@@ -217,7 +112,7 @@
             cursor: not-allowed;
         }
 
-        /* Section */
+        /* Page-specific: Section */
         .section {
             background: white;
             border-radius: 8px;
@@ -238,7 +133,7 @@
             align-items: center;
         }
 
-        /* Timing Stats */
+        /* Page-specific: Timing stats */
         .timing-stats {
             display: flex;
             gap: 2rem;
@@ -265,7 +160,7 @@
             margin-top: 0.25rem;
         }
 
-        /* Chunks List */
+        /* Page-specific: Chunk display */
         .chunk {
             border: 1px solid #eee;
             border-radius: 6px;
@@ -356,15 +251,7 @@
             font-size: 0.85rem;
         }
 
-        /* Tags */
-        .tag {
-            display: inline-block;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
+        /* Page-specific: Tag variants */
         .tag--docs {
             background: #e3f2fd;
             color: #1976d2;
@@ -375,7 +262,7 @@
             color: #c2185b;
         }
 
-        /* Code Block */
+        /* Page-specific: Code block */
         .code-block {
             background: #1e1e1e;
             color: #d4d4d4;
@@ -389,7 +276,7 @@
             overflow-y: auto;
         }
 
-        /* LLM Response */
+        /* Page-specific: LLM response */
         .llm-response {
             line-height: 1.8;
         }
@@ -417,34 +304,7 @@
             overflow-x: auto;
         }
 
-        /* Hidden */
-        .hidden {
-            display: none !important;
-        }
-
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 2rem;
-            color: #606770;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid var(--cyan-blue);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Error */
+        /* Page-specific: Error display */
         .error {
             background: #ffebee;
             color: #c62828;
@@ -453,7 +313,7 @@
             margin-bottom: 1rem;
         }
 
-        /* Collapsible toggle icon */
+        /* Page-specific: Toggle icon */
         .toggle-icon {
             transition: transform 0.2s;
         }
@@ -462,7 +322,7 @@
             transform: rotate(90deg);
         }
 
-        /* Copy button */
+        /* Page-specific: Copy button */
         .copy-btn {
             padding: 0.4rem 0.8rem;
             background: #f0f0f0;
@@ -477,25 +337,7 @@
             background: #e0e0e0;
         }
 
-        /* Logout button */
-        .btn-logout {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.85rem;
-            background: transparent;
-            color: rgba(255, 255, 255, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-logout:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.5);
-            color: white;
-        }
-
-        /* Auth loading overlay */
+        /* Page-specific: Auth loading overlay */
         .auth-loading {
             position: fixed;
             inset: 0;
@@ -510,7 +352,7 @@
             display: none;
         }
 
-        /* Two column layout */
+        /* Page-specific: Two column layout */
         .two-columns {
             display: grid;
             grid-template-columns: 1fr 1fr;

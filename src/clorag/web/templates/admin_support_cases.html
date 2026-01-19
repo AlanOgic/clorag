@@ -6,156 +6,16 @@
     <meta name="robots" content="noindex, nofollow">
     <title>Support Cases - Cyanview Admin</title>
     <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
     <style>
-        :root {
-            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-            --cyan-blue: #00a8e8;
-            --cyan-dark: #0077b6;
-            --cyanview-navy: #003366;
-            --danger: #dc3545;
-            --success: #28a745;
-            --warning: #ffc107;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: var(--ifm-font-family-base);
-            line-height: 1.65;
-            color: #1c1e21;
-            background: #f8f9fa;
-        }
-
-        /* Navbar */
-        .navbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.5rem 1rem;
-            background: var(--cyanview-navy);
-            color: white;
-            height: 60px;
-        }
-
-        .navbar__brand {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            color: white;
-            font-weight: 700;
-            font-size: 1.1rem;
-        }
-
-        .navbar__logo {
-            height: 32px;
-            filter: brightness(0) invert(1);
-        }
-
-        .navbar__badge {
-            background: var(--danger);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .navbar__links {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .navbar__link {
-            color: rgba(255, 255, 255, 0.8);
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-
-        .navbar__link:hover {
-            color: white;
-        }
-
-        .navbar__divider {
-            width: 1px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .btn-logout {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.85rem;
-            background: transparent;
-            color: rgba(255, 255, 255, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-logout:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.5);
-            color: white;
-        }
-
-        /* Main */
-        .main {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .page-title {
-            font-size: 1.5rem;
-            color: var(--cyanview-navy);
-        }
-
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: white;
-            border-radius: 8px;
-            padding: 1.25rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        .stat-card__label {
-            font-size: 0.85rem;
-            color: #666;
-            text-transform: uppercase;
-            font-weight: 600;
-        }
-
-        .stat-card__value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--cyanview-navy);
-        }
-
+        /* Page-specific: Stat card breakdown */
         .stat-card__breakdown {
             margin-top: 0.5rem;
             font-size: 0.85rem;
             color: #666;
         }
 
-        /* Search Bar */
+        /* Page-specific: Search bar */
         .search-bar {
             display: flex;
             gap: 1rem;
@@ -187,45 +47,7 @@
             cursor: pointer;
         }
 
-        /* Buttons */
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.2s;
-        }
-
-        .btn-primary {
-            background: var(--cyan-dark);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--cyan-blue);
-        }
-
-        .btn-secondary {
-            background: #f8f9fa;
-            color: #606770;
-            border: 1px solid #ddd;
-        }
-
-        .btn-secondary:hover {
-            background: #e8e8e8;
-        }
-
-        .btn-sm {
-            padding: 0.4rem 0.75rem;
-            font-size: 0.85rem;
-        }
-
+        /* Page-specific: View and delete buttons */
         .btn-view {
             background: #e8f4fd;
             color: var(--cyan-dark);
@@ -246,14 +68,7 @@
             background: #fee;
         }
 
-        /* Table */
-        .table-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-
+        /* Page-specific: Cases table */
         .cases-table {
             width: 100%;
             border-collapse: collapse;
@@ -300,19 +115,7 @@
             white-space: nowrap;
         }
 
-        /* Tags */
-        .tag {
-            display: inline-block;
-            padding: 0.2rem 0.5rem;
-            background: #e8f4fd;
-            color: var(--cyan-dark);
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-right: 0.25rem;
-            margin-bottom: 0.25rem;
-        }
-
+        /* Page-specific: Tag variants */
         .tag--category {
             background: #e8f5e9;
             color: var(--success);
@@ -328,113 +131,18 @@
             color: #7b1fa2;
         }
 
-        /* Quality Stars */
+        /* Page-specific: Quality stars */
         .quality-stars {
             color: #ffc107;
         }
 
-        /* Actions */
+        /* Page-specific: Actions cell */
         .actions {
             display: flex;
             gap: 0.5rem;
         }
 
-        /* Pagination */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 1rem;
-            padding: 1.5rem;
-        }
-
-        .pagination__info {
-            color: #666;
-            font-size: 0.9rem;
-        }
-
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 3rem;
-            color: #666;
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #666;
-        }
-
-        /* Alert */
-        .alert {
-            padding: 1rem;
-            border-radius: 6px;
-            margin-bottom: 1rem;
-        }
-
-        .alert-success {
-            background: #e8f5e9;
-            color: var(--success);
-        }
-
-        .alert-error {
-            background: #fee;
-            color: var(--danger);
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 8px;
-            max-width: 900px;
-            width: 95%;
-            max-height: 90vh;
-            overflow-y: auto;
-            padding: 2rem;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1.5rem;
-            gap: 1rem;
-        }
-
-        .modal-title {
-            font-size: 1.25rem;
-            color: var(--cyanview-navy);
-            flex: 1;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #666;
-            flex-shrink: 0;
-        }
-
+        /* Page-specific: Modal tabs and sections */
         .modal-meta {
             display: flex;
             flex-wrap: wrap;
@@ -508,7 +216,7 @@
             display: block;
         }
 
-        /* Keywords */
+        /* Page-specific: Keywords */
         .keywords {
             display: flex;
             flex-wrap: wrap;
@@ -520,9 +228,6 @@
             .cases-table {
                 display: block;
                 overflow-x: auto;
-            }
-            .stats-grid {
-                grid-template-columns: 1fr;
             }
             .search-bar {
                 flex-direction: column;

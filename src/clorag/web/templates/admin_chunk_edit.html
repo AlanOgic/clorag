@@ -6,122 +6,14 @@
     <meta name="robots" content="noindex, nofollow">
     <title>Edit Chunk - Cyanview Admin</title>
     <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
     <style>
-        :root {
-            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-            --cyan-blue: #00a8e8;
-            --cyan-dark: #0077b6;
-            --cyanview-navy: #003366;
-            --danger: #dc3545;
-            --success: #28a745;
-            --warning: #ffc107;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: var(--ifm-font-family-base);
-            line-height: 1.65;
-            color: #1c1e21;
-            background: #f8f9fa;
-        }
-
-        /* Navbar */
-        .navbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.5rem 1rem;
-            background: var(--cyanview-navy);
-            color: white;
-            height: 60px;
-        }
-
-        .navbar__brand {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            color: white;
-            font-weight: 700;
-            font-size: 1.1rem;
-        }
-
-        .navbar__logo {
-            height: 32px;
-            filter: brightness(0) invert(1);
-        }
-
-        .navbar__badge {
-            background: var(--danger);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .navbar__links {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .navbar__link {
-            color: rgba(255, 255, 255, 0.8);
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-
-        .navbar__link:hover {
-            color: white;
-        }
-
-        .navbar__divider {
-            width: 1px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .btn-logout {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.85rem;
-            background: transparent;
-            color: rgba(255, 255, 255, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-logout:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.5);
-            color: white;
-        }
-
-        /* Main */
+        /* Page-specific: Narrower main for edit form */
         .main {
             max-width: 1000px;
-            margin: 0 auto;
-            padding: 2rem;
         }
 
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .page-title {
-            font-size: 1.5rem;
-            color: var(--cyanview-navy);
-        }
-
+        /* Page-specific: Back link */
         .back-link {
             color: var(--cyan-blue);
             text-decoration: none;
@@ -132,7 +24,7 @@
             text-decoration: underline;
         }
 
-        /* Form */
+        /* Page-specific: Form card */
         .form-card {
             background: white;
             border-radius: 8px;
@@ -151,39 +43,6 @@
             margin-bottom: 1rem;
             padding-bottom: 0.5rem;
             border-bottom: 2px solid #e8f4fd;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #333;
-        }
-
-        .form-label--readonly {
-            color: #666;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 1rem;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--cyan-blue);
-        }
-
-        .form-input--readonly {
-            background: #f8f9fa;
-            color: #666;
         }
 
         .form-textarea {
@@ -214,7 +73,7 @@
             color: #666;
         }
 
-        /* Warning */
+        /* Page-specific: Warning box */
         .warning-box {
             background: #fff3cd;
             border: 1px solid var(--warning);
@@ -232,7 +91,7 @@
             color: #856404;
         }
 
-        /* Metadata grid */
+        /* Page-specific: Metadata grid */
         .metadata-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -262,7 +121,7 @@
             color: var(--cyan-blue);
         }
 
-        /* Buttons */
+        /* Page-specific: Form actions */
         .form-actions {
             display: flex;
             gap: 1rem;
@@ -271,90 +130,8 @@
             border-top: 1px solid #eee;
         }
 
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
-
-        .btn-primary {
-            background: var(--cyan-dark);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--cyan-blue);
-        }
-
-        .btn-primary:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background: #f8f9fa;
-            color: #333;
-            border: 1px solid #ddd;
-        }
-
-        .btn-secondary:hover {
-            background: #eee;
-        }
-
         .btn-danger {
-            background: var(--danger);
-            color: white;
             margin-left: auto;
-        }
-
-        .btn-danger:hover {
-            background: #c82333;
-        }
-
-        /* Messages */
-        .alert {
-            padding: 1rem;
-            border-radius: 6px;
-            margin-bottom: 1rem;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 3rem;
-            color: #666;
-        }
-
-        /* Hidden */
-        .hidden {
-            display: none;
-        }
-
-        /* Tags */
-        .tag {
-            display: inline-block;
-            padding: 0.2rem 0.5rem;
-            background: #e8f4fd;
-            color: var(--cyan-dark);
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-right: 0.25rem;
         }
     </style>
 </head>
