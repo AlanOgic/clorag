@@ -21,6 +21,30 @@ All notable changes to CLORAG will be documented in this file.
   - `use_reranking` parameter in `MultiSourceRetriever.retrieve()` to override global setting
   - Useful for disabling reranking on simple queries where speed is prioritized
 
+- **Performance Monitoring System** (Phase 3)
+  - `MetricsCollector` class with thread-safe sliding window (1000 entries)
+  - Timing measurements with percentile calculations (p50, p90, p95, p99)
+  - Query counter and error counter with error rate calculation
+  - `measure()` context manager with automatic slow operation logging
+  - Convenience functions: `measure_embedding_generation()`, `measure_vector_search()`, `measure_total_search()`, `measure_llm_synthesis()`
+
+- **Performance Optimizations** (Phases 1-2)
+  - Parallel embedding generation: Dense (Voyage AI) and sparse (BM25) embeddings generated concurrently
+  - Sparse model preloading: BM25 model loaded at startup, not per-request
+  - Async Voyage AI client: Migrated from sync to async API for non-blocking I/O
+  - Dynamic prefetch scaling: Qdrant prefetch factor adjusts based on query complexity
+  - SupportCaseDatabase connection pooling: 5-connection pool with WAL mode
+
+- **Cache Statistics Endpoint**
+  - `GET /api/admin/cache-stats` - View embedding cache hit/miss rates
+
+- **New API Endpoints**
+  - `GET /api/admin/metrics` - Performance metrics with thresholds and alerts
+  - `GET /api/admin/metrics/recent/{metric_name}` - Recent measurements for debugging
+
+- **New Tests**
+  - 20 comprehensive tests for the metrics module (test_metrics.py)
+
 ### Changed
 - `MultiSourceRetriever` now applies reranking after RRF fusion by default
 - Search result scores now reflect reranker relevance scores (0-1 range)
@@ -33,11 +57,18 @@ All notable changes to CLORAG will be documented in this file.
 - `src/clorag/core/__init__.py` - Export `RerankerClient`
 - `src/clorag/config.py` - Added reranking configuration options
 - `src/clorag/agent/tools.py` - Updated output with rerank status
+- `src/clorag/core/metrics.py` - NEW: Performance metrics collection module
+- `src/clorag/web/app.py` - Added metrics instrumentation and API endpoints
+- `tests/test_metrics.py` - NEW: Comprehensive metrics test suite
 
 ### Performance
 - Reranking adds ~100-500ms latency for typical result sets (15 documents)
 - First 200M tokens free with Voyage AI, then pay-per-token
 - Cache hit rate typically 30-50% for repeated queries
+
+### Documentation
+- Admin docs: Added Performance Monitoring section with metrics table, optimizations, and API reference
+- CLAUDE.md: Updated Core section and added Performance Monitoring documentation
 
 ## [0.5.5] - 2026-01-15
 

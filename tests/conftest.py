@@ -57,23 +57,23 @@ def mock_settings(test_settings: Settings) -> Generator[Settings, None, None]:
 
 @pytest.fixture
 def mock_voyage_client() -> Generator[MagicMock, None, None]:
-    """Mock Voyage AI client for embeddings tests."""
+    """Mock Voyage AI async client for embeddings tests."""
     mock_client = MagicMock()
 
-    # Mock embed() response
+    # Mock embed() response (now async)
     mock_embed_response = MagicMock()
     mock_embed_response.embeddings = [[0.1] * 1024, [0.2] * 1024]
     mock_embed_response.total_tokens = 100
-    mock_client.embed.return_value = mock_embed_response
+    mock_client.embed = AsyncMock(return_value=mock_embed_response)
 
-    # Mock contextualized_embed() response
+    # Mock contextualized_embed() response (now async)
     mock_contextualized_response = MagicMock()
     mock_result = MagicMock()
     mock_result.embeddings = [[0.3] * 1024]
     mock_contextualized_response.results = [mock_result]
-    mock_client.contextualized_embed.return_value = mock_contextualized_response
+    mock_client.contextualized_embed = AsyncMock(return_value=mock_contextualized_response)
 
-    with patch("voyageai.Client", return_value=mock_client):
+    with patch("voyageai.AsyncClient", return_value=mock_client):
         yield mock_client
 
 

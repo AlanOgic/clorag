@@ -42,7 +42,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 ### Source Layout
 
-**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion), `embeddings.py` (voyage-context-3 with contextualized embedding), `sparse_embeddings.py` (BM25), `reranker.py` (Voyage rerank-2.5 cross-encoder), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5)
+**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch), `embeddings.py` (voyage-context-3 with AsyncClient), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool)
 
 **Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler), `chunker.py`, `base.py`
 
@@ -111,7 +111,18 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **SQLite storage**: Full document storage with problem/solution summaries, keywords, categories
 - **FTS5 search**: Full-text search across subject, problem, solution, document, keywords
 - **Thread cleaning**: `clean_thread_quotes()` removes quoted replies, headers, signatures (EN/FR/DE)
+- **Connection pool**: Reuses `ConnectionPool` from camera database for concurrent access
 - **Admin UI**: Browse/search cases at `/admin/support-cases` with detail modal (Summary/Document/Raw tabs)
+
+### Performance Monitoring
+- **Metrics collection**: `MetricsCollector` with sliding window (1000 entries), percentiles (p50/p90/p95/p99)
+- **Pipeline instrumentation**: Timing for embedding_generation, vector_search, total_search, llm_synthesis
+- **Parallel embeddings**: Dense + sparse generated concurrently via `asyncio.gather()`
+- **Sparse model preload**: BM25 model loaded at startup to eliminate cold start latency
+- **Async Voyage client**: Non-blocking API calls with `voyageai.AsyncClient`
+- **Dynamic prefetch**: Scales with limit (3x, max 50) for better RRF fusion quality
+- **Cache stats endpoint**: `/api/admin/cache-stats` for hit/miss rates with recommendations
+- **Metrics endpoint**: `/api/admin/metrics` with thresholds, alerts, and percentile breakdowns
 
 ### Security
 - Session-based admin auth with brute force protection (5 attempts → 5min lockout per IP)

@@ -106,6 +106,7 @@
                         <li><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
                         <li><a href="#support-cases" class="docs-nav__link">Support Cases</a></li>
                         <li><a href="#analytics" class="docs-nav__link">Analytics</a></li>
+                        <li><a href="#performance" class="docs-nav__link">Performance Monitoring</a></li>
                     </ul>
                 </div>
             </nav>
@@ -357,6 +358,78 @@ uv run rebuild-fts --check</code></pre>
                     <li>Visual charts for search volume trends</li>
                     <li>Click any search to view full details including response and sources</li>
                 </ul>
+
+                <h2 id="performance">Performance Monitoring</h2>
+
+                <h3>Overview</h3>
+                <p>The system includes comprehensive performance monitoring for the RAG pipeline with real-time metrics collection, automatic slow operation detection, and detailed statistics.</p>
+
+                <h3>Metrics Collected</h3>
+                <table>
+                    <tr><th>Metric</th><th>Target</th><th>Warning</th><th>Description</th></tr>
+                    <tr><td>embedding_generation</td><td>&lt;200ms</td><td>&gt;500ms</td><td>Dense + sparse embedding generation (parallel)</td></tr>
+                    <tr><td>vector_search</td><td>&lt;100ms</td><td>&gt;300ms</td><td>Qdrant hybrid search with RRF fusion</td></tr>
+                    <tr><td>total_search</td><td>&lt;500ms</td><td>&gt;1000ms</td><td>Complete search pipeline (embeddings + search + filtering)</td></tr>
+                    <tr><td>llm_synthesis</td><td>&lt;2000ms</td><td>&gt;5000ms</td><td>Time to first token from Claude</td></tr>
+                </table>
+
+                <h3>Performance Optimizations</h3>
+                <ul>
+                    <li><strong>Parallel Embedding Generation</strong> - Dense (Voyage AI) and sparse (BM25) embeddings generated concurrently using asyncio.gather()</li>
+                    <li><strong>Query Embedding Cache</strong> - LRU cache (200 entries) for both dense and sparse query embeddings</li>
+                    <li><strong>Sparse Model Preloading</strong> - BM25 model loaded at server startup to eliminate cold start latency (~2-3s)</li>
+                    <li><strong>Async Voyage Client</strong> - Non-blocking API calls using voyageai.AsyncClient</li>
+                    <li><strong>Dynamic Prefetch Scaling</strong> - Prefetch limit scales with requested results (3x, max 50) for better RRF fusion</li>
+                    <li><strong>Connection Pooling</strong> - SQLite connection pools (5 connections) for camera and support case databases</li>
+                </ul>
+
+                <h3>API Endpoints</h3>
+                <p>Performance data is accessible via authenticated admin API endpoints:</p>
+                <pre><code># Get comprehensive metrics with percentiles
+GET /api/admin/metrics
+
+# Get cache hit/miss rates
+GET /api/admin/cache-stats
+
+# Get recent measurements for debugging
+GET /api/admin/metrics/recent/{metric_name}?count=10</code></pre>
+
+                <h3>Metrics Response</h3>
+                <pre><code>{
+  "total_queries": 150,
+  "error_count": 0,
+  "error_rate_percent": 0.0,
+  "metrics": {
+    "embedding_generation": {
+      "count": 150, "avg_ms": 185.5,
+      "p50_ms": 175.0, "p95_ms": 250.0, "p99_ms": 310.0
+    },
+    "vector_search": {
+      "count": 150, "avg_ms": 95.2,
+      "p50_ms": 85.0, "p95_ms": 150.0, "p99_ms": 180.0
+    }
+  },
+  "alerts": [
+    {"level": "info", "metric": "embedding_generation",
+     "message": "p95 exceeds target (200ms)"}
+  ]
+}</code></pre>
+
+                <h3>Cache Statistics</h3>
+                <pre><code>{
+  "dense_cache": {
+    "size": 45, "hits": 120, "misses": 30, "hit_rate_percent": 80.0
+  },
+  "sparse_cache": {
+    "size": 45, "hits": 115, "misses": 35, "hit_rate_percent": 76.7
+  },
+  "recommendations": ["Cache performance is healthy."]
+}</code></pre>
+
+                <div class="info-box info-box--success">
+                    <div class="info-box__title">Automatic Slow Operation Logging</div>
+                    <p>Operations exceeding warning thresholds are automatically logged with structured metadata for debugging. Check server logs for <code>Slow operation detected</code> warnings.</p>
+                </div>
 
                 <div class="page-nav">
                     <a href="/admin/docs/content" class="page-nav__link">

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime
@@ -13,6 +12,7 @@ from pathlib import Path
 import structlog
 
 from clorag.config import get_settings
+from clorag.core.database import ConnectionPool
 from clorag.models.support_case import CaseStatus, ResolutionQuality, SupportCase
 
 logger = structlog.get_logger(__name__)
@@ -44,38 +44,39 @@ class SupportCaseDatabase:
         """
         settings = get_settings()
         self._db_path = db_path or str(settings.database_path)
-        self._local = threading.local()
 
         # Ensure directory exists
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
 
+        # Initialize connection pool (reuse pattern from CameraDatabase)
+        self._pool = ConnectionPool(self._db_path, pool_size=5)
+
         # Initialize schema
         self._ensure_schema()
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Get thread-local database connection."""
-        if not hasattr(self._local, "connection") or self._local.connection is None:
-            self._local.connection = sqlite3.connect(self._db_path)
-            self._local.connection.row_factory = sqlite3.Row
-            # Enable WAL mode for better concurrency
-            self._local.connection.execute("PRAGMA journal_mode=WAL")
-            self._local.connection.execute("PRAGMA synchronous=NORMAL")
-        conn: sqlite3.Connection = self._local.connection
-        return conn
+    @contextmanager
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+        """Get a database connection from the pool."""
+        with self._pool.get_connection() as conn:
+            yield conn
+
+    def close(self) -> None:
+        """Close all database connections."""
+        self._pool.close_all()
 
     @contextmanager
     def _cursor(self) -> Generator[sqlite3.Cursor, None, None]:
         """Context manager for database cursor with auto-commit."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        try:
-            yield cursor
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            cursor.close()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                yield cursor
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                cursor.close()
 
     def _ensure_schema(self) -> None:
         """Create tables if they don't exist."""

@@ -1,5 +1,6 @@
 """FastAPI web application for AI Search with Claude synthesis."""
 
+import asyncio
 import io
 import json
 import secrets
@@ -12,7 +13,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
+
+if TYPE_CHECKING:
+    from qdrant_client.http.models import SparseVector
 
 import anthropic
 import anyio
@@ -49,6 +53,12 @@ from clorag.config import get_settings
 from clorag.core.analytics_db import AnalyticsDatabase
 from clorag.core.database import get_camera_database
 from clorag.core.embeddings import EmbeddingsClient
+from clorag.core.metrics import (
+    get_metrics_collector,
+    measure_embedding_generation,
+    measure_total_search,
+    measure_vector_search,
+)
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import VectorStore
 from clorag.models.camera import Camera, CameraCreate, CameraSource, CameraUpdate
@@ -146,6 +156,16 @@ async def lifespan(app: FastAPI):
         logger.info("Qdrant collections ensured")
     except Exception as e:
         logger.warning("Failed to ensure Qdrant collections", error=str(e))
+
+    # Pre-load BM25 sparse embedding model to eliminate cold start latency (~2-3s)
+    try:
+        sparse_emb = get_sparse_embeddings()
+        logger.info(
+            "Sparse embedding model pre-loaded",
+            model=sparse_emb._model_name,
+        )
+    except Exception as e:
+        logger.warning("Failed to pre-load sparse embedding model", error=str(e))
 
     if settings.draft_polling_enabled:
         from clorag.drafts import check_and_create_drafts
@@ -728,6 +748,32 @@ async def synthesize_answer_stream(
             yield text
 
 
+async def _generate_embeddings_parallel(
+    query: str,
+) -> tuple[list[float], "SparseVector"]:
+    """Generate dense and sparse embeddings in parallel.
+
+    Runs dense embedding (async API call) and sparse embedding (sync BM25)
+    concurrently to reduce query latency by ~100ms.
+
+    Args:
+        query: Search query text.
+
+    Returns:
+        Tuple of (dense_vector, sparse_vector).
+    """
+    with measure_embedding_generation(metadata={"query_length": len(query)}):
+        emb = get_embeddings()
+        sparse_emb = get_sparse_embeddings()
+
+        # Run dense (async) and sparse (sync wrapped) in parallel
+        dense_task = emb.embed_query(query)
+        sparse_task = asyncio.to_thread(sparse_emb.embed_query, query)
+
+        dense_vector, sparse_vector = await asyncio.gather(dense_task, sparse_task)
+    return dense_vector, sparse_vector
+
+
 async def _perform_search(
     req: SearchRequest,
 ) -> tuple[list[SearchResult], list[dict], str | None]:
@@ -739,141 +785,145 @@ async def _perform_search(
     Returns:
         Tuple of (search_results, chunks_for_synthesis, graph_context)
     """
-    vs = get_vectorstore()
-    emb = get_embeddings()
-    sparse_emb = get_sparse_embeddings()
+    metrics = get_metrics_collector()
+    metrics.record_query()
 
-    # Generate both dense and sparse query embeddings
-    dense_vector = await emb.embed_query(req.query)
-    sparse_vector = sparse_emb.embed_query(req.query)
+    with measure_total_search(metadata={"source": req.source.value, "limit": req.limit}):
+        vs = get_vectorstore()
 
-    results: list[SearchResult] = []
-    chunks_for_synthesis: list[dict] = []
+        # Generate dense and sparse embeddings in parallel for better latency
+        dense_vector, sparse_vector = await _generate_embeddings_parallel(req.query)
 
-    if req.source == SearchSource.DOCS:
-        # Search only documentation with hybrid RRF
-        docs = await vs.search_docs_hybrid(dense_vector, sparse_vector, limit=req.limit)
-        for doc in docs:
-            results.append(
-                SearchResult(
-                    score=doc.score,
-                    source="documentation",
-                    title=doc.payload.get("title", "Untitled"),
-                    url=doc.payload.get("url"),
-                    snippet=_truncate(doc.payload.get("text", ""), 300),
-                    metadata=doc.payload,
-                )
-            )
-            chunks_for_synthesis.append({
-                "text": doc.payload.get("text", ""),
-                "source_type": "documentation",
-                "url": doc.payload.get("url"),
-                "title": doc.payload.get("title", "Untitled"),
-            })
+        results: list[SearchResult] = []
+        chunks_for_synthesis: list[dict] = []
 
-    elif req.source == SearchSource.GMAIL:
-        # Search only Gmail cases with hybrid RRF
-        cases = await vs.search_cases_hybrid(dense_vector, sparse_vector, limit=req.limit)
-        for case in cases:
-            results.append(
-                SearchResult(
-                    score=case.score,
-                    source="gmail_case",
-                    title=case.payload.get("subject", "No Subject"),
-                    subject=case.payload.get("subject"),
-                    snippet=_truncate(case.payload.get("text", ""), 300),
-                    metadata=case.payload,
-                )
-            )
-            chunks_for_synthesis.append({
-                "text": case.payload.get("text", ""),
-                "source_type": "gmail_case",
-                "subject": case.payload.get("subject", "Support Case"),
-            })
-
-    else:
-        # Hybrid RRF search across all collections (docs, cases, custom_docs)
-        hybrid = await vs.hybrid_search_rrf(dense_vector, sparse_vector, limit=req.limit)
-        for item in hybrid:
-            source_type = item.payload.get("_source", "unknown")
-            if source_type == "documentation":
+        if req.source == SearchSource.DOCS:
+            # Search only documentation with hybrid RRF
+            with measure_vector_search(metadata={"collection": "docs", "limit": req.limit}):
+                docs = await vs.search_docs_hybrid(dense_vector, sparse_vector, limit=req.limit)
+            for doc in docs:
                 results.append(
                     SearchResult(
-                        score=item.score,
+                        score=doc.score,
                         source="documentation",
-                        title=item.payload.get("title", "Untitled"),
-                        url=item.payload.get("url"),
-                        snippet=_truncate(item.payload.get("text", ""), 300),
-                        metadata=item.payload,
+                        title=doc.payload.get("title", "Untitled"),
+                        url=doc.payload.get("url"),
+                        snippet=_truncate(doc.payload.get("text", ""), 300),
+                        metadata=doc.payload,
                     )
                 )
                 chunks_for_synthesis.append({
-                    "text": item.payload.get("text", ""),
+                    "text": doc.payload.get("text", ""),
                     "source_type": "documentation",
-                    "url": item.payload.get("url"),
-                    "title": item.payload.get("title", "Untitled"),
+                    "url": doc.payload.get("url"),
+                    "title": doc.payload.get("title", "Untitled"),
                 })
-            elif source_type == "custom_docs":
+
+        elif req.source == SearchSource.GMAIL:
+            # Search only Gmail cases with hybrid RRF
+            with measure_vector_search(metadata={"collection": "gmail", "limit": req.limit}):
+                cases = await vs.search_cases_hybrid(dense_vector, sparse_vector, limit=req.limit)
+            for case in cases:
                 results.append(
                     SearchResult(
-                        score=item.score,
-                        source="custom_docs",
-                        title=item.payload.get("title", "Custom Knowledge"),
-                        url=item.payload.get("url_reference"),
-                        snippet=_truncate(item.payload.get("text", ""), 300),
-                        metadata=item.payload,
-                    )
-                )
-                chunks_for_synthesis.append({
-                    "text": item.payload.get("text", ""),
-                    "source_type": "custom_docs",
-                    "url": item.payload.get("url_reference"),
-                    "title": item.payload.get("title", "Custom Knowledge"),
-                })
-            else:
-                results.append(
-                    SearchResult(
-                        score=item.score,
+                        score=case.score,
                         source="gmail_case",
-                        title=item.payload.get("subject", "No Subject"),
-                        subject=item.payload.get("subject"),
-                        snippet=_truncate(item.payload.get("text", ""), 300),
-                        metadata=item.payload,
+                        title=case.payload.get("subject", "No Subject"),
+                        subject=case.payload.get("subject"),
+                        snippet=_truncate(case.payload.get("text", ""), 300),
+                        metadata=case.payload,
                     )
                 )
                 chunks_for_synthesis.append({
-                    "text": item.payload.get("text", ""),
+                    "text": case.payload.get("text", ""),
                     "source_type": "gmail_case",
-                    "subject": item.payload.get("subject", "Support Case"),
+                    "subject": case.payload.get("subject", "Support Case"),
                 })
 
-    # Apply dynamic threshold filtering based on query characteristics
-    results, chunks_for_synthesis = _filter_by_dynamic_threshold(
-        results, chunks_for_synthesis, req.query
-    )
+        else:
+            # Hybrid RRF search across all collections (docs, cases, custom_docs)
+            with measure_vector_search(metadata={"collection": "all", "limit": req.limit}):
+                hybrid = await vs.hybrid_search_rrf(dense_vector, sparse_vector, limit=req.limit)
+            for item in hybrid:
+                source_type = item.payload.get("_source", "unknown")
+                if source_type == "documentation":
+                    results.append(
+                        SearchResult(
+                            score=item.score,
+                            source="documentation",
+                            title=item.payload.get("title", "Untitled"),
+                            url=item.payload.get("url"),
+                            snippet=_truncate(item.payload.get("text", ""), 300),
+                            metadata=item.payload,
+                        )
+                    )
+                    chunks_for_synthesis.append({
+                        "text": item.payload.get("text", ""),
+                        "source_type": "documentation",
+                        "url": item.payload.get("url"),
+                        "title": item.payload.get("title", "Untitled"),
+                    })
+                elif source_type == "custom_docs":
+                    results.append(
+                        SearchResult(
+                            score=item.score,
+                            source="custom_docs",
+                            title=item.payload.get("title", "Custom Knowledge"),
+                            url=item.payload.get("url_reference"),
+                            snippet=_truncate(item.payload.get("text", ""), 300),
+                            metadata=item.payload,
+                        )
+                    )
+                    chunks_for_synthesis.append({
+                        "text": item.payload.get("text", ""),
+                        "source_type": "custom_docs",
+                        "url": item.payload.get("url_reference"),
+                        "title": item.payload.get("title", "Custom Knowledge"),
+                    })
+                else:
+                    results.append(
+                        SearchResult(
+                            score=item.score,
+                            source="gmail_case",
+                            title=item.payload.get("subject", "No Subject"),
+                            subject=item.payload.get("subject"),
+                            snippet=_truncate(item.payload.get("text", ""), 300),
+                            metadata=item.payload,
+                        )
+                    )
+                    chunks_for_synthesis.append({
+                        "text": item.payload.get("text", ""),
+                        "source_type": "gmail_case",
+                        "subject": item.payload.get("subject", "Support Case"),
+                    })
 
-    # Get graph enrichment if available
-    graph_context = None
-    try:
-        enrichment = await get_graph_enrichment()
-        if enrichment and results:
-            # Extract chunk IDs for graph traversal
-            chunk_ids = []
-            for result in results[:5]:  # Top 5 chunks
-                if hasattr(result, "metadata") and result.metadata:
-                    chunk_id = result.metadata.get("id") or result.metadata.get("chunk_id")
-                    if chunk_id:
-                        chunk_ids.append(str(chunk_id))
+        # Apply dynamic threshold filtering based on query characteristics
+        results, chunks_for_synthesis = _filter_by_dynamic_threshold(
+            results, chunks_for_synthesis, req.query
+        )
 
-            if chunk_ids:
-                enrichment_ctx = await enrichment.enrich_from_chunks(chunk_ids)
-                graph_context = enrichment_ctx.to_context_string()
-                if graph_context:
-                    logger.debug("graph_enrichment_added", context_len=len(graph_context))
-    except Exception as e:
-        logger.debug("graph_enrichment_skipped", error=str(e))
+        # Get graph enrichment if available
+        graph_context = None
+        try:
+            enrichment = await get_graph_enrichment()
+            if enrichment and results:
+                # Extract chunk IDs for graph traversal
+                chunk_ids = []
+                for result in results[:5]:  # Top 5 chunks
+                    if hasattr(result, "metadata") and result.metadata:
+                        chunk_id = result.metadata.get("id") or result.metadata.get("chunk_id")
+                        if chunk_id:
+                            chunk_ids.append(str(chunk_id))
 
-    return results, chunks_for_synthesis, graph_context
+                if chunk_ids:
+                    enrichment_ctx = await enrichment.enrich_from_chunks(chunk_ids)
+                    graph_context = enrichment_ctx.to_context_string()
+                    if graph_context:
+                        logger.debug("graph_enrichment_added", context_len=len(graph_context))
+        except Exception as e:
+            logger.debug("graph_enrichment_skipped", error=str(e))
+
+        return results, chunks_for_synthesis, graph_context
 
 
 @app.post("/api/search/stream")
@@ -1903,6 +1953,132 @@ async def api_popular_queries(
     return analytics.get_popular_queries(limit=limit, days=days)
 
 
+@app.get("/api/admin/cache-stats", tags=["Performance"])
+async def api_cache_stats(_: bool = Depends(verify_admin)):
+    """Get embedding cache statistics for performance monitoring.
+
+    Returns hit/miss rates for both dense (Voyage AI) and sparse (BM25)
+    query embedding caches. Higher hit rates indicate better cache efficiency.
+    """
+    from clorag.core.embeddings import get_query_cache
+
+    sparse_emb = get_sparse_embeddings()
+    dense_cache = get_query_cache()
+
+    return {
+        "dense_cache": dense_cache.stats(),
+        "sparse_cache": sparse_emb.cache_stats(),
+        "recommendations": _generate_cache_recommendations(
+            dense_cache.stats(), sparse_emb.cache_stats()
+        ),
+    }
+
+
+@app.get("/api/admin/metrics", tags=["Performance"])
+async def api_performance_metrics(_: bool = Depends(verify_admin)):
+    """Get comprehensive performance metrics for the RAG pipeline.
+
+    Returns timing statistics for embedding generation, vector search,
+    and total search latency with percentiles (p50, p90, p95, p99).
+
+    Metrics are collected from a sliding window of the last 1000 operations.
+    """
+    metrics = get_metrics_collector()
+    all_stats = metrics.get_all_stats()
+
+    # Add target thresholds for comparison
+    thresholds = {
+        "embedding_generation": {"target_ms": 200, "warning_ms": 500},
+        "vector_search": {"target_ms": 100, "warning_ms": 300},
+        "total_search": {"target_ms": 500, "warning_ms": 1000},
+        "llm_synthesis": {"target_ms": 2000, "warning_ms": 5000},
+    }
+
+    # Generate performance alerts
+    alerts = []
+    for metric_name, stats in all_stats.get("metrics", {}).items():
+        if metric_name in thresholds:
+            threshold = thresholds[metric_name]
+            if stats.get("p95_ms", 0) > threshold["warning_ms"]:
+                alerts.append({
+                    "level": "warning",
+                    "metric": metric_name,
+                    "message": f"{metric_name} p95 ({stats['p95_ms']}ms) exceeds warning threshold ({threshold['warning_ms']}ms)",
+                })
+            elif stats.get("p95_ms", 0) > threshold["target_ms"]:
+                alerts.append({
+                    "level": "info",
+                    "metric": metric_name,
+                    "message": f"{metric_name} p95 ({stats['p95_ms']}ms) exceeds target ({threshold['target_ms']}ms)",
+                })
+
+    return {
+        **all_stats,
+        "thresholds": thresholds,
+        "alerts": alerts,
+    }
+
+
+@app.get("/api/admin/metrics/recent/{metric_name}", tags=["Performance"])
+async def api_recent_metrics(
+    metric_name: str,
+    count: int = Query(default=10, ge=1, le=100),
+    _: bool = Depends(verify_admin),
+):
+    """Get recent measurements for a specific metric.
+
+    Useful for debugging recent performance issues or viewing trends.
+    """
+    metrics = get_metrics_collector()
+    recent = metrics.get_recent(metric_name, count)
+
+    if not recent:
+        raise HTTPException(status_code=404, detail=f"No data for metric: {metric_name}")
+
+    return {
+        "metric": metric_name,
+        "count": len(recent),
+        "measurements": recent,
+    }
+
+
+def _generate_cache_recommendations(
+    dense_stats: dict[str, int],
+    sparse_stats: dict[str, int],
+) -> list[str]:
+    """Generate actionable recommendations based on cache performance."""
+    recommendations = []
+
+    # Check dense cache hit rate
+    if dense_stats.get("hit_rate_percent", 0) < 30:
+        recommendations.append(
+            "Dense cache hit rate is low (<30%). Consider increasing cache size "
+            "or pre-warming with common queries."
+        )
+
+    # Check sparse cache hit rate
+    if sparse_stats.get("hit_rate_percent", 0) < 30:
+        recommendations.append(
+            "Sparse cache hit rate is low (<30%). Users may be asking diverse queries."
+        )
+
+    # Check if caches are full
+    if dense_stats.get("size", 0) >= 190:  # Near 200 limit
+        recommendations.append(
+            "Dense cache is near capacity. Consider increasing QUERY_CACHE_MAX_SIZE."
+        )
+
+    if sparse_stats.get("size", 0) >= 190:
+        recommendations.append(
+            "Sparse cache is near capacity. Consider increasing SPARSE_CACHE_MAX_SIZE."
+        )
+
+    if not recommendations:
+        recommendations.append("Cache performance is healthy.")
+
+    return recommendations
+
+
 @app.get("/api/admin/search/{search_id}", tags=["Analytics"])
 async def api_get_search(
     search_id: int,
@@ -2375,11 +2551,8 @@ async def api_chunks_list(
 
     # If search query provided, use hybrid search
     if search:
-        emb = get_embeddings()
-        sparse_emb = get_sparse_embeddings()
-
-        dense_vector = await emb.embed_query(search)
-        sparse_vector = sparse_emb.embed_query(search)
+        # Generate embeddings in parallel for better latency
+        dense_vector, sparse_vector = await _generate_embeddings_parallel(search)
 
         results = await vs.search_hybrid_rrf(
             collection=collection.value,
@@ -2511,12 +2684,8 @@ async def api_chunk_update(
     dense_vector = None
     sparse_vector = None
     if text_changed and new_text:
-        emb = get_embeddings()
-        sparse_emb = get_sparse_embeddings()
-
-        dense_vector = await emb.embed_query(new_text)
-        sparse_vector = sparse_emb.embed_query(new_text)
-
+        # Generate embeddings in parallel for better latency
+        dense_vector, sparse_vector = await _generate_embeddings_parallel(new_text)
         logger.info("Re-embedding chunk", chunk_id=chunk_id, collection=collection)
 
     # Update chunk

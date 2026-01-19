@@ -19,6 +19,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 - **Query Embedding Cache** - LRU cache reduces API calls for repeated queries
 - **Dynamic Score Thresholds** - Adaptive filtering based on query characteristics
 - **GraphRAG** - Neo4j knowledge graph enrichment with entity extraction from chunks
+- **Performance Monitoring** - Real-time metrics collection with percentile stats and slow operation alerts
 
 ## Architecture
 

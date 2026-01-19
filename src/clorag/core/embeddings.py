@@ -120,8 +120,8 @@ class EmbeddingsClient:
         self._model = model or settings.voyage_model
         self._dimensions = dimensions or settings.voyage_dimensions
 
-        # Initialize Voyage AI client
-        self._client = voyageai.Client(api_key=self._api_key)
+        # Initialize Voyage AI async client for non-blocking API calls
+        self._client = voyageai.AsyncClient(api_key=self._api_key)
 
     @property
     def model(self) -> str:
@@ -155,7 +155,7 @@ class EmbeddingsClient:
             return EmbeddingResult(vectors=[], total_tokens=0)
 
         # voyage-context-3 supports up to 16K chunks per request
-        result = self._client.embed(
+        result = await self._client.embed(
             texts=texts,
             model=self._model,
             input_type=input_type,
@@ -193,7 +193,7 @@ class EmbeddingsClient:
                 return cached
 
         # Use contextualized_embed for queries too - query as [[text]]
-        result = self._client.contextualized_embed(
+        result = await self._client.contextualized_embed(
             inputs=[[text]],
             model=self._model,
             input_type="query",
@@ -272,7 +272,7 @@ class EmbeddingsClient:
             return []
 
         # voyage-context-3 with contextualized_embed
-        result = self._client.contextualized_embed(
+        result = await self._client.contextualized_embed(
             inputs=documents,
             model=self._model,
             input_type=input_type,

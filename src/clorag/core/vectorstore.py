@@ -426,18 +426,22 @@ class VectorStore:
         Returns:
             List of SearchResult objects ranked by RRF fusion.
         """
+        # Dynamic prefetch: fetch more candidates for better RRF fusion quality
+        # Scale with requested limit but cap to avoid excessive retrieval
+        prefetch_limit = min(limit * 3, 50)
+
         response = await self._client.query_points(
             collection_name=collection,
             prefetch=[
                 models.Prefetch(
                     query=dense_vector,
                     using="dense",
-                    limit=20,
+                    limit=prefetch_limit,
                 ),
                 models.Prefetch(
                     query=sparse_vector,
                     using="sparse",
-                    limit=20,
+                    limit=prefetch_limit,
                 ),
             ],
             query=models.FusionQuery(fusion=models.Fusion.RRF),
