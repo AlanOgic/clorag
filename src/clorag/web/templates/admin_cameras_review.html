@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Review Queue - Camera Admin - Cyanview</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --danger: #dc3545;
+            --success: #28a745;
+            --warning: #ffc107;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: var(--cyanview-navy);
+            color: white;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+            filter: brightness(0) invert(1);
+        }
+
+        .navbar__badge {
+            background: var(--danger);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .navbar__link {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .navbar__link:hover {
+            color: white;
+        }
+
+        /* Main */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            color: var(--cyanview-navy);
+        }
+
+        .page-subtitle {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .btn--primary {
+            background: var(--cyan-blue);
+            color: white;
+        }
+
+        .btn--primary:hover {
+            background: var(--cyan-dark);
+        }
+
+        .btn--success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn--success:hover {
+            background: #218838;
+        }
+
+        .btn--danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn--danger:hover {
+            background: #c82333;
+        }
+
+        .btn--small {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat__value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--cyanview-navy);
+        }
+
+        .stat__label {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        /* Table */
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* Confidence indicator */
+        .confidence {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .confidence__bar {
+            width: 60px;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .confidence__fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .confidence__fill--high {
+            background: var(--success);
+        }
+
+        .confidence__fill--medium {
+            background: var(--warning);
+        }
+
+        .confidence__fill--low {
+            background: var(--danger);
+        }
+
+        .confidence__value {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            background: #e9ecef;
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .tag--source-docs {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .tag--source-support {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .tag--source-manual {
+            background: #e2d5f0;
+            color: #563d7c;
+        }
+
+        /* Camera info */
+        .camera-name {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .camera-manufacturer {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .camera-type {
+            font-size: 0.8rem;
+            color: #888;
+            font-style: italic;
+        }
+
+        /* Actions */
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #666;
+        }
+
+        .empty-state__icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state__title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .pagination__info {
+            margin-right: 1rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .pagination__btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            height: 36px;
+            padding: 0 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            color: #333;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .pagination__btn:hover {
+            background: #f0f4f8;
+            border-color: var(--cyan-blue);
+            color: var(--cyan-blue);
+        }
+
+        .pagination__btn--active {
+            background: var(--cyan-blue);
+            border-color: var(--cyan-blue);
+            color: white;
+        }
+
+        .pagination__btn--disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            background: var(--success);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast--error {
+            background: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/cyanview-logo-horizontal-white.svg" alt="Cyanview" class="navbar__logo">
+            <span class="navbar__badge">Admin</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin/cameras" class="navbar__link">Cameras</a>
+            <a href="/admin/cameras/review" class="navbar__link" style="color: white; font-weight: 600;">Review Queue</a>
+            <a href="/admin/knowledge" class="navbar__link">Knowledge</a>
+            <a href="/admin/analytics" class="navbar__link">Analytics</a>
+            <a href="/" class="navbar__link">Back to Site</a>
+        </div>
+    </nav>
+
+    <main class="main">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Review Queue</h1>
+                <p class="page-subtitle">Low-confidence camera extractions requiring human review</p>
+            </div>
+            <a href="/admin/cameras" class="btn btn--primary">Back to Cameras</a>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <span class="stat__value">{{ total_count }}</span>
+                <span class="stat__label">Pending Review</span>
+            </div>
+        </div>
+
+        {% if cameras %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Camera</th>
+                        <th>Source</th>
+                        <th>Ports</th>
+                        <th>Protocols</th>
+                        <th>Confidence</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for camera in cameras %}
+                    <tr data-id="{{ camera.id }}">
+                        <td>
+                            <div class="camera-name">{{ camera.name }}</div>
+                            <div class="camera-manufacturer">{{ camera.manufacturer or 'Unknown' }}</div>
+                            {% if camera.device_type %}
+                            <div class="camera-type">{{ camera.device_type.value | replace('_', ' ') | title }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if camera.source.value == 'documentation' %}
+                            <span class="tag tag--source-docs">Documentation</span>
+                            {% elif camera.source.value == 'support_case' %}
+                            <span class="tag tag--source-support">Support</span>
+                            {% else %}
+                            <span class="tag tag--source-manual">Manual</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% for port in camera.ports[:3] %}
+                            <span class="tag">{{ port }}</span>
+                            {% endfor %}
+                            {% if camera.ports | length > 3 %}
+                            <span class="tag">+{{ camera.ports | length - 3 }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% for protocol in camera.protocols[:3] %}
+                            <span class="tag">{{ protocol }}</span>
+                            {% endfor %}
+                            {% if camera.protocols | length > 3 %}
+                            <span class="tag">+{{ camera.protocols | length - 3 }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="confidence">
+                                <div class="confidence__bar">
+                                    {% set confidence_pct = (camera.confidence * 100) | int %}
+                                    {% if camera.confidence >= 0.7 %}
+                                    <div class="confidence__fill confidence__fill--high" style="width: {{ confidence_pct }}%"></div>
+                                    {% elif camera.confidence >= 0.5 %}
+                                    <div class="confidence__fill confidence__fill--medium" style="width: {{ confidence_pct }}%"></div>
+                                    {% else %}
+                                    <div class="confidence__fill confidence__fill--low" style="width: {{ confidence_pct }}%"></div>
+                                    {% endif %}
+                                </div>
+                                <span class="confidence__value">{{ confidence_pct }}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn btn--success btn--small" onclick="approveCamera({{ camera.id }})">Approve</button>
+                                <a href="/admin/cameras/{{ camera.id }}/edit" class="btn btn--primary btn--small">Edit</a>
+                                <button class="btn btn--danger btn--small" onclick="deleteCamera({{ camera.id }}, '{{ camera.name | replace("'", "\\'") }}')">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                <span class="pagination__info">
+                    Page {{ page }} of {{ total_pages }}
+                </span>
+
+                {% if page > 1 %}
+                <a href="?page={{ page - 1 }}" class="pagination__btn">Previous</a>
+                {% else %}
+                <span class="pagination__btn pagination__btn--disabled">Previous</span>
+                {% endif %}
+
+                {% if page < total_pages %}
+                <a href="?page={{ page + 1 }}" class="pagination__btn">Next</a>
+                {% else %}
+                <span class="pagination__btn pagination__btn--disabled">Next</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="table-container">
+            <div class="empty-state">
+                <div class="empty-state__icon">&#10003;</div>
+                <h2 class="empty-state__title">All caught up!</h2>
+                <p>No cameras pending review. Great job!</p>
+            </div>
+        </div>
+        {% endif %}
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/admin/session');
+                if (!response.ok) {
+                    window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch {
+                window.location.href = '/admin/login';
+            }
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast' + (isError ? ' toast--error' : '');
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        async function approveCamera(id) {
+            try {
+                const response = await fetch(`/api/admin/cameras/${id}/approve`, {
+                    method: 'POST',
+                });
+
+                if (response.ok) {
+                    // Remove row from table
+                    const row = document.querySelector(`tr[data-id="${id}"]`);
+                    if (row) {
+                        row.style.transition = 'opacity 0.3s';
+                        row.style.opacity = '0';
+                        setTimeout(() => row.remove(), 300);
+                    }
+
+                    // Update count
+                    const countEl = document.querySelector('.stat__value');
+                    if (countEl) {
+                        const newCount = parseInt(countEl.textContent) - 1;
+                        countEl.textContent = newCount;
+                        if (newCount === 0) {
+                            setTimeout(() => window.location.reload(), 500);
+                        }
+                    }
+
+                    showToast('Camera approved successfully');
+                } else {
+                    showToast('Failed to approve camera', true);
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, true);
+            }
+        }
+
+        async function deleteCamera(id, name) {
+            if (!confirm(`Delete camera "${name}"? This cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/cameras/${id}`, {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    // Remove row from table
+                    const row = document.querySelector(`tr[data-id="${id}"]`);
+                    if (row) {
+                        row.style.transition = 'opacity 0.3s';
+                        row.style.opacity = '0';
+                        setTimeout(() => row.remove(), 300);
+                    }
+
+                    // Update count
+                    const countEl = document.querySelector('.stat__value');
+                    if (countEl) {
+                        const newCount = parseInt(countEl.textContent) - 1;
+                        countEl.textContent = newCount;
+                        if (newCount === 0) {
+                            setTimeout(() => window.location.reload(), 500);
+                        }
+                    }
+
+                    showToast('Camera deleted');
+                } else {
+                    showToast('Failed to delete camera', true);
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, true);
+            }
+        }
+
+        // Check auth on page load
+        checkAuth();
+    </script>
+</body>
+</html>

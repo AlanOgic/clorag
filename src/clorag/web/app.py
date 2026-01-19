@@ -59,6 +59,7 @@ from clorag.core.metrics import (
     measure_total_search,
     measure_vector_search,
 )
+from clorag.core.reranker import RerankerClient
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import VectorStore
 from clorag.models.camera import Camera, CameraCreate, CameraSource, CameraUpdate
@@ -270,6 +271,7 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 _vectorstore: VectorStore | None = None
 _embeddings: EmbeddingsClient | None = None
 _sparse_embeddings: SparseEmbeddingsClient | None = None
+_reranker: RerankerClient | None = None
 _anthropic: anthropic.AsyncAnthropic | None = None
 _analytics_db: AnalyticsDatabase | None = None
 _custom_docs_service: CustomDocumentService | None = None
@@ -297,6 +299,14 @@ def get_sparse_embeddings() -> SparseEmbeddingsClient:
     if _sparse_embeddings is None:
         _sparse_embeddings = SparseEmbeddingsClient()
     return _sparse_embeddings
+
+
+def get_reranker() -> RerankerClient:
+    """Get or create RerankerClient instance for result reranking."""
+    global _reranker
+    if _reranker is None:
+        _reranker = RerankerClient()
+    return _reranker
 
 
 def get_anthropic() -> anthropic.AsyncAnthropic:
@@ -776,17 +786,21 @@ async def _generate_embeddings_parallel(
 
 async def _perform_search(
     req: SearchRequest,
-) -> tuple[list[SearchResult], list[dict], str | None]:
+) -> tuple[list[SearchResult], list[dict], str | None, bool]:
     """Perform hybrid search and return results with chunks for synthesis.
 
     Uses hybrid search (dense + sparse vectors) with RRF fusion for better
     results on queries with specific model numbers or technical terms.
+    Optionally applies reranking with Voyage rerank-2.5 for improved relevance.
 
     Returns:
-        Tuple of (search_results, chunks_for_synthesis, graph_context)
+        Tuple of (search_results, chunks_for_synthesis, graph_context, reranked)
     """
+    settings = get_settings()
     metrics = get_metrics_collector()
     metrics.record_query()
+    rerank_enabled = settings.rerank_enabled
+    reranker = get_reranker()
 
     with measure_total_search(metadata={"source": req.source.value, "limit": req.limit}):
         vs = get_vectorstore()
@@ -794,13 +808,16 @@ async def _perform_search(
         # Generate dense and sparse embeddings in parallel for better latency
         dense_vector, sparse_vector = await _generate_embeddings_parallel(req.query)
 
+        # Over-fetch when reranking is enabled (3x the limit, min 15)
+        fetch_limit = max(req.limit * 3, 15) if rerank_enabled else req.limit
+
         results: list[SearchResult] = []
         chunks_for_synthesis: list[dict] = []
 
         if req.source == SearchSource.DOCS:
             # Search only documentation with hybrid RRF
-            with measure_vector_search(metadata={"collection": "docs", "limit": req.limit}):
-                docs = await vs.search_docs_hybrid(dense_vector, sparse_vector, limit=req.limit)
+            with measure_vector_search(metadata={"collection": "docs", "limit": fetch_limit}):
+                docs = await vs.search_docs_hybrid(dense_vector, sparse_vector, limit=fetch_limit)
             for doc in docs:
                 results.append(
                     SearchResult(
@@ -821,8 +838,8 @@ async def _perform_search(
 
         elif req.source == SearchSource.GMAIL:
             # Search only Gmail cases with hybrid RRF
-            with measure_vector_search(metadata={"collection": "gmail", "limit": req.limit}):
-                cases = await vs.search_cases_hybrid(dense_vector, sparse_vector, limit=req.limit)
+            with measure_vector_search(metadata={"collection": "gmail", "limit": fetch_limit}):
+                cases = await vs.search_cases_hybrid(dense_vector, sparse_vector, limit=fetch_limit)
             for case in cases:
                 results.append(
                     SearchResult(
@@ -842,8 +859,8 @@ async def _perform_search(
 
         else:
             # Hybrid RRF search across all collections (docs, cases, custom_docs)
-            with measure_vector_search(metadata={"collection": "all", "limit": req.limit}):
-                hybrid = await vs.hybrid_search_rrf(dense_vector, sparse_vector, limit=req.limit)
+            with measure_vector_search(metadata={"collection": "all", "limit": fetch_limit}):
+                hybrid = await vs.hybrid_search_rrf(dense_vector, sparse_vector, limit=fetch_limit)
             for item in hybrid:
                 source_type = item.payload.get("_source", "unknown")
                 if source_type == "documentation":
@@ -902,6 +919,58 @@ async def _perform_search(
             results, chunks_for_synthesis, req.query
         )
 
+        # Apply reranking if enabled and we have results
+        was_reranked = False
+        if rerank_enabled and results and chunks_for_synthesis:
+            try:
+                # Extract texts for reranking
+                texts_to_rerank = [c.get("text", "") for c in chunks_for_synthesis]
+
+                # Rerank using Voyage AI
+                rerank_response = reranker.rerank(
+                    query=req.query,
+                    documents=texts_to_rerank,
+                    top_k=req.limit,
+                )
+
+                # Reorder results and chunks based on rerank scores
+                reranked_results: list[SearchResult] = []
+                reranked_chunks: list[dict] = []
+                for rr in rerank_response.results:
+                    idx = rr.index
+                    if idx < len(results):
+                        # Update score to reranker score
+                        orig = results[idx]
+                        reranked_results.append(SearchResult(
+                            score=rr.relevance_score,
+                            source=orig.source,
+                            title=orig.title,
+                            url=orig.url,
+                            subject=orig.subject,
+                            snippet=orig.snippet,
+                            metadata=orig.metadata,
+                        ))
+                        reranked_chunks.append(chunks_for_synthesis[idx])
+
+                results = reranked_results
+                chunks_for_synthesis = reranked_chunks
+                was_reranked = True
+                logger.debug(
+                    "reranking_applied",
+                    query_len=len(req.query),
+                    original_count=len(texts_to_rerank),
+                    reranked_count=len(results),
+                )
+            except Exception as e:
+                logger.warning("reranking_failed", error=str(e))
+                # Fall back to original results, trim to limit
+                results = results[:req.limit]
+                chunks_for_synthesis = chunks_for_synthesis[:req.limit]
+        else:
+            # No reranking, just trim to limit
+            results = results[:req.limit]
+            chunks_for_synthesis = chunks_for_synthesis[:req.limit]
+
         # Get graph enrichment if available
         graph_context = None
         try:
@@ -923,7 +992,7 @@ async def _perform_search(
         except Exception as e:
             logger.debug("graph_enrichment_skipped", error=str(e))
 
-        return results, chunks_for_synthesis, graph_context
+        return results, chunks_for_synthesis, graph_context, was_reranked
 
 
 @app.post("/api/search/stream")
@@ -946,7 +1015,7 @@ async def search_stream(request: Request, req: SearchRequest):
     conversation_history = session.get_context_messages()
 
     # Use helper to perform search
-    _, chunks_for_synthesis, graph_context = await _perform_search(req)
+    _, chunks_for_synthesis, graph_context, was_reranked = await _perform_search(req)
 
     # Extract top 3 unique source links
     source_links = _extract_source_links(chunks_for_synthesis)
@@ -988,6 +1057,7 @@ async def search_stream(request: Request, req: SearchRequest):
                     response=full_response,
                     chunks=chunks_for_synthesis,
                     session_id=session.session_id,
+                    reranked=was_reranked,
                 )
             except Exception as e:
                 logger.warning("Failed to log search analytics", error=str(e))
@@ -1024,7 +1094,7 @@ async def search(request: Request, req: SearchRequest):
     conversation_history = session.get_context_messages()
 
     # Use helper to perform search
-    results, chunks_for_synthesis, graph_context = await _perform_search(req)
+    results, chunks_for_synthesis, graph_context, was_reranked = await _perform_search(req)
 
     # Generate synthesized answer using Claude with conversation history and graph context
     answer = await synthesize_answer(
@@ -1048,6 +1118,7 @@ async def search(request: Request, req: SearchRequest):
             response=answer,
             chunks=chunks_for_synthesis,
             session_id=session.session_id,
+            reranked=was_reranked,
         )
     except Exception as e:
         logger.warning("Failed to log search analytics", error=str(e))
@@ -3178,7 +3249,7 @@ async def api_search_debug(
 
     # Perform search and measure retrieval time
     retrieval_start = time.time()
-    results, chunks_for_synthesis, graph_context = await _perform_search(req)
+    results, chunks_for_synthesis, graph_context, _ = await _perform_search(req)
     retrieval_time_ms = int((time.time() - retrieval_start) * 1000)
 
     # Build context (same as synthesis)

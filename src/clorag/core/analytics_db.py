@@ -54,6 +54,10 @@ class AnalyticsDatabase:
                     CREATE INDEX IF NOT EXISTS idx_search_queries_session
                     ON search_queries(session_id)
                 """)
+            if "reranked" not in columns:
+                conn.execute(
+                    "ALTER TABLE search_queries ADD COLUMN reranked INTEGER DEFAULT 0"
+                )
             conn.commit()
 
     def log_search(
@@ -65,6 +69,7 @@ class AnalyticsDatabase:
         response: str | None = None,
         chunks: list[dict[str, Any]] | None = None,
         session_id: str | None = None,
+        reranked: bool = False,
     ) -> int:
         """Log a search query with full response data.
 
@@ -76,6 +81,7 @@ class AnalyticsDatabase:
             response: The LLM-generated response text.
             chunks: List of retrieved chunks with metadata.
             session_id: Conversation session ID for grouping follow-ups.
+            reranked: Whether reranking was applied to results.
 
         Returns:
             The ID of the inserted record.
@@ -85,10 +91,12 @@ class AnalyticsDatabase:
             cursor = conn.execute(
                 """
                 INSERT INTO search_queries
-                (query, source, response_time_ms, results_count, response, chunks, session_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (query, source, response_time_ms, results_count, response, chunks, session_id,
+                 reranked)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (query, source, response_time_ms, results_count, response, chunks_json, session_id),
+                (query, source, response_time_ms, results_count, response, chunks_json,
+                 session_id, 1 if reranked else 0),
             )
             conn.commit()
             return cursor.lastrowid or 0
@@ -197,14 +205,19 @@ class AnalyticsDatabase:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
                 """
-                SELECT id, query, source, response_time_ms, results_count, created_at
+                SELECT id, query, source, response_time_ms, results_count, reranked, created_at
                 FROM search_queries
                 ORDER BY created_at DESC
                 LIMIT ?
                 """,
                 (limit,),
             )
-            return [dict(row) for row in cursor.fetchall()]
+            results = []
+            for row in cursor.fetchall():
+                r = dict(row)
+                r["reranked"] = bool(r.get("reranked", 0))
+                results.append(r)
+            return results
 
     def get_search_by_id(self, search_id: int) -> dict[str, Any] | None:
         """Get a single search by ID with full data including response and chunks.
@@ -220,7 +233,7 @@ class AnalyticsDatabase:
             cursor = conn.execute(
                 """
                 SELECT id, query, source, response_time_ms, results_count,
-                       response, chunks, session_id, created_at
+                       response, chunks, session_id, reranked, created_at
                 FROM search_queries
                 WHERE id = ?
                 """,
@@ -233,6 +246,8 @@ class AnalyticsDatabase:
             # Parse chunks JSON if present
             if result.get("chunks"):
                 result["chunks"] = json.loads(result["chunks"])
+            # Convert reranked to boolean
+            result["reranked"] = bool(result.get("reranked", 0))
             return result
 
     def get_recent_conversations(self, limit: int = 20) -> list[dict[str, Any]]:

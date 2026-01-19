@@ -8,6 +8,17 @@
     <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
     <link rel="stylesheet" href="/static/css/admin.css">
     <style>
+        /* Page-specific: Rerank tags */
+        .tag--reranked {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .tag--no-rerank {
+            background: #f5f5f5;
+            color: #9e9e9e;
+        }
+
         /* Page-specific: Daily Chart */
         .daily-chart {
             display: flex;
@@ -548,6 +559,7 @@
                         <tr>
                             <th>Query</th>
                             <th>Source</th>
+                            <th>Rerank</th>
                             <th>Response Time</th>
                             <th>Results</th>
                             <th>Time</th>
@@ -809,17 +821,21 @@
         function renderRecentTable(searches) {
             const tbody = document.querySelector('#recentTable tbody');
             if (!searches.length) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No searches yet</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No searches yet</td></tr>';
                 return;
             }
 
             tbody.innerHTML = searches.map(s => {
                 const tagClass = s.source === 'docs' ? 'tag--docs' :
                                  s.source === 'gmail' ? 'tag--gmail' : 'tag--both';
+                const rerankTag = s.reranked
+                    ? '<span class="tag tag--reranked">Yes</span>'
+                    : '<span class="tag tag--no-rerank">No</span>';
                 return `
                     <tr class="clickable-row" onclick="openSearchDetail(${s.id})" title="Click to view stored details">
                         <td>${escapeHtml(s.query.substring(0, 60))}${s.query.length > 60 ? '...' : ''}</td>
                         <td><span class="tag ${tagClass}">${s.source}</span></td>
+                        <td>${rerankTag}</td>
                         <td>${s.response_time_ms ? s.response_time_ms + ' ms' : '-'}</td>
                         <td>${s.results_count ?? '-'}</td>
                         <td>${formatDate(s.created_at)}</td>
@@ -902,6 +918,9 @@
         function renderSearchDetail(data) {
             const tagClass = data.source === 'docs' ? 'tag--docs' :
                              data.source === 'gmail' ? 'tag--gmail' : 'tag--both';
+            const rerankTag = data.reranked
+                ? '<span class="tag tag--reranked">Yes</span>'
+                : '<span class="tag tag--no-rerank">No</span>';
 
             let chunksHtml = '<p class="no-data">No chunks stored for this search</p>';
             if (data.chunks && data.chunks.length > 0) {
@@ -935,6 +954,10 @@
                         <div class="detail-meta__item">
                             <span class="detail-meta__label">Source:</span>
                             <span class="tag ${tagClass}">${data.source}</span>
+                        </div>
+                        <div class="detail-meta__item">
+                            <span class="detail-meta__label">Reranked:</span>
+                            ${rerankTag}
                         </div>
                         <div class="detail-meta__item">
                             <span class="detail-meta__label">Response Time:</span>

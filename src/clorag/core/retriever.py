@@ -27,6 +27,7 @@ class RetrievalResult:
     source: SearchSource
     results: list[SearchResult]
     total_found: int
+    reranked: bool = False
 
 
 # Technical terms that indicate precision-focused queries
@@ -188,8 +189,10 @@ class MultiSourceRetriever:
             filtered_results = results[:3]
 
         # Apply reranking if enabled and we have results
+        was_reranked = False
         if should_rerank and filtered_results:
             filtered_results = self._apply_reranking(query, filtered_results, limit)
+            was_reranked = True
 
         # Limit results to requested amount
         final_results = filtered_results[:limit]
@@ -199,6 +202,7 @@ class MultiSourceRetriever:
             source=source,
             results=final_results,
             total_found=len(final_results),
+            reranked=was_reranked,
         )
 
     def _apply_reranking(
