@@ -364,7 +364,9 @@ body {
 .tag--source-manual { background: #f3e5f5; color: #7b1fa2; }
 .tag--docs { background: #e3f2fd; color: #1976d2; }
 .tag--gmail { background: #fce4ec; color: #c2185b; }
+.tag--cases { background: #fce4ec; color: #c2185b; }
 .tag--both { background: #e8f5e9; color: #2e7d32; }
+.tag--human-review { background: #fef3c7; color: #92400e; }
 
 /* ============================================
    Cards & Sections
@@ -893,6 +895,71 @@ body {
 .mt-2 { margin-top: 1rem; }
 .mb-1 { margin-bottom: 0.5rem; }
 .mb-2 { margin-bottom: 1rem; }
+
+/* ============================================
+   Diff View & Terminology Fixes
+   ============================================ */
+
+.diff-view {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+}
+
+.diff-original {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 2px 4px;
+    border-radius: 3px;
+    text-decoration: line-through;
+}
+
+.diff-suggested {
+    background: #dcfce7;
+    color: #166534;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.diff-arrow {
+    color: #666;
+    margin: 0 0.5rem;
+}
+
+.confidence {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.confidence--high { background: #dcfce7; color: #166534; }
+.confidence--medium { background: #fef3c7; color: #92400e; }
+.confidence--low { background: #fee2e2; color: #991b1b; }
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-badge--pending { background: #fef3c7; color: #92400e; }
+.status-badge--approved { background: #dcfce7; color: #166534; }
+.status-badge--rejected { background: #fee2e2; color: #991b1b; }
+.status-badge--applied { background: #dbeafe; color: #1e40af; }
+
+.needs-human-review {
+    background: #fffbeb !important;
+    border-left: 4px solid #f59e0b;
+}
+
+.btn-approve { background: #10b981; color: white; border: none; }
+.btn-approve:hover { background: #059669; }
+.btn-reject { background: #ef4444; color: white; border: none; }
+.btn-reject:hover { background: #dc2626; }
 
 /* ============================================
    Responsive Design

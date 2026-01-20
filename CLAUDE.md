@@ -26,6 +26,8 @@ uv run enrich-cameras                      # Extract camera info from docs
 uv run populate-graph                      # Build Neo4j knowledge graph
 uv run draft-support                       # Auto-reply drafts (--preview)
 uv run rebuild-fts                         # Rebuild camera FTS5 index
+uv run fix-rio-terminology --preview       # Scan for RIO terminology issues
+uv run fix-rio-terminology --apply         # Apply approved fixes
 
 # Quality
 uv run ruff check src/ && uv run mypy src/clorag --strict
@@ -46,7 +48,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler), `chunker.py`, `base.py`
 
-**Analysis** (`analysis/`): `thread_analyzer.py` (Haiku classification), `quality_controller.py` (Sonnet QC), `camera_extractor.py`
+**Analysis** (`analysis/`): `thread_analyzer.py` (Haiku classification), `quality_controller.py` (Sonnet QC), `camera_extractor.py`, `rio_analyzer.py` (RIO terminology context analysis)
 
 **Agent** (`agent/`): `tools.py` (Claude Agent SDK MCP tools), `prompts.py`
 
@@ -140,6 +142,14 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 
 ### Custom Documents
 10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search.
+
+### RIO Product Terminology
+- **RIO +WAN**: Full-featured RIO, works via LAN and WAN, for 1-128 distant cameras (REMI toolbox)
+- **RIO +LAN**: Local version, LAN only, designed as companion for 1 camera
+- **RIO**: Generic reference to hardware (when license isn't relevant)
+- Legacy terms ("RIO-Live", "RIO Live", "RIO +WAN Live") map to "RIO +LAN" in license context
+- Hardware context (grounding, power, wiring) uses generic "RIO" since license doesn't matter
+- Admin UI at `/admin/terminology-fixes` for reviewing and applying corrections
 
 ## Deployment
 

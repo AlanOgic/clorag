@@ -78,6 +78,62 @@
         .auth-loading.hidden {
             display: none;
         }
+
+        /* Page-specific: RAG intro box */
+        .intro-box {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+            border: 1px solid #bbdefb;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .intro-box__title {
+            font-size: 1.1rem;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .intro-box__title::before {
+            content: "🔍";
+        }
+
+        .intro-box__text {
+            color: #37474f;
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+        }
+
+        .intro-box__list {
+            margin: 0 0 1rem 1.25rem;
+            color: #455a64;
+            font-size: 0.9rem;
+        }
+
+        .intro-box__list li {
+            margin-bottom: 0.4rem;
+        }
+
+        .intro-box__list strong {
+            color: var(--cyanview-navy);
+        }
+
+        .intro-box__flow {
+            margin: 0;
+        }
+
+        .intro-box__flow code {
+            display: inline-block;
+            background: rgba(0, 51, 102, 0.1);
+            color: var(--cyanview-navy);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+        }
     </style>
 </head>
 <body>
@@ -111,6 +167,22 @@
 
     <!-- Main Content -->
     <main class="main">
+        <!-- RAG System Overview -->
+        <div class="intro-box">
+            <h2 class="intro-box__title">How CLORAG Works</h2>
+            <p class="intro-box__text">
+                CLORAG is a <strong>Retrieval-Augmented Generation</strong> system that answers Cyanview support questions by combining:
+            </p>
+            <ul class="intro-box__list">
+                <li><strong>Three knowledge sources</strong>: Docusaurus documentation, curated Gmail support threads, and custom admin documents</li>
+                <li><strong>Hybrid search</strong>: Semantic understanding (Voyage AI embeddings) + keyword matching (BM25), merged via Reciprocal Rank Fusion</li>
+                <li><strong>Reranking</strong>: Voyage rerank-2.5 cross-encoder re-scores top results for better relevance</li>
+                <li><strong>Answer synthesis</strong>: Claude Sonnet generates coherent answers with sources and Mermaid diagrams for integration scenarios</li>
+            </ul>
+            <p class="intro-box__flow">
+                <code>Query → Embed → Search 3 collections → Merge &amp; Rerank → Claude generates answer</code>
+            </p>
+        </div>
         <!-- Admin Cards -->
         <div class="admin-grid">
             <a href="/admin/cameras" class="admin-card">
@@ -205,6 +277,18 @@
                 </div>
                 <h2 class="admin-card__title">Chunk Editor</h2>
                 <p class="admin-card__description">Browse, search, edit, and delete individual chunks in the vector database collections.</p>
+            </a>
+
+            <a href="/admin/terminology-fixes" class="admin-card">
+                <div class="admin-card__icon" style="background: #fff8e1;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f57c00" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        <path d="M15 5l3 3"/>
+                    </svg>
+                </div>
+                <h2 class="admin-card__title">Terminology Fixes</h2>
+                <p class="admin-card__description">Review and apply RIO product terminology corrections across vector database chunks.</p>
             </a>
 
             <a href="/admin/graph" class="admin-card">

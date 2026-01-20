@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Terminology Fixes - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        /* Page-specific styles only */
+        .stat__number--pending { color: #f59e0b; }
+        .stat__number--approved { color: #10b981; }
+        .stat__number--rejected { color: #ef4444; }
+        .stat__number--applied { color: #3b82f6; }
+
+        .batch-actions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .batch-actions__buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: auto;
+        }
+
+        .apply-progress {
+            display: none;
+            padding: 1rem;
+            background: #dbeafe;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .apply-progress.active { display: block; }
+
+        .progress-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-bar__fill {
+            height: 100%;
+            background: var(--cyan-dark);
+            transition: width 0.3s ease;
+        }
+
+        .fix-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .reasoning {
+            font-size: 0.75rem;
+            color: #666;
+            font-style: italic;
+            max-width: 250px;
+            margin-top: 0.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .batch-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .batch-actions__buttons {
+                margin-left: 0;
+                margin-top: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2aWV3Qm94PSIwIDAgMjUxLjkgMTUwLjU4Ij48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6dXJsKCNsb2dvX2dyKTt9LmNscy0ye2ZpbGw6I2ZmZjt9LmNscy0ze2ZpbGw6IzZkYzlmMzt9PC9zdHlsZT48bGluZWFyR3JhZGllbnQgaWQ9ImxvZ29fZ3IiIHgxPSIyNTEuOSIgeTE9Ijc1LjI5IiB4Mj0iMCIgeTI9Ijc1LjI5IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMDA1ZmEwIi8+PHN0b3Agb2Zmc2V0PSIwLjI2IiBzdG9wLWNvbG9yPSIjMDA2NmE3Ii8+PHN0b3Agb2Zmc2V0PSIwLjYyIiBzdG9wLWNvbG9yPSIjMDA3OGI5Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDA5M2QzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PGcgaWQ9IkxheWVyXzIiIGRhdGEtbmFtZT0iTGF5ZXIgMiI+PGcgaWQ9IkxheWVyXzEtMiIgZGF0YS1uYW1lPSJMYXllciAxIj48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNzYuNjIsMEE3NSw3NSwwLDAsMCwxMjYsMTkuNiw3NS4yOSw3NS4yOSwwLDEsMCwxMjYsMTMxLDc1LjI5LDc1LjI5LDAsMSwwLDE3Ni42MiwwWiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTE1LjQxLDg0LjI0VjU5LjUzYzAtNy4zOCw0LjcxLTEyLjI5LDExLjY3LTEyLjI5LDYuNzAsMCwxMS4yNyw1LjEyLDExLjQ3LDEzLjExYS43OS43OSwwLDAsMS0uODguODhIMzMuM2EuNzkuNzksMCwwLDEtLjg5LS44OEMzMi4yNyw1NS41NywzMC4xNiw1MywyNyw1M2MtMy40MiwwLTUuNCwyLjMyLTUuNCw2LjE1Vjg0LjU4YzAsMy44MywyLDYuMTUsNS40LDYuMTVzNS41OS0yLjgsNS43My03Ljc4YS43OS43OSwwLDAsMSwuODktLjg5SDM4YS44NS44NSwwLDAsMSwuODksMWMtLjI4LDguMjctNC44NSwxMy41Mi0xMS44MiwxMy41MlMxNS40MSw5MS42MiwxNS40MSw4NC4yNFoiLz48cGF0aCBjbGFzcz0iY2xzLTIiIGQ9Ik02NS45Myw2Mi41M1Y5OS4wNmMwLDYuNzYtNC4yMywxMS4xMy0xMC43OSwxMS4xMy02LjIxLDAtMTAuMzctNC4zLTEwLjcyLTExYS44LjgsMCwwLDEsLjg5LTFoNGMuNTUsMCwuODIuMjcuODksMSwuMiwzLjQxLDIsNS4zOSw0LjkxLDUuMzksMy4xNCwwLDQuOTItMiw0LjkyLTUuMzNWOTIuMzdhNy4wOSw3LjA5LDAsMCwxLTUuMzksMi40NmMtNiwwLTEwLjMxLTQuNTgtMTAuMzEtMTEuMDZWNjIuNTNhLjg0Ljg0LDAsMCwxLDEtLjg5aDRhLjg1Ljg1LDAsMCwxLDEsLjg5Vjg0YzAsMy4xNCwxLjg0LDUuMzMsNC45MSw1LjMzczQuOTItMi4xOSw0LjkyLTUuMzNWNjIuNTNhLjg1Ljg1LDAsMCwxLDEtLjg5aDRBLjg4Ljg4LDAsMCwxLDY1LjkzLDYyLjUzWiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTcyLjM1LDg1LjQ3YzAtNS42Niw0LjM3LTEwLDEwLjc4LTEwaDUuMTNWNzEuNjhjMC0zLjA3LTEuODUtNS4xOS00LjkyLTUuMTktMi44NywwLTQuNDQsMS45MS00LjY0LDQuNzEtLjA3LjYyLS4zNC44Mi0xLC44MmgtNGEuODguODgsMCwwLDEtLjg5LTFjLjQxLTUuOTQsNC40NC0xMC4xOCwxMC41Mi0xMC4xOCw2LjQ4LDAsMTAuNjUsNC42NCwxMC42NSwxMS4wNlY4NS42OGMwLDYuMjgtNC4xLDEwLjc5LTEwLjY1LDEwLjc5Uzc8LjM1LDkxLjg5LDcyLjM1LDg1LjQ3Wm0xNS45MS4yMXYtNUg4My4zNGMtMy4yMSwwLTUuMTIsMi4xMi01LjEyLDQuNzgsMCwzLjI4LDEuOTEsNS40LDUuMTIsNS40UzgOLjI2LDg4LjgyLDg4LjI2LDg1LjY4WiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTEwMC42MSw5NC44M1Y3MmMwLTYuNDksNC4zLTExLjEzLDEwLjY1LTExLjEzUzEyMS45MSw2NS41MywxMjEuOTEsNzJWOTQuODNhLjg2Ljg2LDAsMCwxLTEsMWgtNGEuODYuODYsMCwwLDEtMS0xdi0yM2MwLTMuMjEtMS43Ny01LjQtNC43OC01LjRzLTQuNzgsMi4xOS00Ljc4LDUuNHYyM2EuODYuODYsMCwwLDEtMSwxaC00QS44Ni44NiwwLDAsMSwxMDAuNjEsOTQuODNaIi8+PHBhdGggY2xhc3M9ImNscy0zIiBkPSJNMTUyLjI5LDQ4Ljk0bC04LjEyLDQ0LjU5YTIuNzUsMi43NSwwLDAsMS0yLjk0LDIuNTNoLTMuNzVhMi43NSwyLjc1LDAsMCwxLTIuOTQtMi41M2wtOC4xMi00NC41OWEuNzYuNzYsMCwwLDEsLjgyLS45NWg0LjQ0YS45My45MywwLDAsMSwxLC44Mmw2LjY5LDQwLDYuNjktNDBhLjg2Ljg2LDAsMCwxLDEtLjgyaDQuNDRDMTUyLjA5LDQ4LDE1Mi40Myw0OC40LDE1Mi4yOSw0OC45NFoiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0xNTYuOCw1My44NmEzLjM5LDMuMzksMCwwLDEsMy40OC0zLjU1LDMuNDgsMy40OCwwLDAsMSwzLjU1LDMuNTUsMy41NiwzLjU2LDAsMCwxLTMuNTUsMy40OEEzLjM3LDMuMzcsMCwwLDEsMTU2LjgsNTMuODZabS41NCw0MVY2Mi41M2EuODUuODUsMCwwLDEsMS0uODloNGEuODUuODUsMCwwLDEsMSwuODl2MzIuM2EuODcuODcsMCwwLDEtMSwxaC00QS44Ny44NywwLDAsMSwxNTcuMzQsOTQuODNaIi8+PHBhdGggY2xhc3M9ImNscy0zIiBkPSJNMTY5LjUsODUuMzRWNzJjLjA3LTYuNDgsNC4zLTExLDEwLjg1LTExYTEwLjQsMTAuNCwwLDAsMSwxMC45MywxMC43OWMwLDYtNC4zNywxMC4zMS0xMC44NiwxMC4zMWgtNXYzLjU1YzAsMy4xNCwxLjg0LDUuMzIsNSw1LjMyLDIuOCwwLDQuNjUtMiw0Ljg1LTUuMDVhLjg4Ljg4LDAsMCwxLDEtLjg5aDRhLjgzLjgzLDAsMCwxLC44OC44OWMtLjM0LDYuMzUtNC42NCwxMC41OS0xMC43OCwxMC41OUMxNzMuODcsOTYuNDcsMTY5LjUsOTIsMTY5LjUsODUuMzRabTEwLjkyLTguNjFjMy4xNCwwLDUtMiw1LTQuODQsMC0zLjI4LTEuOTItNS40LTUuMDYtNS40cy01LDIuMTItNSw1LjR2NC44NFoiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0yMTUsOTIuMzdhOC43NSw4Ljc1LDAsMCwxLTcuMzgsNC4xNmMtNi4yMSwwLTEwLjMxLTQuNjQtMTAuMzEtMTEuMTNWNjIuNmEuODcuODcsMCwwLDEsMS0xaDMuODlhLjg3Ljg3LDAsMCwxLDEsMXYyM2MwLDMuMjEsMS42Myw1LjMyLDQuNSw1LjMyczQuNDQtMi4xMSw0LjQ0LTUuMzJ2LTIzYS44Ny44NywwLDAsMSwxLTFoNGEuODQuODQsMCwwLDEsLjg4LDF2MjNjMCwzLjIxLDEuNjQsNS4zMiw0LjUxLDUuMzJzNC40NC0yLjExLDQuNDQtNS4zMnYtMjNhLjg2Ljg2LDAsMCwxLDEtMWg0YS44NS44NSwwLDAsMSwuODksMVY4NS40YzAsNi40OS00LDExLjEzLTEwLjI0LDExLjEzQTguNjUsOC42NSwwLDAsMSwyMTUsOTIuMzdaIi8+PC9nPjwvZz48L3N2Zz4=" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Dashboard</a>
+            <a href="/admin/chunks" class="navbar__link">Chunks</a>
+            <span class="navbar__divider"></span>
+            <a href="/" class="navbar__link">AI Search</a>
+        </div>
+    </nav>
+
+    <main class="main main--wide">
+        <div class="page-header">
+            <h1 class="page-title">RIO Terminology Fixes</h1>
+        </div>
+
+        <div class="stats-bar" id="statsBar">
+            <div class="stat">
+                <div class="stat__number" id="totalFixes">-</div>
+                <div class="stat__label">Total</div>
+            </div>
+            <div class="stat">
+                <div class="stat__number stat__number--pending" id="pendingFixes">-</div>
+                <div class="stat__label">Pending</div>
+            </div>
+            <div class="stat">
+                <div class="stat__number stat__number--approved" id="approvedFixes">-</div>
+                <div class="stat__label">Approved</div>
+            </div>
+            <div class="stat">
+                <div class="stat__number stat__number--rejected" id="rejectedFixes">-</div>
+                <div class="stat__label">Rejected</div>
+            </div>
+            <div class="stat">
+                <div class="stat__number stat__number--applied" id="appliedFixes">-</div>
+                <div class="stat__label">Applied</div>
+            </div>
+        </div>
+
+        <div class="apply-progress" id="applyProgress">
+            <strong>Applying fixes...</strong>
+            <span id="applyStatus">0 / 0</span>
+            <div class="progress-bar">
+                <div class="progress-bar__fill" id="progressFill" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <select class="filter-bar__select" id="statusFilter">
+                <option value="">All Status</option>
+                <option value="pending" selected>Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="applied">Applied</option>
+            </select>
+            <select class="filter-bar__select" id="collectionFilter">
+                <option value="">All Collections</option>
+                <option value="docusaurus_docs">Documentation</option>
+                <option value="gmail_cases">Support Cases</option>
+                <option value="custom_docs">Custom Docs</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadFixes()">Filter</button>
+        </div>
+
+        <div class="batch-actions" id="batchActions">
+            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="selectAll" class="fix-checkbox" onchange="toggleSelectAll()">
+                <span>Select All</span>
+            </label>
+            <span id="selectedCount">0 selected</span>
+            <div class="batch-actions__buttons">
+                <button class="btn btn-sm btn-approve" onclick="batchApprove()">Approve Selected</button>
+                <button class="btn btn-sm btn-reject" onclick="batchReject()">Reject Selected</button>
+                <button class="btn btn-primary btn-sm" onclick="applyApproved()">Apply All Approved</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table" id="fixesTable">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"></th>
+                        <th>Type</th>
+                        <th>Change</th>
+                        <th>Collection</th>
+                        <th>Confidence</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="fixesBody">
+                    <tr>
+                        <td colspan="7" class="loading">Loading fixes...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination" id="pagination" style="display: none;">
+            <button class="btn btn-secondary btn-sm" id="loadMoreBtn" onclick="loadMore()">Load More</button>
+            <span id="pageInfo"></span>
+        </div>
+
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <h3>No terminology fixes found</h3>
+            <p class="text-muted">Run <code>uv run fix-rio-terminology --preview</code> to scan for issues.</p>
+        </div>
+    </main>
+
+    <script>
+        let currentOffset = 0;
+        let currentLimit = 50;
+        let allFixes = [];
+        let selectedIds = new Set();
+
+        async function checkSession() {
+            try {
+                const response = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch (error) {
+                window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/admin/terminology-fixes/stats', { credentials: 'include' });
+                if (!response.ok) throw new Error('Failed to load stats');
+
+                const stats = await response.json();
+                document.getElementById('totalFixes').textContent = stats.total || 0;
+
+                const byStatus = stats.by_status || {};
+                document.getElementById('pendingFixes').textContent = byStatus.pending || 0;
+                document.getElementById('approvedFixes').textContent = byStatus.approved || 0;
+                document.getElementById('rejectedFixes').textContent = byStatus.rejected || 0;
+                document.getElementById('appliedFixes').textContent = byStatus.applied || 0;
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        async function loadFixes(append = false) {
+            const status = document.getElementById('statusFilter').value;
+            const collection = document.getElementById('collectionFilter').value;
+
+            if (!append) {
+                currentOffset = 0;
+                document.getElementById('fixesBody').innerHTML = '<tr><td colspan="7" class="loading">Loading fixes...</td></tr>';
+            }
+
+            try {
+                let url = `/api/admin/terminology-fixes?limit=${currentLimit}&offset=${currentOffset}`;
+                if (status) url += `&status=${status}`;
+                if (collection) url += `&collection=${collection}`;
+
+                const response = await fetch(url, { credentials: 'include' });
+                if (!response.ok) throw new Error('Failed to load fixes');
+
+                const data = await response.json();
+
+                if (append) {
+                    allFixes = [...allFixes, ...data.fixes];
+                } else {
+                    allFixes = data.fixes;
+                }
+
+                renderFixes(allFixes);
+
+                const pagination = document.getElementById('pagination');
+                if (data.fixes.length === currentLimit) {
+                    pagination.style.display = 'flex';
+                    currentOffset += currentLimit;
+                    document.getElementById('pageInfo').textContent = `Showing ${allFixes.length} of ${data.total}`;
+                } else {
+                    pagination.style.display = 'none';
+                }
+
+                document.getElementById('emptyState').style.display = allFixes.length === 0 ? 'block' : 'none';
+                document.getElementById('fixesTable').style.display = allFixes.length === 0 ? 'none' : 'table';
+
+            } catch (error) {
+                document.getElementById('fixesBody').innerHTML = `<tr><td colspan="7" class="empty-state">Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        function renderFixes(fixes) {
+            const tbody = document.getElementById('fixesBody');
+            tbody.innerHTML = '';
+
+            if (fixes.length === 0) return;
+
+            fixes.forEach(fix => {
+                const row = document.createElement('tr');
+                row.dataset.id = fix.id;
+
+                const isHumanReview = fix.suggestion_type === 'needs_human_review';
+                const confidenceClass = fix.confidence >= 0.8 ? 'high' : (fix.confidence >= 0.5 ? 'medium' : 'low');
+                const isChecked = selectedIds.has(fix.id);
+                const isPending = fix.status === 'pending';
+
+                if (isHumanReview) {
+                    row.classList.add('needs-human-review');
+                }
+
+                const typeTag = isHumanReview
+                    ? `<span class="tag tag--human-review">HUMAN REVIEW</span>`
+                    : `<span class="tag">${escapeHtml(fix.suggestion_type)}</span>`;
+
+                row.innerHTML = `
+                    <td>
+                        <input type="checkbox"
+                            class="fix-checkbox"
+                            ${isChecked ? 'checked' : ''}
+                            ${!isPending ? 'disabled' : ''}
+                            onchange="toggleSelect('${fix.id}')">
+                    </td>
+                    <td>${typeTag}</td>
+                    <td class="diff-view">
+                        <span class="diff-original">${escapeHtml(fix.original_text)}</span>
+                        <span class="diff-arrow">&rarr;</span>
+                        <span class="diff-suggested">${escapeHtml(fix.suggested_text)}</span>
+                        <div class="reasoning">${escapeHtml(fix.reasoning)}</div>
+                    </td>
+                    <td>
+                        <span class="tag tag--${fix.collection === 'docusaurus_docs' ? 'docs' : 'cases'}">
+                            ${fix.collection === 'docusaurus_docs' ? 'Docs' : (fix.collection === 'gmail_cases' ? 'Cases' : 'Custom')}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="confidence confidence--${confidenceClass}">${(fix.confidence * 100).toFixed(0)}%</span>
+                    </td>
+                    <td>
+                        <span class="status-badge status-badge--${fix.status}">${fix.status}</span>
+                    </td>
+                    <td>
+                        <div class="actions">
+                            ${isPending ? `
+                                <button class="btn btn-sm btn-approve" onclick="updateStatus('${fix.id}', 'approved')">Approve</button>
+                                <button class="btn btn-sm btn-reject" onclick="updateStatus('${fix.id}', 'rejected')">Reject</button>
+                            ` : ''}
+                            <a href="/admin/chunks/${fix.collection}/${fix.chunk_id}"
+                               class="btn btn-sm btn-edit"
+                               title="Edit chunk in Chunk Editor"
+                               target="_blank">Edit Chunk</a>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            updateSelectedCount();
+        }
+
+        function toggleSelect(id) {
+            if (selectedIds.has(id)) {
+                selectedIds.delete(id);
+            } else {
+                selectedIds.add(id);
+            }
+            updateSelectedCount();
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll').checked;
+            const pendingFixes = allFixes.filter(f => f.status === 'pending');
+
+            if (selectAll) {
+                pendingFixes.forEach(f => selectedIds.add(f.id));
+            } else {
+                selectedIds.clear();
+            }
+
+            document.querySelectorAll('.fix-checkbox:not(#selectAll)').forEach(cb => {
+                if (!cb.disabled) {
+                    cb.checked = selectAll;
+                }
+            });
+
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            document.getElementById('selectedCount').textContent = `${selectedIds.size} selected`;
+        }
+
+        async function updateStatus(id, status) {
+            try {
+                const response = await fetch(`/api/admin/terminology-fixes/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ status })
+                });
+
+                if (!response.ok) throw new Error('Failed to update status');
+
+                const fix = allFixes.find(f => f.id === id);
+                if (fix) {
+                    fix.status = status;
+                    renderFixes(allFixes);
+                }
+
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function batchApprove() {
+            if (selectedIds.size === 0) {
+                alert('No fixes selected');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/terminology-fixes/batch-status', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ ids: Array.from(selectedIds), status: 'approved' })
+                });
+
+                if (!response.ok) throw new Error('Failed to approve fixes');
+
+                allFixes.forEach(f => {
+                    if (selectedIds.has(f.id)) {
+                        f.status = 'approved';
+                    }
+                });
+
+                selectedIds.clear();
+                document.getElementById('selectAll').checked = false;
+                renderFixes(allFixes);
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function batchReject() {
+            if (selectedIds.size === 0) {
+                alert('No fixes selected');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/terminology-fixes/batch-status', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ ids: Array.from(selectedIds), status: 'rejected' })
+                });
+
+                if (!response.ok) throw new Error('Failed to reject fixes');
+
+                allFixes.forEach(f => {
+                    if (selectedIds.has(f.id)) {
+                        f.status = 'rejected';
+                    }
+                });
+
+                selectedIds.clear();
+                document.getElementById('selectAll').checked = false;
+                renderFixes(allFixes);
+                loadStats();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function applyApproved() {
+            if (!confirm('This will apply all approved fixes to the vector database. Continue?')) {
+                return;
+            }
+
+            const progressEl = document.getElementById('applyProgress');
+            const statusEl = document.getElementById('applyStatus');
+            const fillEl = document.getElementById('progressFill');
+
+            progressEl.classList.add('active');
+
+            try {
+                const response = await fetch('/api/admin/terminology-fixes/apply', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (!response.ok) throw new Error('Failed to apply fixes');
+
+                const result = await response.json();
+                fillEl.style.width = '100%';
+                statusEl.textContent = `Applied ${result.applied} fixes`;
+
+                setTimeout(() => {
+                    progressEl.classList.remove('active');
+                    loadFixes();
+                    loadStats();
+                }, 2000);
+
+            } catch (error) {
+                progressEl.classList.remove('active');
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function loadMore() {
+            loadFixes(true);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        checkSession().then(() => {
+            loadStats();
+            loadFixes();
+        });
+    </script>
+</body>
+</html>

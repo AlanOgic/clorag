@@ -2279,6 +2279,205 @@ async def admin_support_cases(request: Request):
 
 
 # =============================================================================
+# Terminology Fixes Routes (Admin)
+# =============================================================================
+
+
+class TerminologyStatusUpdate(BaseModel):
+    """Request body for status update."""
+
+    status: str = Field(..., pattern="^(pending|approved|rejected|applied)$")
+
+
+class TerminologyBatchStatusUpdate(BaseModel):
+    """Request body for batch status update."""
+
+    ids: list[str]
+    status: str = Field(..., pattern="^(pending|approved|rejected|applied)$")
+
+
+@app.get("/api/admin/terminology-fixes", tags=["Terminology Fixes"])
+async def api_list_terminology_fixes(
+    limit: int = 50,
+    offset: int = 0,
+    status: str | None = None,
+    collection: str | None = None,
+    _: bool = Depends(verify_admin),
+):
+    """List terminology fixes with optional filtering."""
+    from clorag.core.terminology_db import get_terminology_fix_database
+
+    db = get_terminology_fix_database()
+    fixes, total = db.list_fixes(
+        status=status,  # type: ignore[arg-type]
+        collection=collection,
+        limit=limit,
+        offset=offset,
+    )
+    return {
+        "fixes": [fix.to_dict() for fix in fixes],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@app.get("/api/admin/terminology-fixes/stats", tags=["Terminology Fixes"])
+async def api_terminology_fixes_stats(_: bool = Depends(verify_admin)):
+    """Get terminology fix statistics."""
+    from clorag.core.terminology_db import get_terminology_fix_database
+
+    db = get_terminology_fix_database()
+    return db.get_stats()
+
+
+@app.get("/api/admin/terminology-fixes/{fix_id}", tags=["Terminology Fixes"])
+async def api_get_terminology_fix(
+    fix_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Get a terminology fix by ID."""
+    from clorag.core.terminology_db import get_terminology_fix_database
+
+    db = get_terminology_fix_database()
+    fix = db.get_fix(fix_id)
+    if not fix:
+        raise HTTPException(status_code=404, detail="Terminology fix not found")
+    return fix.to_dict()
+
+
+@app.put("/api/admin/terminology-fixes/{fix_id}/status", tags=["Terminology Fixes"])
+async def api_update_terminology_fix_status(
+    fix_id: str,
+    body: TerminologyStatusUpdate,
+    _: bool = Depends(verify_admin),
+):
+    """Update the status of a terminology fix."""
+    from clorag.core.terminology_db import get_terminology_fix_database
+
+    db = get_terminology_fix_database()
+    updated = db.update_status(fix_id, body.status)  # type: ignore[arg-type]
+    if not updated:
+        raise HTTPException(status_code=404, detail="Terminology fix not found")
+    return {"updated": True, "fix_id": fix_id, "status": body.status}
+
+
+@app.put("/api/admin/terminology-fixes/batch-status", tags=["Terminology Fixes"])
+async def api_batch_update_terminology_fix_status(
+    body: TerminologyBatchStatusUpdate,
+    _: bool = Depends(verify_admin),
+):
+    """Update status for multiple terminology fixes."""
+    from clorag.core.terminology_db import get_terminology_fix_database
+
+    db = get_terminology_fix_database()
+    count = db.update_statuses_batch(body.ids, body.status)  # type: ignore[arg-type]
+    return {"updated": count, "status": body.status}
+
+
+@app.post("/api/admin/terminology-fixes/apply", tags=["Terminology Fixes"])
+async def api_apply_terminology_fixes(_: bool = Depends(verify_admin)):
+    """Apply all approved terminology fixes to the vector database."""
+    from datetime import datetime
+
+    from clorag.analysis.rio_analyzer import apply_fix_to_text
+    from clorag.core.terminology_db import get_terminology_fix_database
+
+    db = get_terminology_fix_database()
+    approved_fixes = db.get_approved_fixes()
+
+    if not approved_fixes:
+        return {"applied": 0, "failed": 0, "message": "No approved fixes to apply"}
+
+    vectorstore = get_vectorstore()
+    embeddings = get_embeddings()
+    sparse_embeddings = get_sparse_embeddings()
+
+    applied_count = 0
+    failed_count = 0
+
+    for fix in approved_fixes:
+        try:
+            # Get current chunk
+            chunk = await vectorstore.get_chunk(fix.collection, fix.chunk_id)
+            if not chunk:
+                logger.warning("Chunk not found for terminology fix", chunk_id=fix.chunk_id)
+                failed_count += 1
+                continue
+
+            current_text = chunk.get("payload", {}).get("text", "")
+            if not current_text:
+                logger.warning("Chunk has no text", chunk_id=fix.chunk_id)
+                failed_count += 1
+                continue
+
+            # Apply the fix
+            new_text = apply_fix_to_text(current_text, fix.original_text, fix.suggested_text)
+
+            if new_text == current_text:
+                # No change needed, mark as applied
+                db.update_status(fix.id, "applied", datetime.utcnow())
+                applied_count += 1
+                continue
+
+            # Regenerate embeddings
+            dense_result = await embeddings.embed_text(new_text)
+            sparse_vector = sparse_embeddings.embed_text(new_text)
+
+            # Update chunk in vectorstore
+            success = await vectorstore.update_chunk(
+                collection=fix.collection,
+                chunk_id=fix.chunk_id,
+                text=new_text,
+                dense_vector=dense_result.vectors[0],
+                sparse_vector=sparse_vector,
+            )
+
+            if success:
+                db.update_status(fix.id, "applied", datetime.utcnow())
+                applied_count += 1
+                logger.info(
+                    "Applied terminology fix",
+                    chunk_id=fix.chunk_id,
+                    original=fix.original_text,
+                    suggested=fix.suggested_text,
+                )
+            else:
+                failed_count += 1
+
+        except Exception as e:
+            logger.error("Failed to apply terminology fix", fix_id=fix.id, error=str(e))
+            failed_count += 1
+
+    return {
+        "applied": applied_count,
+        "failed": failed_count,
+        "message": f"Applied {applied_count} fixes, {failed_count} failed",
+    }
+
+
+@app.delete("/api/admin/terminology-fixes/{fix_id}", tags=["Terminology Fixes"])
+async def api_delete_terminology_fix(
+    fix_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Delete a terminology fix."""
+    from clorag.core.terminology_db import get_terminology_fix_database
+
+    db = get_terminology_fix_database()
+    deleted = db.delete_fix(fix_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Terminology fix not found")
+    return {"deleted": True, "fix_id": fix_id}
+
+
+@app.get("/admin/terminology-fixes", response_class=HTMLResponse)
+async def admin_terminology_fixes(request: Request):
+    """Admin terminology fixes management page."""
+    return templates.TemplateResponse("admin_terminology_fixes.html", {"request": request})
+
+
+# =============================================================================
 # Graph Stats Routes (Admin)
 # =============================================================================
 

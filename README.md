@@ -347,6 +347,26 @@ uv run rebuild-fts
 uv run rebuild-fts --check
 ```
 
+### RIO Terminology Fix
+
+```bash
+# Scan chunks for RIO terminology issues
+uv run fix-rio-terminology --preview
+
+# View statistics
+uv run fix-rio-terminology --stats
+
+# Apply approved fixes (after review in admin UI)
+uv run fix-rio-terminology --apply
+```
+
+**RIO Product Terminology:**
+- **RIO +WAN** - Full-featured RIO, works via LAN and WAN, for 1-128 distant cameras (REMI toolbox)
+- **RIO +LAN** - Local version, LAN only, designed as companion for 1 camera
+- **RIO** - Generic reference to hardware (when license isn't relevant)
+- Legacy terms ("RIO-Live", "RIO Live", "RIO +WAN Live") → "RIO +LAN" in license context
+- Hardware context (grounding, power, wiring) → generic "RIO"
+
 ### Web Interface
 
 ```bash
@@ -376,6 +396,7 @@ uv run rag-web
 | `/admin/search-debug` | Debug RAG: view chunks, prompts, timing |
 | `/admin/docs` | Technical documentation |
 | `/admin/chunks` | Chunk editor: browse, search, edit, delete vectors |
+| `/admin/terminology-fixes` | RIO terminology review: approve/reject fixes, batch apply |
 | `/admin/graph` | Knowledge Graph Explorer: browse entities, edit/delete relationships |
 
 Admin authentication uses secure session cookies (24-hour expiry). Set `ADMIN_PASSWORD` in your `.env` file.
@@ -570,6 +591,7 @@ clorag/
          ingest_curated.py # CLI ingestion curated
          populate_graph.py # CLI graph population
          draft_support.py  # CLI draft creation
+         fix_rio_terminology.py # CLI RIO terminology fix
          run_web.py        # CLI run web server
    tests/
    data/

@@ -2,6 +2,54 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.5.7] - 2026-01-20
+
+### Added
+- **RIO Terminology Fix System**
+  - CLI tool `uv run fix-rio-terminology` for scanning and fixing RIO product terminology
+  - Context-aware Haiku analysis distinguishes license vs hardware contexts
+  - Admin UI at `/admin/terminology-fixes` for reviewing and approving fixes
+  - Batch approve/reject with diff view showing original → suggested changes
+  - Human-in-the-loop for ambiguous cases (`needs_human_review` type)
+  - Direct "Edit Chunk" links to chunk editor for manual corrections
+
+- **RIO Product Terminology Convention**
+  - **RIO +WAN**: Full-featured RIO, works via LAN and WAN, for 1-128 distant cameras (REMI toolbox)
+  - **RIO +LAN**: Local version, LAN only, designed as companion for 1 camera
+  - **RIO**: Generic reference to hardware (when license isn't relevant)
+  - Legacy terms: "RIO-Live", "RIO Live", "RIO +WAN Live" → "RIO +LAN" (in license context)
+  - Hardware context (grounding, power, wiring) → generic "RIO" (license not relevant)
+
+- **New CLI Commands**
+  - `uv run fix-rio-terminology --preview` - Scan chunks and save suggestions
+  - `uv run fix-rio-terminology --apply` - Apply all approved fixes
+  - `uv run fix-rio-terminology --stats` - Show fix statistics
+  - `uv run fix-rio-terminology --export FILE` - Export fixes to JSON
+  - `uv run fix-rio-terminology --import FILE` - Import fixes from JSON
+
+- **New API Endpoints**
+  - `GET /api/admin/terminology-fixes` - List fixes with filters
+  - `GET /api/admin/terminology-fixes/stats` - Statistics by status/type/collection
+  - `PUT /api/admin/terminology-fixes/{id}/status` - Update fix status
+  - `PUT /api/admin/terminology-fixes/batch-status` - Batch status update
+  - `POST /api/admin/terminology-fixes/apply` - Apply all approved fixes
+  - `DELETE /api/admin/terminology-fixes/{id}` - Delete a fix
+
+- **Metadata Updates on Apply**
+  - Fixes also update `subject`, `problem_summary`, `solution_summary` fields
+  - Keywords cleaned: legacy terms removed, new terminology added
+  - Automatic re-embedding after text changes
+
+### New Files
+- `src/clorag/core/terminology_db.py` - SQLite storage for terminology fixes
+- `src/clorag/analysis/rio_analyzer.py` - Haiku-based context analyzer
+- `src/clorag/scripts/fix_rio_terminology.py` - CLI script
+- `src/clorag/web/templates/admin_terminology_fixes.html` - Admin UI
+
+### Changed
+- Admin dashboard includes Terminology Fixes card
+- Unified admin.css styles for diff view, approve/reject buttons
+
 ## [0.5.6] - 2026-01-19
 
 ### Added
