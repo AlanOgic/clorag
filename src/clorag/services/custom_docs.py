@@ -39,15 +39,7 @@ class CustomDocumentService:
         self._vectorstore = vectorstore or VectorStore()
         self._embeddings = embeddings or EmbeddingsClient()
         self._sparse_embeddings = sparse_embeddings or SparseEmbeddingsClient()
-        # Use SemanticChunker for code block and heading preservation
-        self._chunker = SemanticChunker(
-            chunk_size=1000,
-            chunk_overlap=100,
-            adaptive_threshold=800,  # Short docs stay as single chunk
-            preserve_code_blocks=True,
-            preserve_tables=True,
-            respect_headings=True,
-        )
+        # Chunker is created per-document based on category (see create_document)
 
     async def create_document(
         self,
@@ -80,7 +72,9 @@ class CustomDocumentService:
         elif doc.category.value == "release_notes":
             content_type = ContentType.RELEASE_NOTES
 
-        chunks = self._chunker.chunk_text(doc.content, content_type=content_type)
+        # Create chunker with settings-based token-aware sizing for this content type
+        chunker = SemanticChunker.from_settings(content_type)
+        chunks = chunker.chunk_text(doc.content, content_type=content_type)
 
         if not chunks:
             # Single chunk for short content

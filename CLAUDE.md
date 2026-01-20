@@ -62,7 +62,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Models** (`models/`): `camera.py`, `custom_document.py` (10 categories), `support_case.py`
 
-**Utils** (`utils/`): `token_encryption.py` (Fernet/PBKDF2), `anonymizer.py`, `logger.py`
+**Utils** (`utils/`): `token_encryption.py` (Fernet/PBKDF2), `anonymizer.py`, `logger.py`, `tokenizer.py` (tiktoken token counting)
 
 ### Vector Collections
 
@@ -83,6 +83,12 @@ Environment variables (see `.env.example`):
 - `RERANK_ENABLED` (default: `true`) - Enable/disable reranking
 - `VOYAGE_RERANK_MODEL` (default: `rerank-2.5`) - Reranker model
 - `RERANK_TOP_K` (default: `5`) - Results after reranking
+- `CHUNK_USE_TOKENS` (default: `true`) - Token-based chunking (vs character-based)
+- `CHUNK_SIZE_DOCS` (default: `450`) - Chunk size for documentation (tokens)
+- `CHUNK_SIZE_CASES` (default: `350`) - Chunk size for support cases (tokens)
+- `CHUNK_SIZE_DEFAULT` (default: `400`) - Default chunk size (tokens)
+- `CHUNK_OVERLAP` (default: `50`) - Chunk overlap (~12.5%)
+- `CHUNK_ADAPTIVE_THRESHOLD` (default: `200`) - Single-chunk threshold (tokens)
 
 Settings via `clorag.config.get_settings()` (cached singleton).
 
@@ -95,6 +101,14 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Query cache**: LRU caches (200 entries) for embeddings + (100 entries) for reranking
 - **Dynamic thresholds**: ≤2 words: 0.15, 3-5: 0.20, >5: 0.25; technical terms +0.05; minimum 3 results
 - **Contextualized embeddings**: `voyage-context-3` encodes chunks with full document context
+
+### Chunking
+- **Token-based sizing**: Uses `tiktoken` (cl100k_base) for 15-20% more consistent chunk sizes vs character-based
+- **Content-type specific**: Documentation (450 tokens), Support cases (350 tokens), Default (400 tokens)
+- **Factory method**: `SemanticChunker.from_settings(ContentType.DOCUMENTATION)` for config-driven creation
+- **Atomic blocks**: Code blocks, tables, and markdown headings preserved as units
+- **Adaptive threshold**: Short content (< 200 tokens) stays as single chunk
+- **Backward compatible**: Set `CHUNK_USE_TOKENS=false` for character-based mode
 
 ### Data Protection
 - **Anonymization**: Gmail threads use placeholders (`[SERIAL:XXX-N]`, `[EMAIL-N]`) before LLM processing

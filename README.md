@@ -20,6 +20,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 - **Dynamic Score Thresholds** - Adaptive filtering based on query characteristics
 - **GraphRAG** - Neo4j knowledge graph enrichment with entity extraction from chunks
 - **Performance Monitoring** - Real-time metrics collection with percentile stats and slow operation alerts
+- **Token-Aware Chunking** - Configurable token-based chunking (tiktoken) with content-type specific sizing
 
 ## Architecture
 
@@ -286,6 +287,13 @@ SEARXNG_URL=https://search.sapti.me
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_neo4j_password
+
+# Chunking (optional, defaults shown)
+CHUNK_USE_TOKENS=true          # Token-based chunking (recommended)
+CHUNK_SIZE_DOCS=450            # Chunk size for documentation (tokens)
+CHUNK_SIZE_CASES=350           # Chunk size for support cases (tokens)
+CHUNK_SIZE_DEFAULT=400         # Default chunk size (tokens)
+CHUNK_OVERLAP=50               # Chunk overlap (~12.5%)
 ```
 
 ## Usage

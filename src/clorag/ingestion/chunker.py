@@ -1,8 +1,15 @@
 """Text chunking strategies for document processing."""
 
+from __future__ import annotations
+
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from clorag.config import Settings
 
 
 class ContentType(Enum):
@@ -46,6 +53,7 @@ class SemanticChunker:
     - Markdown heading-based sectioning
     - Adaptive sizing for short content
     - Section-aware chunking for support cases
+    - Token-based sizing (recommended) or character-based (legacy)
     """
 
     # Regex patterns for atomic blocks
@@ -66,18 +74,20 @@ class SemanticChunker:
         preserve_tables: bool = True,
         preserve_lists: bool = True,
         respect_headings: bool = True,
+        use_tokens: bool = False,
     ) -> None:
         """Initialize semantic chunker.
 
         Args:
-            chunk_size: Target size for each chunk in characters.
-            chunk_overlap: Overlap between consecutive chunks.
+            chunk_size: Target size for each chunk (tokens if use_tokens=True, else characters).
+            chunk_overlap: Overlap between consecutive chunks (tokens or characters).
             min_chunk_size: Minimum chunk size (won't split below this).
             adaptive_threshold: Content below this size stays as single chunk.
             preserve_code_blocks: Keep code blocks (```) as atomic units.
             preserve_tables: Keep markdown tables as atomic units.
             preserve_lists: Keep bullet/numbered lists together when possible.
             respect_headings: Use markdown headings as chunk boundaries.
+            use_tokens: Use token-based sizing instead of character-based.
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -87,6 +97,67 @@ class SemanticChunker:
         self.preserve_tables = preserve_tables
         self.preserve_lists = preserve_lists
         self.respect_headings = respect_headings
+        self.use_tokens = use_tokens
+
+        # Lazy-load tokenizer only when needed
+        self._count_tokens_fn: Callable[[str], int] | None = None
+
+    @classmethod
+    def from_settings(
+        cls,
+        content_type: ContentType = ContentType.GENERIC,
+        settings: Settings | None = None,
+    ) -> SemanticChunker:
+        """Create a chunker with settings from config.
+
+        Args:
+            content_type: Type of content being chunked, used to select appropriate size.
+            settings: Settings instance (uses get_settings() if not provided).
+
+        Returns:
+            Configured SemanticChunker instance.
+        """
+        if settings is None:
+            from clorag.config import get_settings
+            settings = get_settings()
+
+        # Map content type to appropriate chunk size
+        if content_type in (ContentType.SUPPORT_CASE,):
+            chunk_size = settings.chunk_size_cases
+        elif content_type in (ContentType.DOCUMENTATION,):
+            chunk_size = settings.chunk_size_docs
+        else:
+            chunk_size = settings.chunk_size_default
+
+        return cls(
+            chunk_size=chunk_size,
+            chunk_overlap=settings.chunk_overlap,
+            adaptive_threshold=settings.chunk_adaptive_threshold,
+            preserve_code_blocks=True,
+            preserve_tables=True,
+            preserve_lists=True,
+            respect_headings=True,
+            use_tokens=settings.chunk_use_tokens,
+        )
+
+    def _measure_size(self, text: str) -> int:
+        """Measure text size using tokens or characters based on configuration.
+
+        Args:
+            text: Text to measure.
+
+        Returns:
+            Size in tokens (if use_tokens=True) or characters.
+        """
+        if not self.use_tokens:
+            return len(text)
+
+        # Lazy-load tokenizer
+        if self._count_tokens_fn is None:
+            from clorag.utils.tokenizer import count_tokens
+            self._count_tokens_fn = count_tokens
+
+        return self._count_tokens_fn(text)
 
     def chunk_text(
         self,
@@ -108,7 +179,7 @@ class SemanticChunker:
         text = text.strip()
 
         # Adaptive sizing: short content stays as single chunk
-        if len(text) <= self.adaptive_threshold:
+        if self._measure_size(text) <= self.adaptive_threshold:
             return [
                 Chunk(
                     text=text,
@@ -199,7 +270,7 @@ class SemanticChunker:
             section_text = f"## {section_name}\n{section_content}".strip()
 
             # If section is too large, sub-chunk it
-            if len(section_text) > self.chunk_size * 1.5:
+            if self._measure_size(section_text) > self.chunk_size * 1.5:
                 sub_chunks = self._chunk_paragraphs(section_text)
                 for sub_chunk in sub_chunks:
                     sub_chunk.metadata["section"] = section_name
@@ -311,7 +382,7 @@ class SemanticChunker:
             )
 
             # If section is small enough, keep as single chunk
-            if len(full_section) <= self.chunk_size * 1.5:
+            if self._measure_size(full_section) <= self.chunk_size * 1.5:
                 chunks.append(
                     Chunk(
                         text=full_section,
@@ -421,7 +492,7 @@ class SemanticChunker:
         text = text.strip()
 
         # Short text: single chunk
-        if len(text) <= self.adaptive_threshold:
+        if self._measure_size(text) <= self.adaptive_threshold:
             return [
                 Chunk(
                     text=text,
@@ -442,7 +513,8 @@ class SemanticChunker:
                 continue
 
             # If adding this paragraph exceeds chunk size
-            if len(current_chunk) + len(para) + 2 > self.chunk_size:
+            candidate = current_chunk + "\n\n" + para if current_chunk else para
+            if self._measure_size(candidate) > self.chunk_size:
                 if current_chunk:
                     chunks.append(
                         Chunk(
@@ -484,19 +556,61 @@ class SemanticChunker:
             text: Text to extract overlap from.
 
         Returns:
-            Overlap text (last N characters, preferably at sentence boundary).
+            Overlap text (last N tokens/characters, preferably at sentence boundary).
         """
-        if len(text) <= self.chunk_overlap:
+        text_size = self._measure_size(text)
+        if text_size <= self.chunk_overlap:
             return text
 
-        overlap = text[-self.chunk_overlap :]
+        if not self.use_tokens:
+            # Character-based overlap (original behavior)
+            overlap = text[-self.chunk_overlap :]
+            # Try to find a sentence boundary
+            sentence_end = overlap.rfind(". ")
+            if sentence_end > len(overlap) // 2:
+                return overlap[sentence_end + 2 :]
+            return overlap
 
-        # Try to find a sentence boundary
-        sentence_end = overlap.rfind(". ")
-        if sentence_end > len(overlap) // 2:
-            return overlap[sentence_end + 2 :]
+        # Token-based overlap
+        # For token mode, we need to get the last N tokens worth of text
+        # Strategy: split text into sentences, take sentences from end
+        # until we reach approximately the overlap size
+        from clorag.utils.tokenizer import count_tokens
 
-        return overlap
+        sentences = text.replace(".\n", ". ").split(". ")
+
+        if len(sentences) <= 1:
+            # Single sentence or no sentence boundaries - estimate from end
+            # Get last ~chunk_overlap*5 chars as starting point (rough estimate)
+            estimate_chars = min(self.chunk_overlap * 5, len(text))
+            return text[-estimate_chars:]
+
+        # Build overlap from end, sentence by sentence
+        overlap_parts: list[str] = []
+        current_tokens = 0
+
+        for sentence in reversed(sentences):
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            sentence_with_period = sentence + "." if not sentence.endswith(".") else sentence
+            sentence_tokens = count_tokens(sentence_with_period)
+
+            if current_tokens + sentence_tokens > self.chunk_overlap * 1.5:
+                # This sentence would exceed our target by too much
+                if overlap_parts:
+                    break
+                # But if we have nothing yet, take at least part of it
+                overlap_parts.insert(0, sentence_with_period)
+                break
+
+            overlap_parts.insert(0, sentence_with_period)
+            current_tokens += sentence_tokens
+
+            if current_tokens >= self.chunk_overlap:
+                break
+
+        return " ".join(overlap_parts)
 
 
 class TextChunker:

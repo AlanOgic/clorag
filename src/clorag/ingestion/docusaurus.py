@@ -36,8 +36,6 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         base_url: str | None = None,
         embeddings_client: EmbeddingsClient | None = None,
         vector_store: VectorStore | None = None,
-        chunk_size: int = 1000,
-        chunk_overlap: int = 100,
         extract_cameras: bool = True,
         use_jina: bool | None = None,
     ) -> None:
@@ -47,8 +45,6 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
             base_url: Docusaurus site URL. Defaults to DOCUSAURUS_URL env var.
             embeddings_client: Client for generating embeddings.
             vector_store: Client for storing vectors.
-            chunk_size: Size of text chunks.
-            chunk_overlap: Overlap between chunks.
             extract_cameras: Whether to extract camera compatibility info.
             use_jina: Use Jina Reader API for extraction. Defaults to USE_JINA_READER env var.
         """
@@ -57,15 +53,8 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         self._embeddings = embeddings_client or EmbeddingsClient()
         self._sparse_embeddings = SparseEmbeddingsClient()
         self._vectorstore = vector_store or VectorStore()
-        # Use SemanticChunker for code block and heading preservation
-        self._chunker = SemanticChunker(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            adaptive_threshold=800,  # Short pages stay as single chunk
-            preserve_code_blocks=True,
-            preserve_tables=True,
-            respect_headings=True,
-        )
+        # Use SemanticChunker with settings-based token-aware chunking
+        self._chunker = SemanticChunker.from_settings(ContentType.DOCUMENTATION)
         self._extract_cameras = extract_cameras
 
         # Jina Reader configuration

@@ -78,14 +78,8 @@ class CuratedGmailPipeline:
         self._embeddings = EmbeddingsClient()
         self._sparse_embeddings = SparseEmbeddingsClient()
         self._vectorstore = VectorStore()
-        # Use SemanticChunker for section-aware chunking of support cases
-        self._chunker = SemanticChunker(
-            chunk_size=1000,
-            chunk_overlap=100,
-            adaptive_threshold=800,  # Short cases stay as single chunk
-            preserve_code_blocks=True,
-            respect_headings=True,
-        )
+        # Use SemanticChunker with settings-based token-aware chunking
+        self._chunker = SemanticChunker.from_settings(ContentType.SUPPORT_CASE)
         self._anonymizer = TextAnonymizer()
 
         self._sonnet_concurrent = sonnet_concurrent

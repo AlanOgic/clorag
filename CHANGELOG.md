@@ -5,6 +5,15 @@ All notable changes to CLORAG will be documented in this file.
 ## [0.5.7] - 2026-01-20
 
 ### Added
+- **Token-Aware Chunking System**
+  - Token-based chunk sizing using `tiktoken` (cl100k_base encoding) for 15-20% more consistent chunks
+  - Configurable via environment variables: `CHUNK_USE_TOKENS`, `CHUNK_SIZE_DOCS`, `CHUNK_SIZE_CASES`, etc.
+  - Content-type specific sizing: Documentation (450 tokens), Support cases (350 tokens), Default (400 tokens)
+  - `SemanticChunker.from_settings()` factory method for config-driven chunker creation
+  - New `src/clorag/utils/tokenizer.py` module with `count_tokens()`, `truncate_to_tokens()` functions
+  - Backward compatible: Set `CHUNK_USE_TOKENS=false` for character-based mode
+  - Hierarchical chunking design document at `docs/architecture/hierarchical-chunking.md`
+
 - **RIO Terminology Fix System**
   - CLI tool `uv run fix-rio-terminology` for scanning and fixing RIO product terminology
   - Context-aware Haiku analysis distinguishes license vs hardware contexts
@@ -41,10 +50,24 @@ All notable changes to CLORAG will be documented in this file.
   - Automatic re-embedding after text changes
 
 ### New Files
+- `src/clorag/utils/tokenizer.py` - Token counting utilities using tiktoken
 - `src/clorag/core/terminology_db.py` - SQLite storage for terminology fixes
 - `src/clorag/analysis/rio_analyzer.py` - Haiku-based context analyzer
 - `src/clorag/scripts/fix_rio_terminology.py` - CLI script
 - `src/clorag/web/templates/admin_terminology_fixes.html` - Admin UI
+- `docs/architecture/hierarchical-chunking.md` - Future chunking design doc
+- `tests/test_chunker.py` - 20 unit tests for token-aware chunking
+
+### New Configuration Options
+- `CHUNK_USE_TOKENS` (default: `true`) - Use token-based chunking
+- `CHUNK_SIZE_DOCS` (default: `450`) - Chunk size for documentation (tokens)
+- `CHUNK_SIZE_CASES` (default: `350`) - Chunk size for support cases (tokens)
+- `CHUNK_SIZE_DEFAULT` (default: `400`) - Default chunk size (tokens)
+- `CHUNK_OVERLAP` (default: `50`) - Chunk overlap (~12.5%)
+- `CHUNK_ADAPTIVE_THRESHOLD` (default: `200`) - Single-chunk threshold (tokens)
+
+### Dependencies
+- Added `tiktoken>=0.12.0` for token counting
 
 ### Changed
 - Admin dashboard includes Terminology Fixes card

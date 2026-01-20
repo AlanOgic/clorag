@@ -549,6 +549,7 @@ dependencies = [
     { name = "slowapi" },
     { name = "structlog" },
     { name = "tenacity" },
+    { name = "tiktoken" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "voyageai" },
 ]
@@ -591,6 +592,7 @@ requires-dist = [
     { name = "slowapi", specifier = ">=0.1.9" },
     { name = "structlog", specifier = ">=24.0.0" },
     { name = "tenacity", specifier = ">=9.0.0" },
+    { name = "tiktoken", specifier = ">=0.12.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
     { name = "voyageai", specifier = ">=0.3.5" },
 ]

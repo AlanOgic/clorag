@@ -155,6 +155,32 @@ class Settings(BaseSettings):
         description="OAuth token file for draft creation (with compose scope)",
     )
 
+    # Chunking Configuration
+    chunk_use_tokens: bool = Field(
+        default=True,
+        description="Use token-based chunking (vs character-based for backward compatibility)",
+    )
+    chunk_size_docs: int = Field(
+        default=450,
+        description="Chunk size for documentation (tokens or chars based on chunk_use_tokens)",
+    )
+    chunk_size_cases: int = Field(
+        default=350,
+        description="Chunk size for support cases (tokens or chars based on chunk_use_tokens)",
+    )
+    chunk_size_default: int = Field(
+        default=400,
+        description="Default chunk size in tokens (or characters if chunk_use_tokens=false)",
+    )
+    chunk_overlap: int = Field(
+        default=50,
+        description="Chunk overlap (tokens or chars). ~12.5% of default size.",
+    )
+    chunk_adaptive_threshold: int = Field(
+        default=200,
+        description="Content below this token count stays as single chunk",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
