@@ -44,7 +44,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 ### Source Layout
 
-**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch), `embeddings.py` (voyage-context-3 with AsyncClient), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool)
+**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool)
 
 **Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler), `chunker.py`, `base.py`
 
@@ -100,7 +100,7 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Over-fetch strategy**: Retrieves 3x limit, reranks, returns top-K for optimal quality
 - **Query cache**: LRU caches (200 entries) for embeddings + (100 entries) for reranking
 - **Dynamic thresholds**: ≤2 words: 0.15, 3-5: 0.20, >5: 0.25; technical terms +0.05; minimum 3 results
-- **Contextualized embeddings**: `voyage-context-3` encodes chunks with full document context
+- **Contextualized embeddings**: `voyage-context-3` uses `/v1/contextualizedembeddings` API (not `/v1/embeddings`) to encode chunks with full document context
 
 ### Chunking
 - **Token-based sizing**: Uses `tiktoken` (cl100k_base) for 15-20% more consistent chunk sizes vs character-based
@@ -164,6 +164,8 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 - Legacy terms ("RIO-Live", "RIO Live", "RIO +WAN Live") map to "RIO +LAN" in license context
 - Hardware context (grounding, power, wiring) uses generic "RIO" since license doesn't matter
 - Admin UI at `/admin/terminology-fixes` for reviewing and applying corrections
+- **Document-context re-embedding**: When fixes are applied, ALL sibling chunks from the same document are re-embedded together using `contextualized_embed()` to preserve semantic understanding
+- **Grouping fields**: `url` (docusaurus_docs), `thread_id` (gmail_cases), `parent_doc_id` (custom_docs)
 
 ## Deployment
 

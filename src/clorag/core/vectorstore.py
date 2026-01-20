@@ -770,3 +770,98 @@ class VectorStore:
             points_selector=models.PointIdsList(points=[chunk_id]),
         )
         return True
+
+    async def get_chunks_by_field(
+        self,
+        collection: str,
+        field: str,
+        value: str,
+        with_vectors: bool = False,
+        max_chunks: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Get all chunks matching a field value (e.g., all chunks from same document).
+
+        Args:
+            collection: Collection name.
+            field: Metadata field to filter on (e.g., 'url', 'thread_id', 'parent_doc_id').
+            value: Value to match.
+            with_vectors: Whether to include vectors in response.
+            max_chunks: Maximum chunks to return (safety limit).
+
+        Returns:
+            List of chunk dicts sorted by chunk_index, each containing id, payload,
+            and optionally vectors.
+        """
+        chunks: list[dict[str, Any]] = []
+        offset: str | None = None
+
+        while len(chunks) < max_chunks:
+            batch, next_offset = await self.scroll_chunks(
+                collection=collection,
+                limit=50,
+                offset=offset,
+                filter_conditions={field: value},
+            )
+
+            if not batch:
+                break
+
+            # If we need vectors, fetch them individually
+            if with_vectors:
+                for chunk in batch:
+                    full_chunk = await self.get_chunk(
+                        collection, chunk["id"], with_vectors=True
+                    )
+                    if full_chunk:
+                        chunks.append(full_chunk)
+            else:
+                chunks.extend(batch)
+
+            if not next_offset or len(chunks) >= max_chunks:
+                break
+            offset = next_offset
+
+        # Sort by chunk_index for correct document order
+        chunks.sort(key=lambda c: c.get("payload", {}).get("chunk_index", 0))
+
+        return chunks[:max_chunks]
+
+    async def update_chunks_vectors_batch(
+        self,
+        collection: str,
+        updates: list[tuple[str, list[float], SparseVector]],
+    ) -> int:
+        """Update vectors for multiple chunks in a batch.
+
+        Args:
+            collection: Collection name.
+            updates: List of (chunk_id, dense_vector, sparse_vector) tuples.
+
+        Returns:
+            Number of chunks updated.
+        """
+        if not updates:
+            return 0
+
+        # Build points for batch update
+        points = [
+            models.PointVectors(
+                id=chunk_id,
+                vector={
+                    "dense": dense_vec,
+                    "sparse": sparse_vec,
+                },
+            )
+            for chunk_id, dense_vec, sparse_vec in updates
+        ]
+
+        # Update in batches of 100
+        batch_size = 100
+        for i in range(0, len(points), batch_size):
+            batch = points[i : i + batch_size]
+            await self._client.update_vectors(
+                collection_name=collection,
+                points=batch,
+            )
+
+        return len(updates)

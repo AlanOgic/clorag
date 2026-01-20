@@ -154,14 +154,84 @@ def update_keywords(
     return updated if updated else None
 
 
+def get_grouping_field(collection: str) -> str:
+    """Get the field used to group chunks by document for a collection.
+
+    Args:
+        collection: Collection name.
+
+    Returns:
+        Field name for grouping (url, thread_id, or parent_doc_id).
+    """
+    grouping_fields = {
+        "docusaurus_docs": "url",
+        "gmail_cases": "thread_id",
+        "custom_docs": "parent_doc_id",
+    }
+    return grouping_fields.get(collection, "url")
+
+
+def apply_metadata_fixes(
+    payload: dict[str, str | list[str] | None],
+    fixes: list[TerminologyFix],
+) -> dict[str, str | list[str] | None]:
+    """Apply terminology fixes to metadata fields.
+
+    Args:
+        payload: Chunk payload with metadata.
+        fixes: List of fixes to apply.
+
+    Returns:
+        Dict of metadata updates.
+    """
+    metadata_updates: dict[str, str | list[str] | None] = {}
+
+    for fix in fixes:
+        # Apply fix to subject if present
+        subject = payload.get("subject")
+        if isinstance(subject, str) and fix.original_text.lower() in subject.lower():
+            new_subject = apply_fix_to_text(subject, fix.original_text, fix.suggested_text)
+            if new_subject != subject:
+                metadata_updates["subject"] = new_subject
+                payload["subject"] = new_subject  # Update for subsequent fixes
+
+        # Apply fix to problem_summary if present
+        problem = payload.get("problem_summary")
+        if isinstance(problem, str) and fix.original_text.lower() in problem.lower():
+            new_problem = apply_fix_to_text(problem, fix.original_text, fix.suggested_text)
+            if new_problem != problem:
+                metadata_updates["problem_summary"] = new_problem
+                payload["problem_summary"] = new_problem
+
+        # Apply fix to solution_summary if present
+        solution = payload.get("solution_summary")
+        if isinstance(solution, str) and fix.original_text.lower() in solution.lower():
+            new_solution = apply_fix_to_text(solution, fix.original_text, fix.suggested_text)
+            if new_solution != solution:
+                metadata_updates["solution_summary"] = new_solution
+                payload["solution_summary"] = new_solution
+
+        # Update keywords - remove legacy terms, add new terminology
+        keywords = payload.get("keywords")
+        if keywords and isinstance(keywords, list):
+            new_keywords = update_keywords(keywords, fix.original_text, fix.suggested_text)
+            if new_keywords != keywords:
+                metadata_updates["keywords"] = new_keywords
+                payload["keywords"] = new_keywords
+
+    return metadata_updates
+
+
 async def apply_approved_fixes(
     vectorstore: VectorStore,
     embeddings: EmbeddingsClient,
     sparse_embeddings: SparseEmbeddingsClient,
 ) -> int:
-    """Apply all approved terminology fixes to chunks.
+    """Apply all approved terminology fixes to chunks with full document context.
 
-    Also updates related metadata fields (subject, summaries, keywords).
+    Groups fixes by document, fetches all sibling chunks, applies fixes,
+    and re-embeds the entire document with contextualized embeddings to
+    preserve document-level semantic understanding.
 
     Args:
         vectorstore: VectorStore instance.
@@ -178,85 +248,128 @@ async def apply_approved_fixes(
         logger.info("No approved fixes to apply")
         return 0
 
-    applied_count = 0
-    failed_ids: list[str] = []
+    # Group fixes by (collection, document_group_value)
+    # This allows us to re-embed entire documents once with all their fixes
+    fixes_by_document: dict[tuple[str, str], list[TerminologyFix]] = {}
 
     for fix in approved_fixes:
-        try:
-            # Get current chunk
-            chunk = await vectorstore.get_chunk(fix.collection, fix.chunk_id)
-            if not chunk:
-                logger.warning("Chunk not found", chunk_id=fix.chunk_id)
-                failed_ids.append(fix.id)
-                continue
+        # Get the chunk to find its document grouping value
+        chunk = await vectorstore.get_chunk(fix.collection, fix.chunk_id)
+        if not chunk:
+            logger.warning("Chunk not found", chunk_id=fix.chunk_id)
+            continue
 
-            payload = chunk.get("payload", {})
-            current_text = payload.get("text", "")
-            if not current_text:
-                logger.warning("Chunk has no text", chunk_id=fix.chunk_id)
-                failed_ids.append(fix.id)
-                continue
-
-            # Apply the fix to main text
-            new_text = apply_fix_to_text(current_text, fix.original_text, fix.suggested_text)
-
-            # Build metadata updates for related fields
-            metadata_updates: dict[str, str | list[str] | None] = {}
-
-            # Apply fix to subject if present
-            subject = payload.get("subject")
-            if subject and fix.original_text.lower() in subject.lower():
-                new_subject = apply_fix_to_text(subject, fix.original_text, fix.suggested_text)
-                if new_subject != subject:
-                    metadata_updates["subject"] = new_subject
-
-            # Apply fix to problem_summary if present
-            problem = payload.get("problem_summary")
-            if problem and fix.original_text.lower() in problem.lower():
-                new_problem = apply_fix_to_text(problem, fix.original_text, fix.suggested_text)
-                if new_problem != problem:
-                    metadata_updates["problem_summary"] = new_problem
-
-            # Apply fix to solution_summary if present
-            solution = payload.get("solution_summary")
-            if solution and fix.original_text.lower() in solution.lower():
-                new_solution = apply_fix_to_text(solution, fix.original_text, fix.suggested_text)
-                if new_solution != solution:
-                    metadata_updates["solution_summary"] = new_solution
-
-            # Update keywords - remove legacy terms, add new terminology
-            keywords = payload.get("keywords")
-            if keywords and isinstance(keywords, list):
-                new_keywords = update_keywords(keywords, fix.original_text, fix.suggested_text)
-                if new_keywords != keywords:
-                    metadata_updates["keywords"] = new_keywords
-
-            # Check if any changes were made
-            if new_text == current_text and not metadata_updates:
-                logger.warning(
-                    "No change after applying fix",
-                    chunk_id=fix.chunk_id,
-                    original=fix.original_text,
-                )
-                db.update_status(fix.id, "applied", datetime.utcnow())
-                applied_count += 1
-                continue
-
-            # Regenerate embeddings for new text
-            dense_result = await embeddings.embed_documents([new_text])
-            sparse_vector = sparse_embeddings.embed_texts([new_text])[0]
-
-            # Update chunk in vectorstore (text + metadata)
-            success = await vectorstore.update_chunk(
-                collection=fix.collection,
+        grouping_field = get_grouping_field(fix.collection)
+        group_value = chunk.get("payload", {}).get(grouping_field)
+        if not group_value:
+            logger.warning(
+                "Chunk missing grouping field",
                 chunk_id=fix.chunk_id,
-                text=new_text,
-                metadata_updates=metadata_updates if metadata_updates else None,
-                dense_vector=dense_result.vectors[0],
-                sparse_vector=sparse_vector,
+                field=grouping_field,
+            )
+            continue
+
+        key = (fix.collection, group_value)
+        if key not in fixes_by_document:
+            fixes_by_document[key] = []
+        fixes_by_document[key].append(fix)
+
+    applied_count = 0
+    failed_ids: list[str] = []
+    documents_processed = 0
+
+    for (collection, group_value), fixes in fixes_by_document.items():
+        try:
+            grouping_field = get_grouping_field(collection)
+            logger.info(
+                "Processing document",
+                collection=collection,
+                grouping_field=grouping_field,
+                group_value=group_value[:50] if len(group_value) > 50 else group_value,
+                fixes_count=len(fixes),
             )
 
-            if success:
+            # Fetch ALL sibling chunks from this document
+            siblings = await vectorstore.get_chunks_by_field(
+                collection=collection,
+                field=grouping_field,
+                value=group_value,
+            )
+
+            if not siblings:
+                logger.warning("No siblings found for document", group_value=group_value)
+                failed_ids.extend(f.id for f in fixes)
+                continue
+
+            # Build a map of chunk_id -> fixes for fast lookup
+            fixes_by_chunk: dict[str, list[TerminologyFix]] = {}
+            for fix in fixes:
+                if fix.chunk_id not in fixes_by_chunk:
+                    fixes_by_chunk[fix.chunk_id] = []
+                fixes_by_chunk[fix.chunk_id].append(fix)
+
+            # Apply text fixes and collect updated texts in document order
+            texts: list[str] = []
+            # (chunk_id, new_text, metadata_updates)
+            chunk_updates: list[tuple[str, str, dict[str, str | list[str] | None]]] = []
+
+            for sib in siblings:
+                chunk_id = sib["id"]
+                payload = sib.get("payload", {})
+                text = payload.get("text", "")
+
+                # Apply fixes if this chunk has any
+                chunk_fixes = fixes_by_chunk.get(chunk_id, [])
+                new_text = text
+                metadata_updates: dict[str, str | list[str] | None] = {}
+
+                for fix in chunk_fixes:
+                    new_text = apply_fix_to_text(new_text, fix.original_text, fix.suggested_text)
+                    # Apply to metadata too
+                    meta_updates = apply_metadata_fixes(payload, [fix])
+                    metadata_updates.update(meta_updates)
+
+                texts.append(new_text)
+                chunk_updates.append((chunk_id, new_text, metadata_updates))
+
+            # Re-embed entire document with full context
+            # This uses contextualized_embed([[chunk1, chunk2, ...]])
+            doc_embeddings = await embeddings.embed_contextualized([texts])
+            dense_vectors = doc_embeddings[0]  # Single document's embeddings
+
+            # Generate sparse vectors for each chunk
+            sparse_vectors = sparse_embeddings.embed_batch(texts)
+
+            # Update all chunks with new vectors and text/metadata where changed
+            for i, (chunk_id, new_text, metadata_updates) in enumerate(chunk_updates):
+                # Check if this chunk had fixes applied
+                had_fixes = chunk_id in fixes_by_chunk
+                original_text = siblings[i].get("payload", {}).get("text", "")
+
+                if had_fixes and (new_text != original_text or metadata_updates):
+                    # Update text and metadata for chunks with fixes
+                    success = await vectorstore.update_chunk(
+                        collection=collection,
+                        chunk_id=chunk_id,
+                        text=new_text,
+                        metadata_updates=metadata_updates if metadata_updates else None,
+                        dense_vector=dense_vectors[i],
+                        sparse_vector=sparse_vectors[i],
+                    )
+                else:
+                    # Only update vectors for sibling chunks (no text change)
+                    success = await vectorstore.update_chunk(
+                        collection=collection,
+                        chunk_id=chunk_id,
+                        dense_vector=dense_vectors[i],
+                        sparse_vector=sparse_vectors[i],
+                    )
+
+                if not success:
+                    logger.error("Failed to update chunk", chunk_id=chunk_id)
+
+            # Mark all fixes for this document as applied
+            for fix in fixes:
                 db.update_status(fix.id, "applied", datetime.utcnow())
                 applied_count += 1
                 logger.info(
@@ -264,20 +377,31 @@ async def apply_approved_fixes(
                     chunk_id=fix.chunk_id,
                     original=fix.original_text,
                     suggested=fix.suggested_text,
-                    metadata_updated=list(metadata_updates.keys()) if metadata_updates else [],
                 )
-            else:
-                logger.error("Failed to update chunk", chunk_id=fix.chunk_id)
-                failed_ids.append(fix.id)
+
+            documents_processed += 1
+            logger.info(
+                "Document re-embedded with context",
+                collection=collection,
+                group_value=group_value[:50] if len(group_value) > 50 else group_value,
+                chunks_updated=len(siblings),
+                fixes_applied=len(fixes),
+            )
 
         except Exception as e:
-            logger.error("Error applying fix", fix_id=fix.id, error=str(e))
-            failed_ids.append(fix.id)
+            logger.error(
+                "Error processing document",
+                collection=collection,
+                group_value=group_value[:50] if len(group_value) > 50 else group_value,
+                error=str(e),
+            )
+            failed_ids.extend(f.id for f in fixes)
 
     logger.info(
         "Applied fixes complete",
         applied=applied_count,
         failed=len(failed_ids),
+        documents_processed=documents_processed,
     )
 
     return applied_count

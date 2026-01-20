@@ -2377,11 +2377,14 @@ async def api_batch_update_terminology_fix_status(
 
 @app.post("/api/admin/terminology-fixes/apply", tags=["Terminology Fixes"])
 async def api_apply_terminology_fixes(_: bool = Depends(verify_admin)):
-    """Apply all approved terminology fixes to the vector database."""
-    from datetime import datetime
+    """Apply all approved terminology fixes to the vector database.
 
-    from clorag.analysis.rio_analyzer import apply_fix_to_text
+    Uses document-context re-embedding: when a chunk is fixed, all sibling
+    chunks from the same document are re-embedded together using contextualized
+    embeddings to preserve semantic understanding of the full document.
+    """
     from clorag.core.terminology_db import get_terminology_fix_database
+    from clorag.scripts.fix_rio_terminology import apply_approved_fixes
 
     db = get_terminology_fix_database()
     approved_fixes = db.get_approved_fixes()
@@ -2393,67 +2396,28 @@ async def api_apply_terminology_fixes(_: bool = Depends(verify_admin)):
     embeddings = get_embeddings()
     sparse_embeddings = get_sparse_embeddings()
 
-    applied_count = 0
-    failed_count = 0
+    try:
+        applied_count = await apply_approved_fixes(
+            vectorstore=vectorstore,
+            embeddings=embeddings,
+            sparse_embeddings=sparse_embeddings,
+        )
 
-    for fix in approved_fixes:
-        try:
-            # Get current chunk
-            chunk = await vectorstore.get_chunk(fix.collection, fix.chunk_id)
-            if not chunk:
-                logger.warning("Chunk not found for terminology fix", chunk_id=fix.chunk_id)
-                failed_count += 1
-                continue
+        # Calculate failed from total - applied
+        total_approved = len(approved_fixes)
+        failed_count = total_approved - applied_count
 
-            current_text = chunk.get("payload", {}).get("text", "")
-            if not current_text:
-                logger.warning("Chunk has no text", chunk_id=fix.chunk_id)
-                failed_count += 1
-                continue
-
-            # Apply the fix
-            new_text = apply_fix_to_text(current_text, fix.original_text, fix.suggested_text)
-
-            if new_text == current_text:
-                # No change needed, mark as applied
-                db.update_status(fix.id, "applied", datetime.utcnow())
-                applied_count += 1
-                continue
-
-            # Regenerate embeddings
-            dense_result = await embeddings.embed_text(new_text)
-            sparse_vector = sparse_embeddings.embed_text(new_text)
-
-            # Update chunk in vectorstore
-            success = await vectorstore.update_chunk(
-                collection=fix.collection,
-                chunk_id=fix.chunk_id,
-                text=new_text,
-                dense_vector=dense_result.vectors[0],
-                sparse_vector=sparse_vector,
-            )
-
-            if success:
-                db.update_status(fix.id, "applied", datetime.utcnow())
-                applied_count += 1
-                logger.info(
-                    "Applied terminology fix",
-                    chunk_id=fix.chunk_id,
-                    original=fix.original_text,
-                    suggested=fix.suggested_text,
-                )
-            else:
-                failed_count += 1
-
-        except Exception as e:
-            logger.error("Failed to apply terminology fix", fix_id=fix.id, error=str(e))
-            failed_count += 1
-
-    return {
-        "applied": applied_count,
-        "failed": failed_count,
-        "message": f"Applied {applied_count} fixes, {failed_count} failed",
-    }
+        return {
+            "applied": applied_count,
+            "failed": failed_count,
+            "message": f"Applied {applied_count} fixes with document-context re-embedding, {failed_count} failed",
+        }
+    except Exception as e:
+        logger.error("Failed to apply terminology fixes", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to apply terminology fixes: {str(e)}",
+        )
 
 
 @app.delete("/api/admin/terminology-fixes/{fix_id}", tags=["Terminology Fixes"])

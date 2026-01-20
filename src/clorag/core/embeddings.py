@@ -144,6 +144,10 @@ class EmbeddingsClient:
     ) -> EmbeddingResult:
         """Generate embeddings for documents.
 
+        For voyage-context-3, wraps each text as a single-chunk document
+        and uses contextualized_embed(). For isolated chunks without document
+        context, prefer embed_contextualized() with full document chunks.
+
         Args:
             texts: List of text chunks to embed.
             input_type: Type of input - 'document' for indexing, 'query' for search.
@@ -154,16 +158,22 @@ class EmbeddingsClient:
         if not texts:
             return EmbeddingResult(vectors=[], total_tokens=0)
 
-        # voyage-context-3 supports up to 16K chunks per request
-        result = await self._client.embed(
-            texts=texts,
+        # voyage-context-3 requires contextualized_embed API
+        # Wrap each text as a single-chunk "document" [[text1], [text2], ...]
+        documents = [[text] for text in texts]
+
+        result = await self._client.contextualized_embed(
+            inputs=documents,
             model=self._model,
             input_type=input_type,
             output_dimension=self._dimensions,
         )
 
+        # Extract the single embedding from each document result
+        vectors = [doc_result.embeddings[0] for doc_result in result.results]
+
         return EmbeddingResult(
-            vectors=result.embeddings,
+            vectors=vectors,
             total_tokens=result.total_tokens,
         )
 
