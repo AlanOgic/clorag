@@ -181,6 +181,16 @@ class Settings(BaseSettings):
         description="Content below this token count stays as single chunk",
     )
 
+    # RIO Terminology Fix Configuration
+    rio_fix_on_ingest: bool = Field(
+        default=True,
+        description="Apply high-confidence RIO terminology fixes during ingestion",
+    )
+    rio_fix_min_confidence: float = Field(
+        default=0.85,
+        description="Minimum confidence threshold for auto-applying RIO fixes during ingestion",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

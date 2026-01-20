@@ -5,6 +5,8 @@ from uuid import uuid4
 
 import structlog
 
+from clorag.analysis.rio_analyzer import RIOTerminologyAnalyzer, apply_rio_fixes_before_embedding
+from clorag.config import get_settings
 from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import VectorStore
@@ -62,6 +64,26 @@ class CustomDocumentService:
         doc_id = str(uuid4())
         now = datetime.utcnow()
 
+        # Apply RIO terminology fixes before embedding (if enabled)
+        settings = get_settings()
+        content_to_embed = doc.content
+        rio_fixes_applied = 0
+
+        if settings.rio_fix_on_ingest:
+            analyzer = RIOTerminologyAnalyzer()
+            fixed_content, applied_fixes = await apply_rio_fixes_before_embedding(
+                doc.content, analyzer, settings.rio_fix_min_confidence
+            )
+            if applied_fixes:
+                content_to_embed = fixed_content
+                rio_fixes_applied = len(applied_fixes)
+                logger.info(
+                    "Applied RIO terminology fixes to custom document",
+                    doc_id=doc_id,
+                    title=doc.title,
+                    fixes_applied=rio_fixes_applied,
+                )
+
         # Chunk the content with semantic awareness
         # Map document category to content type for optimal chunking
         content_type = ContentType.GENERIC
@@ -74,11 +96,11 @@ class CustomDocumentService:
 
         # Create chunker with settings-based token-aware sizing for this content type
         chunker = SemanticChunker.from_settings(content_type)
-        chunks = chunker.chunk_text(doc.content, content_type=content_type)
+        chunks = chunker.chunk_text(content_to_embed, content_type=content_type)
 
         if not chunks:
             # Single chunk for short content
-            chunk_texts = [doc.content]
+            chunk_texts = [content_to_embed]
             chunk_meta_list: list[dict[str, str | int | bool]] = [{}]
         else:
             chunk_texts = [chunk.text for chunk in chunks]
@@ -96,7 +118,7 @@ class CustomDocumentService:
         sparse_vectors = self._sparse_embeddings.embed_batch(chunk_texts)
 
         # Prepare metadata for each chunk
-        base_metadata = {
+        base_metadata: dict[str, str | list[str] | int | None] = {
             "source": "custom_docs",
             "title": doc.title,
             "tags": doc.tags,
@@ -109,6 +131,8 @@ class CustomDocumentService:
             "created_by": created_by,
             "parent_doc_id": doc_id,
         }
+        if rio_fixes_applied > 0:
+            base_metadata["rio_fixes_applied"] = rio_fixes_applied
 
         # Generate chunk IDs and metadata
         chunk_ids = []

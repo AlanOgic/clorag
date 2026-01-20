@@ -6,6 +6,7 @@ from datetime import datetime
 import structlog
 
 from clorag.analysis import CameraExtractor, QualityController, ThreadAnalyzer
+from clorag.analysis.rio_analyzer import RIOTerminologyAnalyzer, apply_rio_fixes_before_embedding
 from clorag.config import get_settings
 from clorag.core.database import get_camera_database
 from clorag.core.embeddings import EmbeddingsClient
@@ -232,6 +233,10 @@ class CuratedGmailPipeline:
 
         logger.info("Built support cases", count=len(support_cases))
 
+        # Step 5.1: Apply RIO terminology fixes before embedding (if enabled)
+        if self._settings.rio_fix_on_ingest:
+            support_cases = await self._apply_rio_fixes_to_cases(support_cases)
+
         # Step 5.5: Store full documents in SQLite for easy retrieval
         logger.info("Step 5.5: Storing full documents in SQLite")
         support_case_db = get_support_case_database()
@@ -340,6 +345,63 @@ class CuratedGmailPipeline:
             await self._extract_cameras_from_cases(support_cases)
 
         return len(support_cases)
+
+    async def _apply_rio_fixes_to_cases(
+        self, cases: list[SupportCase]
+    ) -> list[SupportCase]:
+        """Apply RIO terminology fixes to support cases before embedding.
+
+        Args:
+            cases: List of support cases to process.
+
+        Returns:
+            List of support cases with RIO fixes applied.
+        """
+        analyzer = RIOTerminologyAnalyzer()
+        min_confidence = self._settings.rio_fix_min_confidence
+        fixed_cases: list[SupportCase] = []
+        total_fixes = 0
+
+        for case in cases:
+            case_fixes = 0
+
+            # Fix the main document (most important - this gets embedded)
+            fixed_doc, doc_fixes = await apply_rio_fixes_before_embedding(
+                case.document, analyzer, min_confidence
+            )
+            if doc_fixes:
+                case.document = fixed_doc
+                case_fixes += len(doc_fixes)
+
+            # Fix problem summary
+            if case.problem_summary:
+                fixed_problem, problem_fixes = await apply_rio_fixes_before_embedding(
+                    case.problem_summary, analyzer, min_confidence
+                )
+                if problem_fixes:
+                    case.problem_summary = fixed_problem
+                    case_fixes += len(problem_fixes)
+
+            # Fix solution summary
+            if case.solution_summary:
+                fixed_solution, solution_fixes = await apply_rio_fixes_before_embedding(
+                    case.solution_summary, analyzer, min_confidence
+                )
+                if solution_fixes:
+                    case.solution_summary = fixed_solution
+                    case_fixes += len(solution_fixes)
+
+            total_fixes += case_fixes
+            fixed_cases.append(case)
+
+        if total_fixes > 0:
+            logger.info(
+                "Applied RIO terminology fixes to support cases",
+                cases_fixed=sum(1 for _ in fixed_cases),
+                total_fixes=total_fixes,
+            )
+
+        return fixed_cases
 
     async def _extract_cameras_from_cases(
         self, cases: list[SupportCase]

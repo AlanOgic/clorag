@@ -163,8 +163,10 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 - **RIO**: Generic reference to hardware (when license isn't relevant)
 - Legacy terms ("RIO-Live", "RIO Live", "RIO +WAN Live") map to "RIO +LAN" in license context
 - Hardware context (grounding, power, wiring) uses generic "RIO" since license doesn't matter
-- Admin UI at `/admin/terminology-fixes` for reviewing and applying corrections
-- **Document-context re-embedding**: When fixes are applied, ALL sibling chunks from the same document are re-embedded together using `contextualized_embed()` to preserve semantic understanding
+- **Pre-ingestion fixes**: High-confidence fixes (≥0.85) auto-applied during ingestion before embedding
+- **Configuration**: `RIO_FIX_ON_INGEST` (default: true), `RIO_FIX_MIN_CONFIDENCE` (default: 0.85)
+- Admin UI at `/admin/terminology-fixes` for reviewing and applying corrections to existing chunks
+- **Document-context re-embedding**: When fixes are applied post-ingestion, ALL sibling chunks re-embedded together
 - **Grouping fields**: `url` (docusaurus_docs), `thread_id` (gmail_cases), `parent_doc_id` (custom_docs)
 
 ## Deployment

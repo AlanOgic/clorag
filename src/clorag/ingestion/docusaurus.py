@@ -7,6 +7,7 @@ from uuid import uuid4
 import httpx
 
 from clorag.analysis.camera_extractor import CameraExtractor
+from clorag.analysis.rio_analyzer import RIOTerminologyAnalyzer, apply_rio_fixes_before_embedding
 from clorag.config import get_settings
 from clorag.core.database import get_camera_database
 from clorag.core.embeddings import EmbeddingsClient
@@ -411,13 +412,22 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
     async def process(self, documents: list[Document]) -> list[tuple[Document, list[Document]]]:
         """Chunk documents for contextualized embedding.
 
+        Optionally applies RIO terminology fixes before chunking based on settings.
+
         Args:
             documents: Raw documents.
 
         Returns:
             List of (parent_doc, chunk_docs) tuples for contextualized embedding.
         """
+        settings = get_settings()
         processed: list[tuple[Document, list[Document]]] = []
+
+        # Apply RIO terminology fixes before chunking if enabled
+        if settings.rio_fix_on_ingest:
+            documents = await self._apply_rio_fixes(
+                documents, settings.rio_fix_min_confidence
+            )
 
         for doc in documents:
             # Use semantic chunking with documentation content type
@@ -525,6 +535,54 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
             await self._extract_cameras_from_docs(doc_chunks)
 
         return len(all_chunk_docs)
+
+    async def _apply_rio_fixes(
+        self, documents: list[Document], min_confidence: float
+    ) -> list[Document]:
+        """Apply RIO terminology fixes to documents before chunking.
+
+        Args:
+            documents: List of documents to process.
+            min_confidence: Minimum confidence threshold for auto-applying fixes.
+
+        Returns:
+            List of documents with RIO fixes applied.
+        """
+        analyzer = RIOTerminologyAnalyzer()
+        fixed_documents: list[Document] = []
+        total_fixes = 0
+
+        for doc in documents:
+            fixed_text, applied_fixes = await apply_rio_fixes_before_embedding(
+                doc.text, analyzer, min_confidence
+            )
+
+            if applied_fixes:
+                total_fixes += len(applied_fixes)
+                # Create new document with fixed text
+                fixed_documents.append(
+                    Document(
+                        id=doc.id,
+                        text=fixed_text,
+                        metadata={
+                            **doc.metadata,
+                            "rio_fixes_applied": len(applied_fixes),
+                        },
+                    )
+                )
+            else:
+                fixed_documents.append(doc)
+
+        if total_fixes > 0:
+            logger.info(
+                "Applied RIO terminology fixes during ingestion",
+                documents_fixed=sum(
+                    1 for d in fixed_documents if d.metadata.get("rio_fixes_applied", 0) > 0
+                ),
+                total_fixes=total_fixes,
+            )
+
+        return fixed_documents
 
     async def _extract_cameras_from_docs(
         self, doc_chunks: list[tuple[Document, list[Document]]]

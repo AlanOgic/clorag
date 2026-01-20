@@ -32,7 +32,7 @@ COMPILED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in RIO_PATTERNS]
 ANALYSIS_PROMPT = """You are analyzing CyanView text to fix RIO terminology.
 
 **Product Definitions:**
-- **"RIO +WAN"** = Full-featured RIO, works via LAN AND WAN, for 1-128 distant cameras (REMI toolbox)
+- **"RIO +WAN"** = Full-featured RIO, LAN AND WAN, for 1-128 distant cameras (REMI)
 - **"RIO +LAN"** = Local version, LAN only, designed as companion for 1 camera
 - **"the RIO"** or **"RIO"** = Generic reference to RIO hardware (when license isn't relevant)
 
@@ -400,3 +400,122 @@ def apply_fix_to_text(text: str, original: str, suggested: str) -> str:
     # Use case-insensitive replacement but preserve casing pattern
     pattern = re.compile(re.escape(original), re.IGNORECASE)
     return pattern.sub(suggested, text, count=1)
+
+
+@dataclass
+class AppliedFix:
+    """Record of a fix applied during ingestion."""
+
+    original_text: str
+    suggested_text: str
+    suggestion_type: str
+    confidence: float
+    reasoning: str
+
+
+async def apply_rio_fixes_before_embedding(
+    text: str,
+    analyzer: RIOTerminologyAnalyzer | None = None,
+    min_confidence: float = 0.85,
+) -> tuple[str, list[AppliedFix]]:
+    """Apply high-confidence RIO terminology fixes to text before embedding.
+
+    This function is designed to be called during ingestion, before the text
+    is chunked and embedded. It analyzes the text for RIO terminology issues
+    and automatically applies fixes that meet the confidence threshold.
+
+    Args:
+        text: The text to analyze and fix.
+        analyzer: RIOTerminologyAnalyzer instance (created if None).
+        min_confidence: Minimum confidence threshold for auto-applying fixes.
+
+    Returns:
+        Tuple of (fixed_text, list_of_applied_fixes).
+    """
+    if not text or not text.strip():
+        return text, []
+
+    # Create analyzer if not provided
+    if analyzer is None:
+        analyzer = RIOTerminologyAnalyzer()
+
+    # Check if text has any RIO mentions worth analyzing
+    if not analyzer.has_rio_mentions(text):
+        return text, []
+
+    # Find all RIO mentions
+    mentions = analyzer.find_rio_mentions(text)
+    if not mentions:
+        return text, []
+
+    applied_fixes: list[AppliedFix] = []
+    fixed_text = text
+
+    # Analyze each mention and apply high-confidence fixes
+    for matched_text in mentions:
+        result = await analyzer.analyze_mention(fixed_text, matched_text)
+
+        if result and result.needs_fix and result.confidence >= min_confidence:
+            # Skip "needs_human_review" suggestions - these should not be auto-applied
+            if result.suggestion_type == "needs_human_review":
+                logger.debug(
+                    "Skipping human review fix during ingestion",
+                    original=result.original_text,
+                    suggested=result.suggested_text,
+                    confidence=result.confidence,
+                )
+                continue
+
+            # Apply the fix
+            new_text = apply_fix_to_text(
+                fixed_text, result.original_text, result.suggested_text
+            )
+
+            # Only record if text actually changed
+            if new_text != fixed_text:
+                fixed_text = new_text
+                applied_fixes.append(
+                    AppliedFix(
+                        original_text=result.original_text,
+                        suggested_text=result.suggested_text,
+                        suggestion_type=result.suggestion_type,
+                        confidence=result.confidence,
+                        reasoning=result.reasoning,
+                    )
+                )
+                logger.info(
+                    "Applied RIO fix during ingestion",
+                    original=result.original_text,
+                    suggested=result.suggested_text,
+                    suggestion_type=result.suggestion_type,
+                    confidence=result.confidence,
+                )
+
+    if applied_fixes:
+        logger.info(
+            "RIO fixes applied before embedding",
+            total_fixes=len(applied_fixes),
+            fix_types=[f.suggestion_type for f in applied_fixes],
+        )
+
+    return fixed_text, applied_fixes
+
+
+def apply_rio_fixes_sync(
+    text: str,
+    min_confidence: float = 0.85,
+) -> tuple[str, list[AppliedFix]]:
+    """Synchronous wrapper for apply_rio_fixes_before_embedding.
+
+    Convenience function for use in sync code paths.
+
+    Args:
+        text: The text to analyze and fix.
+        min_confidence: Minimum confidence threshold for auto-applying fixes.
+
+    Returns:
+        Tuple of (fixed_text, list_of_applied_fixes).
+    """
+    import asyncio
+
+    return asyncio.run(apply_rio_fixes_before_embedding(text, None, min_confidence))
