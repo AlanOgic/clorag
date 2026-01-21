@@ -341,7 +341,10 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         return None
 
     def _extract_text_from_html(self, html: str) -> str:
-        """Extract main content from Docusaurus HTML, excluding navigation."""
+        """Extract main content from Docusaurus HTML, excluding navigation.
+
+        Converts HTML tables to markdown format to preserve structure.
+        """
         from bs4 import BeautifulSoup
 
         soup = BeautifulSoup(html, "html.parser")
@@ -359,10 +362,84 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         # Try to find main content area
         content = soup.find("article") or soup.find("main") or soup.body or soup
 
+        # Convert tables to markdown before extracting text
+        if content:
+            self._convert_tables_to_markdown(content)
+
         # Get text with proper spacing
-        text = content.get_text(separator=" ", strip=True)
+        text = content.get_text(separator=" ", strip=True) if content else ""
 
         return text
+
+    def _convert_tables_to_markdown(self, element: "Tag") -> None:
+        """Convert HTML tables to markdown format in-place.
+
+        Replaces <table> elements with their markdown representation
+        so that get_text() preserves the table structure.
+
+        Args:
+            element: BeautifulSoup element containing tables.
+        """
+        from bs4 import NavigableString
+
+        tables = element.find_all("table")
+
+        for table in tables:
+            markdown_lines: list[str] = []
+
+            # Extract header row
+            thead = table.find("thead")
+            header_cells: list[str] = []
+
+            if thead:
+                header_row = thead.find("tr")
+                if header_row:
+                    for th in header_row.find_all(["th", "td"]):
+                        cell_text = th.get_text(strip=True)
+                        header_cells.append(cell_text)
+            else:
+                # Try first row as header
+                first_row = table.find("tr")
+                if first_row:
+                    for cell in first_row.find_all(["th", "td"]):
+                        cell_text = cell.get_text(strip=True)
+                        header_cells.append(cell_text)
+
+            if header_cells:
+                # Add header row
+                markdown_lines.append("| " + " | ".join(header_cells) + " |")
+                # Add separator row
+                markdown_lines.append("| " + " | ".join(["---"] * len(header_cells)) + " |")
+
+            # Extract body rows
+            tbody = table.find("tbody")
+            body_rows = tbody.find_all("tr") if tbody else []
+
+            # If no tbody, get all rows except first (used as header)
+            if not body_rows:
+                all_rows = table.find_all("tr")
+                body_rows = all_rows[1:] if header_cells and all_rows else all_rows
+
+            for row in body_rows:
+                cells = row.find_all(["td", "th"])
+                row_data: list[str] = []
+                for cell in cells:
+                    cell_text = cell.get_text(strip=True)
+                    # Escape pipe characters in cell content
+                    cell_text = cell_text.replace("|", "\\|")
+                    row_data.append(cell_text)
+
+                # Pad row to match header length
+                while len(row_data) < len(header_cells):
+                    row_data.append("")
+
+                if row_data:
+                    markdown_lines.append("| " + " | ".join(row_data) + " |")
+
+            # Replace table with markdown text
+            if markdown_lines:
+                markdown_text = "\n" + "\n".join(markdown_lines) + "\n"
+                table.replace_with(NavigableString(markdown_text))
 
     def _extract_title_from_html(self, html: str) -> str:
         """Extract title from HTML using cascading fallback strategy."""
