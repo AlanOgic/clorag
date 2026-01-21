@@ -2420,6 +2420,57 @@ async def api_apply_terminology_fixes(_: bool = Depends(verify_admin)):
         )
 
 
+@app.post("/api/admin/terminology-fixes/scan", tags=["Terminology Fixes"])
+async def api_scan_terminology_fixes(
+    max_chunks: int | None = None,
+    _: bool = Depends(verify_admin),
+):
+    """Scan vector database for RIO terminology issues.
+
+    This runs the same scan as `uv run fix-rio-terminology --preview`.
+    Suggestions are saved to the database for review.
+
+    Args:
+        max_chunks: Maximum chunks to scan (optional, for quick testing).
+    """
+    from clorag.analysis.rio_analyzer import RIOTerminologyAnalyzer
+    from clorag.core.terminology_db import get_terminology_fix_database
+    from clorag.scripts.fix_rio_terminology import scan_for_rio_mentions
+
+    db = get_terminology_fix_database()
+    vectorstore = get_vectorstore()
+    analyzer = RIOTerminologyAnalyzer()
+
+    try:
+        # Clear previous pending fixes
+        cleared = db.clear_pending()
+
+        # Run scan
+        fixes = await scan_for_rio_mentions(vectorstore, analyzer, max_chunks)
+
+        if fixes:
+            count = db.insert_fixes_batch(fixes)
+        else:
+            count = 0
+
+        # Get updated stats
+        stats = db.get_stats()
+
+        return {
+            "scanned": True,
+            "max_chunks": max_chunks,
+            "cleared_pending": cleared,
+            "fixes_found": count,
+            "stats": stats,
+        }
+    except Exception as e:
+        logger.error("Failed to scan for terminology issues", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to scan: {str(e)}",
+        )
+
+
 @app.delete("/api/admin/terminology-fixes/{fix_id}", tags=["Terminology Fixes"])
 async def api_delete_terminology_fix(
     fix_id: str,

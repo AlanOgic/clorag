@@ -147,6 +147,19 @@
                 <option value="custom_docs">Custom Docs</option>
             </select>
             <button class="btn btn-primary" onclick="loadFixes()">Filter</button>
+            <div style="margin-left: auto; display: flex; gap: 0.5rem;">
+                <button class="btn btn-secondary" id="quickScanBtn" onclick="runScan(20)">
+                    Quick Scan (20)
+                </button>
+                <button class="btn btn-primary" id="fullScanBtn" onclick="runScan(null)">
+                    Full Scan
+                </button>
+            </div>
+        </div>
+
+        <div class="scan-progress" id="scanProgress" style="display: none; padding: 1rem; background: #e0f2fe; border-radius: 8px; margin-bottom: 1rem;">
+            <strong>Scanning for RIO terminology issues...</strong>
+            <span id="scanStatus"></span>
         </div>
 
         <div class="batch-actions" id="batchActions">
@@ -503,6 +516,55 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        async function runScan(maxChunks) {
+            const progressEl = document.getElementById('scanProgress');
+            const statusEl = document.getElementById('scanStatus');
+            const quickBtn = document.getElementById('quickScanBtn');
+            const fullBtn = document.getElementById('fullScanBtn');
+
+            // Disable buttons and show progress
+            quickBtn.disabled = true;
+            fullBtn.disabled = true;
+            progressEl.style.display = 'block';
+            statusEl.textContent = maxChunks ? ` (max ${maxChunks} chunks)` : ' (all chunks - this may take a while)';
+
+            try {
+                let url = '/api/admin/terminology-fixes/scan';
+                if (maxChunks) {
+                    url += `?max_chunks=${maxChunks}`;
+                }
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Scan failed');
+                }
+
+                const result = await response.json();
+                statusEl.textContent = ` - Found ${result.fixes_found} issues`;
+
+                // Refresh data
+                await loadStats();
+                await loadFixes();
+
+                // Hide progress after a moment
+                setTimeout(() => {
+                    progressEl.style.display = 'none';
+                }, 3000);
+
+            } catch (error) {
+                statusEl.textContent = ` - Error: ${error.message}`;
+                console.error('Scan failed:', error);
+            } finally {
+                quickBtn.disabled = false;
+                fullBtn.disabled = false;
+            }
         }
 
         checkSession().then(() => {
