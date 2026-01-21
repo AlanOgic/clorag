@@ -244,6 +244,26 @@
             text-decoration: underline;
         }
 
+        /* Modal override - ensure modal content is visible when overlay shows */
+        .modal {
+            background: white;
+            border-radius: 12px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal__footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
         /* Page-specific: Preview sections */
         .preview-section { margin-bottom: 1.5rem; }
         .preview-section__title {
