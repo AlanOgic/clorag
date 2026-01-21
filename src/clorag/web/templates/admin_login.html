@@ -210,6 +210,9 @@
         const submitBtn = document.getElementById('submitBtn');
         const errorMessage = document.getElementById('errorMessage');
 
+        // CSRF token storage
+        let csrfToken = null;
+
         // Security: Validate redirect URL to prevent open redirect attacks
         function getSafeRedirect() {
             const redirect = new URLSearchParams(window.location.search).get('redirect');
@@ -218,6 +221,17 @@
                 return redirect;
             }
             return '/admin';
+        }
+
+        // Fetch CSRF token
+        async function fetchCsrfToken() {
+            try {
+                const res = await fetch('/api/admin/csrf-token');
+                const data = await res.json();
+                csrfToken = data.csrf_token;
+            } catch (e) {
+                console.error('Failed to fetch CSRF token:', e);
+            }
         }
 
         // Check if already logged in
@@ -232,6 +246,9 @@
                 console.error('Session check failed:', e);
             }
         }
+
+        // Initialize
+        fetchCsrfToken();
         checkSession();
 
         form.addEventListener('submit', async (e) => {
@@ -246,9 +263,14 @@
             errorMessage.classList.remove('show');
 
             try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (csrfToken) {
+                    headers['X-CSRF-Token'] = csrfToken;
+                }
+
                 const res = await fetch('/api/admin/login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({ password }),
                 });
 
@@ -261,6 +283,8 @@
                     errorMessage.classList.add('show');
                     passwordInput.focus();
                     passwordInput.select();
+                    // Refresh CSRF token on failure
+                    fetchCsrfToken();
                 }
             } catch (err) {
                 errorMessage.textContent = 'Connection error. Please try again.';

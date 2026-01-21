@@ -1129,6 +1129,21 @@
         const newConversationBtn = document.getElementById('new-conversation-btn');
         const infoSection = document.getElementById('info-section');
 
+        // CSRF token for secure requests
+        let csrfToken = null;
+
+        // Fetch CSRF token on page load
+        async function fetchCsrfToken() {
+            try {
+                const res = await fetch('/api/admin/csrf-token');
+                const data = await res.json();
+                csrfToken = data.csrf_token;
+            } catch (e) {
+                console.warn('CSRF token fetch failed (non-critical for public endpoints):', e);
+            }
+        }
+        fetchCsrfToken();
+
         // Session management for follow-up conversations
         let currentSessionId = null;
         let currentExchangeId = 0;
@@ -1447,11 +1462,14 @@
                     requestBody.session_id = currentSessionId;
                 }
 
+                const headers = { 'Content-Type': 'application/json' };
+                if (csrfToken) {
+                    headers['X-CSRF-Token'] = csrfToken;
+                }
+
                 const response = await fetch('/api/search/stream', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: headers,
                     body: JSON.stringify(requestBody)
                 });
 

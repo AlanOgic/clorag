@@ -116,6 +116,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         # Referrer policy
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # HSTS - enforce HTTPS for 1 year, include subdomains
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains; preload"
+        )
         # Content Security Policy - allow inline for existing JS, Mermaid/Swagger from CDN
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
@@ -200,6 +204,33 @@ app = FastAPI(title="Cyanview AI Search", version="1.0.0", lifespan=lifespan)
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+
+# Global exception handler to prevent stack trace exposure in production
+async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle uncaught exceptions without exposing stack traces.
+
+    Logs the full error for debugging while returning a sanitized
+    error message to the client.
+    """
+    # Log full error details for debugging
+    logger.error(
+        "unhandled_exception",
+        path=str(request.url.path),
+        method=request.method,
+        error_type=type(exc).__name__,
+        error_message=str(exc),
+        exc_info=True,
+    )
+
+    # Return generic error to client - no stack trace exposure
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal server error occurred. Please try again later."},
+    )
+
+
+app.add_exception_handler(Exception, generic_exception_handler)
 
 # Add CORS middleware
 app.add_middleware(
@@ -1182,6 +1213,123 @@ def get_session_serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(settings.admin_password.get_secret_value())
 
 
+# =============================================================================
+# CSRF Protection
+# =============================================================================
+
+CSRF_TOKEN_MAX_AGE = 3600  # 1 hour validity
+CSRF_HEADER_NAME = "X-CSRF-Token"
+
+
+def generate_csrf_token(session_id: str | None = None) -> str:
+    """Generate a signed CSRF token.
+
+    Args:
+        session_id: Optional session ID to tie token to session.
+
+    Returns:
+        Signed CSRF token string.
+    """
+    serializer = get_session_serializer()
+    # Include timestamp and optional session binding
+    payload = {
+        "csrf": secrets.token_hex(16),
+        "ts": int(time.time()),
+    }
+    if session_id:
+        payload["sid"] = session_id
+    return serializer.dumps(payload)
+
+
+def validate_csrf_token(
+    token: str,
+    session_id: str | None = None,
+) -> bool:
+    """Validate a CSRF token.
+
+    Args:
+        token: The CSRF token to validate.
+        session_id: Optional session ID to verify token binding.
+
+    Returns:
+        True if valid, False otherwise.
+    """
+    try:
+        serializer = get_session_serializer()
+        payload = serializer.loads(token, max_age=CSRF_TOKEN_MAX_AGE)
+
+        # Verify session binding if provided
+        if session_id and payload.get("sid") != session_id:
+            logger.warning("CSRF token session mismatch")
+            return False
+
+        return True
+    except SignatureExpired:
+        logger.warning("CSRF token expired")
+        return False
+    except BadSignature:
+        logger.warning("CSRF token invalid signature")
+        return False
+    except Exception as e:
+        logger.warning("CSRF validation error", error=str(e))
+        return False
+
+
+def verify_csrf(
+    request: Request,
+    x_csrf_token: Annotated[str | None, Header(alias=CSRF_HEADER_NAME)] = None,
+    admin_session: Annotated[str | None, Cookie()] = None,
+) -> bool:
+    """Dependency to verify CSRF token on state-changing requests.
+
+    Checks for CSRF token in X-CSRF-Token header.
+    Must be used on POST, PUT, DELETE endpoints that modify state.
+
+    Args:
+        request: The FastAPI request object.
+        x_csrf_token: CSRF token from header.
+        admin_session: Admin session cookie for session binding.
+
+    Returns:
+        True if CSRF is valid.
+
+    Raises:
+        HTTPException: If CSRF validation fails.
+    """
+    # Skip CSRF for safe methods (GET, HEAD, OPTIONS)
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return True
+
+    # Skip CSRF for API endpoints that use X-Admin-Password header authentication
+    # (these are typically programmatic API calls, not browser requests)
+    if request.headers.get("X-Admin-Password"):
+        return True
+
+    if not x_csrf_token:
+        raise HTTPException(
+            status_code=403,
+            detail="CSRF token missing. Include X-CSRF-Token header.",
+        )
+
+    # Extract session ID for binding verification (optional)
+    session_id = None
+    if admin_session:
+        try:
+            serializer = get_session_serializer()
+            data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
+            session_id = data.get("session_id")
+        except Exception:
+            pass  # Session validation failure is handled elsewhere
+
+    if not validate_csrf_token(x_csrf_token, session_id):
+        raise HTTPException(
+            status_code=403,
+            detail="CSRF token invalid or expired. Please refresh the page.",
+        )
+
+    return True
+
+
 def verify_admin(
     x_admin_password: Annotated[str | None, Header()] = None,
     admin_session: Annotated[str | None, Cookie()] = None,
@@ -1593,6 +1741,31 @@ async def api_admin_session(
         pass
 
     return {"authenticated": False}
+
+
+@app.get("/api/admin/csrf-token", tags=["Authentication"])
+async def api_admin_csrf_token(
+    admin_session: Annotated[str | None, Cookie()] = None,
+):
+    """Get a CSRF token for state-changing requests.
+
+    Returns a signed CSRF token that must be included in the
+    X-CSRF-Token header for POST, PUT, DELETE requests.
+
+    The token is valid for 1 hour and should be refreshed periodically.
+    """
+    # Extract session ID for binding if authenticated
+    session_id = None
+    if admin_session:
+        try:
+            serializer = get_session_serializer()
+            data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
+            session_id = data.get("session_id")
+        except (SignatureExpired, BadSignature):
+            pass  # Generate unbound token for unauthenticated requests
+
+    token = generate_csrf_token(session_id)
+    return {"csrf_token": token}
 
 
 @app.get("/api/admin/backup", tags=["Backup"])
