@@ -7,65 +7,9 @@ import structlog
 
 from clorag.config import get_settings
 from clorag.models import ThreadAnalysis
+from clorag.services.prompt_manager import get_prompt
 
 logger = structlog.get_logger(__name__)
-
-ANALYSIS_PROMPT = """Analyze this support email thread and extract structured information.
-
-IMPORTANT: The content has been pre-processed with placeholder tokens:
-- [SERIAL:XXX-N] = Device serial number (e.g., [SERIAL:RCP-1])
-- [EMAIL-N] = Email address placeholder
-- [PHONE-N] = Phone number placeholder
-
-These placeholders are intentional for anonymization. Do NOT try to reveal or guess the original values.
-
-<thread>
-{thread_content}
-</thread>
-
-Analyze the thread and respond with a JSON object containing:
-
-1. **is_resolved**: boolean - Is this a resolved support case?
-   - TRUE if: CyanView provided a solution AND the customer confirmed it worked OR no further issues were raised
-   - FALSE if: Issue still pending, no solution provided, or customer reported the solution didn't work
-
-2. **confidence**: float (0.0-1.0) - How confident are you in the resolution status?
-
-3. **is_cyanview_response**: boolean - Did someone from CyanView (@cyanview.com) respond?
-
-4. **problem_summary**: string - 2-3 sentence summary of the customer's problem.
-   - Be specific and technical
-   - NEVER include customer names, company names, or organization names
-   - Use generic terms: "the customer", "the user", "their system"
-   - Focus ONLY on the technical problem
-
-5. **solution_summary**: string - 2-3 sentence summary of the solution provided.
-   - If unresolved, describe what was attempted
-   - NEVER include customer names or company names
-   - Focus ONLY on the technical solution
-
-6. **keywords**: array of strings - 5-10 technical keywords for search (e.g., "RCP", "network", "connection", "firmware", "IP address")
-
-7. **category**: string - Main category: "RCP", "Network", "Hardware", "Software", "Configuration", "Installation", "Other"
-
-8. **product**: string or null - Specific CyanView product mentioned (e.g., "RCP", "RIO", "CVP", null if unclear)
-
-9. **resolution_quality**: integer 1-5 or null - Quality of the resolution:
-   - 5: Excellent - Clear problem, complete solution, verified working
-   - 4: Very Good - Clear solution provided and likely resolved
-   - 3: Good - Solution provided but not verified
-   - 2: Fair - Partial solution or workaround
-   - 1: Poor - Minimal help provided
-   - null: If unresolved
-
-10. **reasoning**: string - Brief explanation of your classification decision
-
-11. **anonymized_subject**: string - Create a clean, technical title for this case.
-    - Describe the main technical issue (e.g., "RCP firmware update failure", "Network connectivity issues with RIO")
-    - NEVER include customer names, company names, serial numbers, or any identifying information
-    - Keep it concise (5-10 words)
-
-Respond ONLY with valid JSON, no markdown formatting."""
 
 
 class ThreadAnalyzer:
@@ -115,7 +59,9 @@ class ThreadAnalyzer:
                 messages=[
                     {
                         "role": "user",
-                        "content": ANALYSIS_PROMPT.format(thread_content=thread_content),
+                        "content": get_prompt(
+                            "analysis.thread_analyzer", thread_content=thread_content
+                        ),
                     }
                 ],
             )

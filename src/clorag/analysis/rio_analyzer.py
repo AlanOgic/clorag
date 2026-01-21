@@ -13,6 +13,7 @@ import structlog
 
 from clorag.config import get_settings
 from clorag.core.terminology_db import TerminologyFix
+from clorag.services.prompt_manager import get_prompt
 
 logger = structlog.get_logger(__name__)
 
@@ -28,68 +29,6 @@ RIO_PATTERNS = [
 
 # Compile patterns for efficiency
 COMPILED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in RIO_PATTERNS]
-
-ANALYSIS_PROMPT = """You are analyzing CyanView text to fix RIO terminology.
-
-**Product Definitions:**
-- **"RIO +WAN"** = Full-featured RIO, LAN AND WAN, for 1-128 distant cameras (REMI)
-- **"RIO +LAN"** = Local version, LAN only, designed as companion for 1 camera
-- **"the RIO"** or **"RIO"** = Generic reference to RIO hardware (when license isn't relevant)
-
-**Legacy Terms:**
-- **"RIO-Live"** / **"RIO Live"** / **"RIO +WAN Live"** = Old naming, "Live" meant LAN license
-
-**CRITICAL: Context determines the fix:**
-
-1. **License-relevant context** (connectivity, remote access, REMI, camera count, licensing):
-   - "Live" terms -> "RIO +LAN"
-   - Remote/WAN/REMI features -> "RIO +WAN"
-   - Local/single camera -> "RIO +LAN"
-
-2. **Hardware context** (grounding, power, physical setup, wiring, mounting):
-   - Keep as generic **"RIO"** (or "the RIO")
-   - License distinction is NOT relevant for hardware aspects
-   - Example: "RIO +WAN Live grounding" -> just "RIO" (grounding same for all)
-
-**Rules:**
-1. Check if context discusses LICENSE-SPECIFIC features or HARDWARE aspects
-2. Hardware context (power, grounding, wiring, physical) -> generic "RIO"
-3. License context (connectivity, remote, local, REMI) -> specific "RIO +WAN" or "RIO +LAN"
-4. "Live" in license context -> "RIO +LAN"
-5. Ambiguous -> "needs_human_review"
-
-**Text:**
-<text>
-{chunk_text}
-</text>
-
-**Match found:** "{matched_text}"
-
-Respond with JSON:
-{{
-    "needs_fix": boolean,
-    "suggestion_type": "live_to_lan" | "to_generic_rio" | "clarify_rio_wan" |
-        "clarify_rio_lan" | "needs_human_review" | "no_change",
-    "original_text": "exact matched text",
-    "suggested_text": "corrected text (or same if unsure)",
-    "confidence": float 0.0-1.0,
-    "reasoning": "brief explanation"
-}}
-
-Suggestion types:
-- "live_to_lan": "Live" term in LICENSE context -> RIO +LAN
-- "to_generic_rio": License term in HARDWARE context -> generic RIO (grounding, power, etc.)
-- "clarify_rio_wan": Should specify RIO +WAN (REMI/remote context)
-- "clarify_rio_lan": Should specify RIO +LAN (local/single camera context)
-- "needs_human_review": Ambiguous, needs human decision
-- "no_change": Correct as-is
-
-IMPORTANT:
-- Use "needs_human_review" when ambiguous or confidence <0.7
-- For "needs_human_review", set needs_fix=true
-- Be conservative - flag for review rather than guess
-
-Only valid JSON, no markdown."""
 
 
 @dataclass
@@ -236,7 +175,8 @@ class RIOTerminologyAnalyzer:
                 messages=[
                     {
                         "role": "user",
-                        "content": ANALYSIS_PROMPT.format(
+                        "content": get_prompt(
+                            "analysis.rio_terminology",
                             chunk_text=chunk_text[:3000],  # Limit context size
                             matched_text=matched_text,
                         ),

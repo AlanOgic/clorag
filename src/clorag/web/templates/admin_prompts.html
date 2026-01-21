@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Prompt Management - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        /* Page-specific: Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #eee;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--cyan-dark);
+        }
+
+        .tab.active {
+            color: var(--cyan-dark);
+            border-bottom-color: var(--cyan-dark);
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Page-specific: Page header */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            color: var(--cyanview-navy);
+        }
+
+        /* Page-specific: Prompts table */
+        .prompts-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .prompts-table th,
+        .prompts-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .prompts-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #606770;
+        }
+
+        .prompts-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .prompts-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Page-specific: Filter bar */
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-bar__select {
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        /* Page-specific: Prompt editor */
+        .prompt-editor {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            min-height: 400px;
+            resize: vertical;
+            tab-size: 4;
+        }
+
+        /* Page-specific: Token counter */
+        .token-counter {
+            display: flex;
+            gap: 1.5rem;
+            padding: 0.75rem 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #606770;
+        }
+
+        .token-counter__item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .token-counter__label {
+            color: #888;
+        }
+
+        .token-counter__value {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        /* Page-specific: Variables list */
+        .variables-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .variable-tag {
+            background: #e8f4f8;
+            color: var(--cyan-dark);
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        /* Page-specific: Version history */
+        .version-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 6px;
+        }
+
+        .version-item {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .version-item:hover {
+            background: #f8f9fa;
+        }
+
+        .version-item:last-child {
+            border-bottom: none;
+        }
+
+        .version-item__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .version-item__number {
+            font-weight: 600;
+            color: var(--cyan-dark);
+        }
+
+        .version-item__date {
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .version-item__note {
+            font-size: 0.9rem;
+            color: #606770;
+        }
+
+        /* Page-specific: Test panel */
+        .test-panel {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .test-panel__title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--cyanview-navy);
+        }
+
+        .test-output {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        /* Page-specific: Source badge */
+        .source-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .source-badge--database {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .source-badge--default {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        /* Page-specific: Model badge */
+        .model-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .model-badge--haiku {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .model-badge--sonnet {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .model-badge--claude {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .prompts-table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2aWV3Qm94PSIwIDAgMjUxLjkgMTUwLjU4Ij48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6dXJsKCNsb2dvX2dyKTt9LmNscy0ye2ZpbGw6I2ZmZjt9LmNscy0ze2ZpbGw6IzZkYzlmMzt9PC9zdHlsZT48bGluZWFyR3JhZGllbnQgaWQ9ImxvZ29fZ3IiIHgxPSIyNTEuOSIgeTE9Ijc1LjI5IiB4Mj0iMCIgeTI9Ijc1LjI5IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMDA1ZmEwIi8+PHN0b3Agb2Zmc2V0PSIwLjI2IiBzdG9wLWNvbG9yPSIjMDA2NmE3Ii8+PHN0b3Agb2Zmc2V0PSIwLjYyIiBzdG9wLWNvbG9yPSIjMDA3OGI5Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDA5M2QzIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHRpdGxlPkxvZ29fQ3lhbl9ncjwvdGl0bGU+PGcgaWQ9IkxheWVyXzIiIGRhdGEtbmFtZT0iTGF5ZXIgMiI+PGcgaWQ9IkxheWVyXzEtMiIgZGF0YS1uYW1lPSJMYXllciAxIj48cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNzYuNjIsMEE3NSw3NSwwLDAsMCwxMjYsMTkuNiw3NS4yOSw3NS4yOSwwLDEsMCwxMjYsMTMxLDc1LjI5LDc1LjI5LDAsMSwwLDE3Ni42MiwwWiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTE1LjQxLDg0LjI0VjU5LjUzYzAtNy4zOCw0LjcxLTEyLjI5LDExLjY3LTEyLjI5LDYuNzAsMCwxMS4yNyw1LjEyLDExLjQ3LDEzLjExYS43OS43OSwwLDAsMS0uODguODhIMzMuM2EuNzkuNzksMCwwLDEtLjg5LS44OEMzMi4yNyw1NS41NywzMC4xNiw1MywyNyw1M2MtMy40MiwwLTUuNCwyLjMyLTUuNCw2LjE1Vjg0LjU4YzAsMy44MywyLDYuMTUsNS40LDYuMTVzNS41OS0yLjgsNS43My03Ljc4YS43OS43OSwwLDAsMSwuODktLjg5SDM4YS44NS44NSwwLDAsMSwuODksMWMtLjI4LDguMjctNC44NSwxMy41Mi0xMS44MiwxMy41MlMxNS40MSw5MS42MiwxNS40MSw4NC4yNFoiLz48cGF0aCBjbGFzcz0iY2xzLTIiIGQ9Ik02NS45Myw2Mi41M1Y5OS4wNmMwLDYuNzYtNC4yMywxMS4xMy0xMC43OSwxMS4xMy02LjIxLDAtMTAuMzctNC4zLTEwLjcyLTExYS44LjgsMCwwLDEsLjg5LTFoNGMuNTUsMCwuODIuMjcuODksMSwuMiwzLjQxLDIsNS4zOSw0LjkxLDUuMzksMy4xNCwwLDQuOTItMiw0LjkyLTUuMzNWOTIuMzdhNy4wOSw3LjA5LDAsMCwxLTUuMzksMi40NmMtNiwwLTEwLjMxLTQuNTgtMTAuMzEtMTEuMDZWNjIuNTNhLjg0Ljg0LDAsMCwxLDEtLjg5aDRhLjg1Ljg1LDAsMCwxLDEsLjg5Vjg0YzAsMy4xNCwxLjg0LDUuMzMsNC45MSw1LjMzczQuOTItMi4xOSw0LjkyLTUuMzNWNjIuNTNhLjg1Ljg1LDAsMCwxLDEtLjg5aDRBLjg4Ljg4LDAsMCwxLDY1LjkzLDYyLjUzWiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTcyLjM1LDg1LjQ3YzAtNS42Niw0LjM3LTEwLDEwLjc4LTEwaDUuMTNWNzEuNjhjMC0zLjA3LTEuODUtNS4xOS00LjkyLTUuMTktMi44NywwLTQuNDQsMS45MS00LjY0LDQuNzEtLjA3LjYyLS4zNC44Mi0xLC44MmgtNGEuODguODgsMCwwLDEtLjg5LTFjLjQxLTUuOTQsNC40NC0xMC4xOCwxMC41Mi0xMC4xOCw2LjQ4LDAsMTAuNjUsNC42NCwxMC42NSwxMS4wNlY4NS42OGMwLDYuMjgtNC4xLDEwLjc5LTEwLjY1LDEwLjc5UzcyLjM1LDkxLjg5LDcyLjM1LDg1LjQ3Wm0xNS45MS4yMXYtNUg4My4zNGMtMy4yMSwwLTUuMTIsMi4xMi01LjEyLDQuNzgsMCwzLjI4LDEuOTEsNS40LDUuMTIsNS40UzgOLjI2LDg4LjgyLDg4LjI2LDg1LjY4WiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTEwMC42MSw5NC44M1Y3MmMwLTYuNDksNC4zLTExLjEzLDEwLjY1LTExLjEzUzEyMS45MSw2NS41MywxMjEuOTEsNzJWOTQuODNhLjg2Ljg2LDAsMCwxLTEsMWgtNGEuODYuODYsMCwwLDEtMS0xdi0yM2MwLTMuMjEtMS43Ny01LjQtNC43OC01LjRzLTQuNzgsMi4xOS00Ljc4LDUuNHYyM2EuODYuODYsMCwwLDEtMSwxaC00QS44Ni44NiwwLDAsMSwxMDAuNjEsOTQuODNaIi8+PHBhdGggY2xhc3M9ImNscy0zIiBkPSJNMTUyLjI5LDQ4Ljk0bC04LjEyLDQ0LjU5YTIuNzUsMi43NSwwLDAsMS0yLjk0LDIuNTNoLTMuNzVhMi43NSwyLjc1LDAsMCwxLTIuOTQtMi41M2wtOC4xMi00NC41OWEuNzYuNzYsMCwwLDEsLjgyLS45NWg0LjQ0YS45My45MywwLDAsMSwxLC44Mmw2LjY5LDQwLDYuNjktNDBhLjg2Ljg2LDAsMCwxLDEtLjgyaDQuNDRDMTUyLjA5LDQ4LDE1Mi40Myw0OC40LDE1Mi4yOSw0OC45NFoiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0xNTYuOCw1My44NmEzLjM5LDMuMzksMCwwLDEsMy40OC0zLjU1LDMuNDgsMy40OCwwLDAsMSwzLjU1LDMuNTUsMy41NiwzLjU2LDAsMCwxLTMuNTUsMy40OEEzLjM3LDMuMzcsMCwwLDEsMTU2LjgsNTMuODZabS41NCw0MVY2Mi41M2EuODUuODUsMCwwLDEsMS0uODloNGEuODUuODUsMCwwLDEsMSwuODl2MzIuM2EuODcuODcsMCwwLDEtMSwxaC00QS44Ny44NywwLDAsMSwxNTcuMzQsOTQuODNaIi8+PHBhdGggY2xhc3M9ImNscy0zIiBkPSJNMTY5LjUsODUuMzRWNzJjLjA3LTYuNDgsNC4zLTExLDEwLjg1LTExYTEwLjQsMTAuNCwwLDAsMSwxMC45MywxMC43OWMwLDYtNC4zNywxMC4zMS0xMC44NiwxMC4zMWgtNXYzLjU1YzAsMy4xNCwxLjg0LDUuMzIsNSw1LjMyLDIuOCwwLDQuNjUtMiw0Ljg1LTUuMDVhLjg4Ljg4LDAsMCwxLDEtLjg5aDRhLjgzLjgzLDAsMCwxLC44OC44OWMtLjM0LDYuMzUtNC42NCwxMC41OS0xMC43OCwxMC41OUMxNzMuODcsOTYuNDcsMTY5LjUsOTIsMTY5LjUsODUuMzRabTEwLjkyLTguNjFjMy4xNCwwLDUtMiw1LTQuODQsMC0zLjI4LTEuOTItNS40LTUuMDYtNS40cy01LDIuMTItNSw1LjR2NC44NFoiLz48cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0yMTUsOTIuMzdhOC43NSw4Ljc1LDAsMCwxLTcuMzgsNC4xNmMtNi4yMSwwLTEwLjMxLTQuNjQtMTAuMzEtMTEuMTNWNjIuNmEuODcuODcsMCwwLDEsMS0xaDMuODlhLjg3Ljg3LDAsMCwxLDEsMXYyM2MwLDMuMjEsMS42Myw1LjMyLDQuNSw1LjMyczQuNDQtMi4xMSw0LjQ0LTUuMzJ2LTIzYS44Ny44NywwLDAsMSwxLTFoNGEuODQuODQsMCwwLDEsLjg4LDF2MjNjMCwzLjIxLDEuNjQsNS4zMiw0LjUxLDUuMzJzNC40NC0yLjExLDQuNDQtNS4zMnYtMjNhLjg2Ljg2LDAsMCwxLDEtMWg0YS44NS44NSwwLDAsMSwuODksMVY4NS40YzAsNi40OS00LDExLjEzLTEwLjI0LDExLjEzQTguNjUsOC42NSwwLDAsMSwyMTUsOTIuMzdaIi8+PC9nPjwvZz48L3N2Zz4=" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Dashboard</a>
+            <a href="/admin/docs" class="navbar__link">Docs</a>
+            <a href="/admin/prompts" class="navbar__link navbar__link--active">Prompts</a>
+            <span class="navbar__divider"></span>
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">Prompt Management</h1>
+            <div>
+                <button class="btn btn-secondary" onclick="reloadAllCaches()">Reload All Caches</button>
+                <button class="btn btn-primary" onclick="initializeDefaults()">Initialize Defaults</button>
+            </div>
+        </div>
+
+        <!-- Alert container -->
+        <div id="alertContainer"></div>
+
+        <!-- Filter bar -->
+        <div class="filter-bar">
+            <select class="filter-bar__select" id="filterCategory">
+                <option value="">All Categories</option>
+                <option value="agent">Agent</option>
+                <option value="analysis">Analysis</option>
+                <option value="synthesis">Synthesis</option>
+                <option value="drafts">Drafts</option>
+                <option value="graph">Graph</option>
+                <option value="scripts">Scripts</option>
+            </select>
+            <button class="btn btn-secondary" onclick="loadPrompts()">Refresh</button>
+        </div>
+
+        <!-- Prompts Table -->
+        <div class="table-container">
+            <table class="prompts-table">
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Name</th>
+                        <th>Model</th>
+                        <th>Category</th>
+                        <th>Source</th>
+                        <th>Variables</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="promptsBody">
+                    <tr><td colspan="7" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content" style="max-width: 1000px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Edit Prompt</h2>
+                <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+            </div>
+            <form id="editPromptForm">
+                <input type="hidden" name="prompt_id" id="editPromptId">
+                <input type="hidden" name="prompt_key" id="editPromptKey">
+
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-input" name="name" id="editName" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Model</label>
+                        <select class="form-select" name="model" id="editModel">
+                            <option value="haiku">Haiku</option>
+                            <option value="sonnet">Sonnet</option>
+                            <option value="claude">Claude</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" class="form-input" name="description" id="editDescription">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Content</label>
+                    <textarea class="form-textarea prompt-editor" name="content" id="editContent" required></textarea>
+                    <div class="token-counter">
+                        <div class="token-counter__item">
+                            <span class="token-counter__label">Characters:</span>
+                            <span class="token-counter__value" id="charCount">0</span>
+                        </div>
+                        <div class="token-counter__item">
+                            <span class="token-counter__label">Est. Tokens:</span>
+                            <span class="token-counter__value" id="tokenCount">0</span>
+                        </div>
+                        <div class="token-counter__item">
+                            <span class="token-counter__label">Lines:</span>
+                            <span class="token-counter__value" id="lineCount">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Detected Variables</label>
+                    <div class="variables-list" id="variablesList">
+                        <span class="form-help">No variables detected</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Change Note</label>
+                    <input type="text" class="form-input" name="change_note" id="editChangeNote" placeholder="Describe your changes...">
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Cancel</button>
+                </div>
+            </form>
+
+            <!-- Version History -->
+            <div style="margin-top: 2rem;">
+                <h3>Version History</h3>
+                <div class="version-list" id="versionList">
+                    <div class="loading">Loading versions...</div>
+                </div>
+            </div>
+
+            <!-- Test Panel -->
+            <div class="test-panel" id="testPanel">
+                <div class="test-panel__title">Test Prompt</div>
+                <div class="form-group">
+                    <label class="form-label">Sample Variables (JSON)</label>
+                    <textarea class="form-textarea" id="testVariables" rows="3" placeholder='{"variable_name": "sample value"}'></textarea>
+                </div>
+                <button class="btn btn-secondary" onclick="testPrompt()">Run Test</button>
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label">Output</label>
+                    <div class="test-output" id="testOutput">Click "Run Test" to see the prompt with variables substituted.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Version Detail Modal -->
+    <div class="modal" id="versionModal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Version <span id="versionNumber"></span></h2>
+                <button class="modal-close" onclick="closeModal('versionModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Content at this version</label>
+                <textarea class="form-textarea prompt-editor" id="versionContent" readonly style="min-height: 300px;"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Change Note</label>
+                <p id="versionNote">-</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Created</label>
+                <p id="versionCreated">-</p>
+            </div>
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                <button class="btn btn-primary" onclick="rollbackToVersion()">Rollback to This Version</button>
+                <button class="btn btn-secondary" onclick="closeModal('versionModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPromptId = null;
+        let currentVersionNumber = null;
+
+        // Check session
+        async function checkSession() {
+            try {
+                const response = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch (error) {
+                window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+            }
+        }
+
+        // Load prompts
+        async function loadPrompts() {
+            const category = document.getElementById('filterCategory').value;
+            let url = '/api/admin/prompts';
+            if (category) url += `?category=${category}`;
+
+            try {
+                const response = await fetch(url, { credentials: 'include' });
+                const prompts = await response.json();
+
+                const tbody = document.getElementById('promptsBody');
+                if (prompts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No prompts found. Click "Initialize Defaults" to seed the database.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = prompts.map(p => `
+                    <tr>
+                        <td><code>${escapeHtml(p.key)}</code></td>
+                        <td>${escapeHtml(p.name)}</td>
+                        <td><span class="model-badge model-badge--${p.model}">${p.model}</span></td>
+                        <td>${p.category}</td>
+                        <td><span class="source-badge source-badge--${p.source}">${p.source}</span></td>
+                        <td>${p.variables.length > 0 ? p.variables.map(v => `<code>{${v}}</code>`).join(' ') : '-'}</td>
+                        <td class="actions">
+                            <button class="btn btn-sm btn-edit" onclick="editPrompt('${p.id || p.key}', '${p.source}')">Edit</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                showAlert('Failed to load prompts: ' + error.message, 'error');
+            }
+        }
+
+        // Edit prompt
+        async function editPrompt(idOrKey, source) {
+            try {
+                let prompt;
+                if (source === 'database') {
+                    const response = await fetch(`/api/admin/prompts/${idOrKey}`, { credentials: 'include' });
+                    const data = await response.json();
+                    prompt = data.prompt;
+                    currentPromptId = idOrKey;
+                    loadVersions(idOrKey);
+                } else {
+                    // Default prompt - need to initialize it first or edit in-place
+                    const response = await fetch(`/api/admin/prompts/by-key/${idOrKey}`, { credentials: 'include' });
+                    const data = await response.json();
+                    prompt = data.prompt;
+                    currentPromptId = prompt.id || null;
+                    if (prompt.id) {
+                        loadVersions(prompt.id);
+                    } else {
+                        document.getElementById('versionList').innerHTML = '<div class="form-help">No version history - this is a default prompt</div>';
+                    }
+                }
+
+                document.getElementById('editPromptId').value = currentPromptId || '';
+                document.getElementById('editPromptKey').value = prompt.key;
+                document.getElementById('editName').value = prompt.name || '';
+                document.getElementById('editDescription').value = prompt.description || '';
+                document.getElementById('editModel').value = prompt.model || 'haiku';
+                document.getElementById('editContent').value = prompt.content || '';
+                document.getElementById('editChangeNote').value = '';
+
+                document.getElementById('modalTitle').textContent = `Edit: ${prompt.key}`;
+                updateCounters();
+                detectVariables();
+
+                document.getElementById('editModal').classList.add('active');
+            } catch (error) {
+                showAlert('Failed to load prompt: ' + error.message, 'error');
+            }
+        }
+
+        // Load versions
+        async function loadVersions(promptId) {
+            try {
+                const response = await fetch(`/api/admin/prompts/${promptId}/versions`, { credentials: 'include' });
+                const versions = await response.json();
+
+                const list = document.getElementById('versionList');
+                if (versions.length === 0) {
+                    list.innerHTML = '<div class="form-help">No version history yet</div>';
+                    return;
+                }
+
+                list.innerHTML = versions.map(v => `
+                    <div class="version-item" onclick="viewVersion(${v.version}, '${v.id}')">
+                        <div class="version-item__header">
+                            <span class="version-item__number">Version ${v.version}</span>
+                            <span class="version-item__date">${formatDate(v.created_at)}</span>
+                        </div>
+                        <div class="version-item__note">${escapeHtml(v.change_note || 'No note')}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('versionList').innerHTML = '<div class="form-help">Failed to load versions</div>';
+            }
+        }
+
+        // View version detail
+        async function viewVersion(version, versionId) {
+            try {
+                const response = await fetch(`/api/admin/prompts/${currentPromptId}/versions`, { credentials: 'include' });
+                const versions = await response.json();
+                const v = versions.find(ver => ver.version === version);
+
+                if (!v) {
+                    showAlert('Version not found', 'error');
+                    return;
+                }
+
+                currentVersionNumber = version;
+                document.getElementById('versionNumber').textContent = version;
+                document.getElementById('versionContent').value = v.content;
+                document.getElementById('versionNote').textContent = v.change_note || 'No note';
+                document.getElementById('versionCreated').textContent = formatDate(v.created_at);
+
+                document.getElementById('versionModal').classList.add('active');
+            } catch (error) {
+                showAlert('Failed to load version: ' + error.message, 'error');
+            }
+        }
+
+        // Rollback to version
+        async function rollbackToVersion() {
+            if (!currentPromptId || !currentVersionNumber) return;
+
+            if (!confirm(`Rollback to version ${currentVersionNumber}? This will create a new version with that content.`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/prompts/${currentPromptId}/rollback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ version: currentVersionNumber }),
+                });
+
+                if (response.ok) {
+                    showAlert('Rolled back successfully', 'success');
+                    closeModal('versionModal');
+                    editPrompt(currentPromptId, 'database');
+                    loadPrompts();
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Rollback failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Save prompt
+        document.getElementById('editPromptForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            const data = {
+                name: formData.get('name'),
+                description: formData.get('description'),
+                model: formData.get('model'),
+                content: formData.get('content'),
+                change_note: formData.get('change_note'),
+            };
+
+            try {
+                let response;
+                const promptId = formData.get('prompt_id');
+                const promptKey = formData.get('prompt_key');
+
+                if (promptId) {
+                    // Update existing
+                    response = await fetch(`/api/admin/prompts/${promptId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(data),
+                    });
+                } else {
+                    // Create from default
+                    response = await fetch('/api/admin/prompts/from-default', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ key: promptKey, ...data }),
+                    });
+                }
+
+                if (response.ok) {
+                    showAlert('Prompt saved successfully', 'success');
+                    closeModal('editModal');
+                    loadPrompts();
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to save prompt', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        });
+
+        // Test prompt
+        async function testPrompt() {
+            const content = document.getElementById('editContent').value;
+            const variablesText = document.getElementById('testVariables').value;
+
+            let variables = {};
+            if (variablesText.trim()) {
+                try {
+                    variables = JSON.parse(variablesText);
+                } catch (e) {
+                    showAlert('Invalid JSON for variables', 'error');
+                    return;
+                }
+            }
+
+            try {
+                // Simple client-side substitution for preview
+                let output = content;
+                for (const [key, value] of Object.entries(variables)) {
+                    output = output.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+                }
+                document.getElementById('testOutput').textContent = output;
+            } catch (error) {
+                document.getElementById('testOutput').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Initialize defaults
+        async function initializeDefaults() {
+            if (!confirm('Initialize database with default prompts? Existing prompts will not be overwritten.')) return;
+
+            try {
+                const response = await fetch('/api/admin/prompts/initialize', {
+                    method: 'POST',
+                    credentials: 'include',
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showAlert(`Initialized: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`, 'success');
+                    loadPrompts();
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Initialization failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Reload all caches
+        async function reloadAllCaches() {
+            try {
+                const response = await fetch('/api/admin/prompts/reload', {
+                    method: 'POST',
+                    credentials: 'include',
+                });
+
+                if (response.ok) {
+                    showAlert('All prompt caches reloaded', 'success');
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Reload failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Update counters
+        function updateCounters() {
+            const content = document.getElementById('editContent').value;
+            document.getElementById('charCount').textContent = content.length.toLocaleString();
+            document.getElementById('tokenCount').textContent = Math.ceil(content.length / 4).toLocaleString(); // Rough estimate
+            document.getElementById('lineCount').textContent = content.split('\n').length.toLocaleString();
+        }
+
+        // Detect variables
+        function detectVariables() {
+            const content = document.getElementById('editContent').value;
+            const pattern = /(?<!\{)\{(\w+)\}(?!\})/g;
+            const matches = [...new Set([...content.matchAll(pattern)].map(m => m[1]))];
+
+            const container = document.getElementById('variablesList');
+            if (matches.length === 0) {
+                container.innerHTML = '<span class="form-help">No variables detected</span>';
+            } else {
+                container.innerHTML = matches.map(v => `<span class="variable-tag">{${v}}</span>`).join('');
+            }
+        }
+
+        // Close modal
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Show alert
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Format date
+        function formatDate(isoString) {
+            if (!isoString) return '-';
+            return new Date(isoString).toLocaleString();
+        }
+
+        // Event listeners
+        document.getElementById('filterCategory').addEventListener('change', loadPrompts);
+        document.getElementById('editContent').addEventListener('input', () => {
+            updateCounters();
+            detectVariables();
+        });
+
+        // Close modals on outside click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal')) {
+                    closeModal(modal.id);
+                }
+            });
+        });
+
+        // Initialize
+        checkSession().then(() => {
+            loadPrompts();
+        });
+    </script>
+</body>
+</html>

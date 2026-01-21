@@ -28,6 +28,9 @@ uv run draft-support                       # Auto-reply drafts (--preview)
 uv run rebuild-fts                         # Rebuild camera FTS5 index
 uv run fix-rio-terminology --preview       # Scan for RIO terminology issues
 uv run fix-rio-terminology --apply         # Apply approved fixes
+uv run init-prompts                        # Initialize prompt database with defaults
+uv run init-prompts --list                 # List all prompts
+uv run init-prompts --stats                # Show prompt database stats
 
 # Quality
 uv run ruff check src/ && uv run mypy src/clorag --strict
@@ -44,7 +47,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 ### Source Layout
 
-**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool)
+**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool), `prompt_db.py` (LLM prompts SQLite with version history)
 
 **Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler with Jina Reader + BeautifulSoup fallback), `chunker.py`, `base.py`
 
@@ -54,11 +57,11 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Graph** (`graph/`): `schema.py` (Camera, Product, Protocol, Issue, Solution entities), `enrichment.py`
 
-**Services** (`services/`): `custom_docs.py` (CustomDocumentService CRUD)
+**Services** (`services/`): `custom_docs.py` (CustomDocumentService CRUD), `prompt_manager.py` (LLM prompt management with caching), `default_prompts.py` (hardcoded prompt registry)
 
 **Drafts** (`drafts/`): `gmail_service.py`, `draft_generator.py`, `draft_pipeline.py`
 
-**Web** (`web/app.py`): FastAPI with streaming, admin UI at `/admin/{cameras,knowledge,analytics,drafts,chunks,graph,support-cases}`, REST APIs at `/api/`
+**Web** (`web/app.py`): FastAPI with streaming, admin UI at `/admin/{cameras,knowledge,analytics,drafts,chunks,graph,support-cases,prompts}`, REST APIs at `/api/`
 
 **Models** (`models/`): `camera.py`, `custom_document.py` (10 categories), `support_case.py`
 
@@ -163,6 +166,16 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 
 ### Custom Documents
 10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search.
+
+### Prompt Management
+- **Admin-editable prompts**: 11 LLM prompts stored in SQLite, editable via `/admin/prompts` without code changes
+- **Version history**: Every content change creates a new version for audit and rollback
+- **Fallback to defaults**: If DB prompt not found, falls back to hardcoded defaults in `default_prompts.py`
+- **Caching**: In-memory cache with TTL (default: 300s) for performance, hot reload via API
+- **Variable substitution**: `{variable}` placeholders auto-detected and substituted at runtime
+- **Categories**: agent, analysis, synthesis, drafts, graph, scripts
+- **Configuration**: `PROMPTS_CACHE_TTL` (default: 300 seconds)
+- **API usage**: `pm = get_prompt_manager(); prompt = pm.get_prompt("analysis.thread_analyzer", thread_content="...")`
 
 ### RIO Product Terminology
 - **RIO +WAN**: Full-featured RIO, works via LAN and WAN, for 1-128 distant cameras (REMI toolbox)

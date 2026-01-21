@@ -5,7 +5,7 @@ import sys
 import anyio
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
 
-from clorag.agent.prompts import SYSTEM_PROMPT
+from clorag.agent.prompts import get_system_prompt
 from clorag.agent.tools import create_rag_tools_server
 from clorag.config import get_settings
 
@@ -23,7 +23,7 @@ async def run_agent(prompt: str | None = None) -> None:
 
     # Configure agent options
     options = ClaudeAgentOptions(
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=get_system_prompt(),
         max_turns=settings.max_turns,
         mcp_servers={"rag": rag_server},
         allowed_tools=[

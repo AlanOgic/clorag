@@ -7,60 +7,9 @@ import structlog
 
 from clorag.config import get_settings
 from clorag.models import QualityControlResult, ThreadAnalysis
+from clorag.services.prompt_manager import get_prompt
 
 logger = structlog.get_logger(__name__)
-
-QC_PROMPT = """You are a quality controller for a support case documentation system.
-
-CRITICAL ANONYMIZATION REQUIREMENTS:
-- The content has placeholder tokens: [SERIAL:XXX-N], [EMAIL-N], [PHONE-N]
-- You MUST ensure ALL customer names, company names, and identifying information are removed
-- Use generic terms: "the customer", "the user", "their organization"
-- Focus ONLY on technical problems and solutions
-- If you detect ANY remaining PII that cannot be anonymized, set approved=false
-
-Review this analyzed support case and:
-1. Verify the analysis is accurate
-2. Refine and improve the summaries for clarity and searchability
-3. ENSURE all summaries are fully anonymized (no customer/company names)
-4. Ensure keywords are comprehensive and useful for search
-5. Validate the category assignment
-6. Generate a final structured document for the knowledge base
-
-<original_thread>
-{thread_content}
-</original_thread>
-
-<haiku_analysis>
-Problem Summary: {problem_summary}
-Solution Summary: {solution_summary}
-Keywords: {keywords}
-Category: {category}
-Product: {product}
-Resolution Quality: {resolution_quality}
-Anonymized Subject: {anonymized_subject}
-</haiku_analysis>
-
-Respond with a JSON object:
-
-{{
-    "approved": boolean,  // Is this case suitable? Set FALSE if PII cannot be fully anonymized
-    "refined_problem": "Improved 2-3 sentence problem description. Be specific and technical. NO customer names.",
-    "refined_solution": "Improved 2-3 sentence solution description. Include actionable steps. NO customer names.",
-    "refined_keywords": ["array", "of", "keywords"],  // 8-12 keywords for search
-    "refined_category": "Category name",
-    "suggestions": ["Any suggestions for improvement or notes"],
-    "final_document": "A well-structured markdown document summarizing this case for the knowledge base. Include: ## Problem, ## Solution, ## Technical Details sections. MUST be fully anonymized.",
-    "anonymized_title": "A clean, technical title for this case (5-10 words). Example: 'RCP Firmware Update Issue on VLAN Network'. NO customer names, company names, or serial numbers."
-}}
-
-Only approve if:
-- The problem is clearly described
-- A concrete solution was provided
-- The case adds value to the knowledge base
-- ALL content is fully anonymized (no customer/company names remain)
-
-Respond ONLY with valid JSON."""
 
 
 class QualityController:
@@ -100,7 +49,8 @@ class QualityController:
             QualityControlResult if successful, None if QC failed.
         """
         try:
-            prompt = QC_PROMPT.format(
+            prompt = get_prompt(
+                "analysis.quality_controller",
                 thread_content=thread_content,
                 problem_summary=analysis.problem_summary,
                 solution_summary=analysis.solution_summary,

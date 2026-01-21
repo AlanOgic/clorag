@@ -14,6 +14,7 @@ import httpx
 from clorag.config import get_settings
 from clorag.core.database import get_camera_database
 from clorag.models.camera import Camera, CameraUpdate
+from clorag.services.prompt_manager import get_prompt
 from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -44,34 +45,6 @@ TOP_MANUFACTURERS = [
     "Z CAM",
     "DJI",
 ]
-
-# Prompt for extracting model code and URL from search results
-EXTRACTION_PROMPT = """Given the camera model name "{camera_name}" from manufacturer "{manufacturer}",
-analyze the search results and extract:
-1. The official manufacturer model code/SKU
-2. The official product page URL from the manufacturer's website
-
-The model code is typically:
-- An alphanumeric code like "ILME-FX6V" for Sony FX6
-- A product reference number from the manufacturer's catalog
-- Different from the marketing name (e.g., "Alpha 7S III" marketing name vs "ILCE-7SM3" model code)
-
-The URL should be:
-- From the official manufacturer website (e.g., sony.com, canon.com, panasonic.com)
-- The product page or specifications page for this specific camera model
-- NOT a retailer, review site, or third-party website
-
-Search results:
-{search_results}
-
-Return a JSON object with this format:
-{{"code_model": "MODEL_CODE_HERE", "manufacturer_url": "URL_HERE"}}
-
-Use null for any field not found. Examples:
-{{"code_model": "ILME-FX6V", "manufacturer_url": "https://pro.sony/en_US/products/cinema-line/ilme-fx6v"}}
-{{"code_model": "EOS C300 Mark III", "manufacturer_url": null}}
-
-JSON response:"""
 
 
 # Known model codes for common cameras (manual mapping)
@@ -357,7 +330,8 @@ async def search_enrichment(
             messages=[
                 {
                     "role": "user",
-                    "content": EXTRACTION_PROMPT.format(
+                    "content": get_prompt(
+                        "scripts.model_code_lookup",
                         camera_name=camera.name,
                         manufacturer=camera.manufacturer,
                         search_results=search_text,

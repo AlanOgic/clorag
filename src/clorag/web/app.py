@@ -71,6 +71,7 @@ from clorag.models.custom_document import (
     DocumentCategory,
 )
 from clorag.services.custom_docs import CustomDocumentService
+from clorag.services.prompt_manager import get_prompt
 
 # Initialize logger
 logger = structlog.get_logger()
@@ -214,51 +215,6 @@ app.add_middleware(TimeoutMiddleware)
 
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
-
-# Optimized system prompt - single source of truth
-SYNTHESIS_SYSTEM_PROMPT = """You are a Cyanview support expert, representing Cyanview's excellence in broadcast camera control solutions.
-
-TONE: Empathetic, warm, professional. Like a knowledgeable colleague explaining things over coffee.
-
-STYLE:
-- Write naturally in flowing paragraphs - avoid excessive bullet lists
-- Explain concepts conversationally, as if talking to a colleague
-- Use lists sparingly: only for step-by-step procedures or comparing 3+ distinct options
-- Complete sentences, natural transitions between ideas
-
-FORMAT RULES:
-- **Bold** product names (RCP, RIO, CI0, VP4)
-- Numbered steps only for actual multi-step procedures
-- Code blocks for IP addresses, commands, config values
-- Keep responses focused - brief for simple questions, more detailed for complex ones
-
-DIAGRAMS (Mermaid):
-When explaining integration setups, camera connections, or signal flows, include a Mermaid diagram to visualize the architecture. Use this format:
-
-```mermaid
-graph LR
-    A[Camera] -->|Protocol| B[RIO]
-    B -->|Ethernet| C[RCP]
-```
-
-Include diagrams when:
-- Explaining how to connect cameras to RIO/RCP/CI0/VP4
-- Describing network topology or IP setup
-- Showing signal flow (control, tally)
-- Multi-device integration scenarios
-
-Keep diagrams simple and focused. Use `graph LR` for signal flows, `graph TB` for hierarchies.
-
-CONTENT RULES:
-- Use ONLY the provided context - never invent
-- Sound natural - avoid "based on the context" or "according to the documentation"
-- For unknowns: suggest checking the specific product page
-- Never say "contact Cyanview support" (you ARE the support)
-
-ALWAYS END WITH:
-After your answer, add a "📚 Related documentation:" section with 1-3 most relevant links from the context (use the URLs provided in [Doc: url] tags).
-
-Match the user's language (EN/FR)."""
 
 # Static files and templates
 STATIC_DIR = Path(__file__).parent / "static"
@@ -715,7 +671,7 @@ async def synthesize_answer(
     response = await get_anthropic().messages.create(
         model=settings.sonnet_model,
         max_tokens=1500,
-        system=SYNTHESIS_SYSTEM_PROMPT,
+        system=get_prompt("synthesis.web_answer"),
         messages=messages,
     )
     return response.content[0].text
@@ -751,7 +707,7 @@ async def synthesize_answer_stream(
     async with get_anthropic().messages.stream(
         model=settings.sonnet_model,
         max_tokens=1500,
-        system=SYNTHESIS_SYSTEM_PROMPT,
+        system=get_prompt("synthesis.web_answer"),
         messages=messages,
     ) as stream:
         async for text in stream.text_stream:
@@ -3479,7 +3435,7 @@ async def api_search_debug(
         response = await get_anthropic().messages.create(
             model=settings.sonnet_model,
             max_tokens=1500,
-            system=SYNTHESIS_SYSTEM_PROMPT,
+            system=get_prompt("synthesis.web_answer"),
             messages=[{"role": "user", "content": user_prompt}],
         )
         llm_response = response.content[0].text
@@ -3508,7 +3464,7 @@ async def api_search_debug(
         total_time_ms=total_time_ms,
         chunks=detailed_chunks,
         llm_prompt=user_prompt,
-        system_prompt=SYNTHESIS_SYSTEM_PROMPT,
+        system_prompt=get_prompt("synthesis.web_answer"),
         llm_response=llm_response,
         model=settings.haiku_model,
     )
@@ -3600,6 +3556,272 @@ async def admin_swagger_ui(
         title="Cyanview Admin API",
         swagger_favicon_url="/static/favicon.ico",
     )
+
+
+# =============================================================================
+# Prompt Management Routes (Admin)
+# =============================================================================
+
+
+@app.get("/admin/prompts", response_class=HTMLResponse)
+async def admin_prompts(request: Request):
+    """Admin prompt management page."""
+    return templates.TemplateResponse("admin_prompts.html", {"request": request})
+
+
+@app.get("/api/admin/prompts", tags=["Prompts"])
+async def api_prompts_list(
+    category: str | None = None,
+    _: bool = Depends(verify_admin),
+):
+    """List all prompts from database and defaults."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    return pm.list_all_prompts(category=category)
+
+
+@app.get("/api/admin/prompts/by-key/{key:path}", tags=["Prompts"])
+async def api_prompt_by_key(
+    key: str,
+    _: bool = Depends(verify_admin),
+):
+    """Get a prompt by its key (works for both database and default prompts)."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    try:
+        return pm.get_prompt_with_metadata(key)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Prompt not found: {key}")
+
+
+@app.get("/api/admin/prompts/{prompt_id}", tags=["Prompts"])
+async def api_prompt_get(
+    prompt_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Get a database prompt by ID with metadata."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    prompt = pm.get_prompt_by_id(prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    return {"source": "database", "prompt": prompt.to_dict()}
+
+
+@app.get("/api/admin/prompts/{prompt_id}/versions", tags=["Prompts"])
+async def api_prompt_versions(
+    prompt_id: str,
+    _: bool = Depends(verify_admin),
+):
+    """Get version history for a prompt."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    versions = pm.get_prompt_versions(prompt_id)
+    return [v.to_dict() for v in versions]
+
+
+class PromptUpdateRequest(BaseModel):
+    """Request body for updating a prompt."""
+
+    name: str | None = None
+    description: str | None = None
+    model: str | None = None
+    content: str | None = None
+    change_note: str | None = None
+
+
+@app.put("/api/admin/prompts/{prompt_id}", tags=["Prompts"])
+@limiter.limit("30/minute")
+async def api_prompt_update(
+    request: Request,
+    prompt_id: str,
+    updates: Annotated[PromptUpdateRequest, Body()],
+    _: bool = Depends(verify_admin),
+):
+    """Update a prompt (creates a new version if content changed)."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+
+    # Detect variables in new content if provided
+    variables = None
+    if updates.content:
+        variables = pm.detect_variables(updates.content)
+
+    prompt = pm.update_prompt(
+        prompt_id=prompt_id,
+        content=updates.content,
+        name=updates.name,
+        description=updates.description,
+        model=updates.model,
+        variables=variables,
+        change_note=updates.change_note,
+        updated_by="admin",
+    )
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    return prompt.to_dict()
+
+
+class PromptCreateFromDefaultRequest(BaseModel):
+    """Request body for creating a prompt from defaults."""
+
+    key: str
+    name: str | None = None
+    description: str | None = None
+    model: str | None = None
+    content: str | None = None
+
+
+@app.post("/api/admin/prompts/from-default", tags=["Prompts"])
+@limiter.limit("10/minute")
+async def api_prompt_create_from_default(
+    request: Request,
+    data: Annotated[PromptCreateFromDefaultRequest, Body()],
+    _: bool = Depends(verify_admin),
+):
+    """Create a database prompt from a default, optionally with modifications."""
+    from clorag.core.prompt_db import get_prompt_database
+    from clorag.services.default_prompts import get_default_prompt
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    default = get_default_prompt(data.key)
+    if not default:
+        raise HTTPException(status_code=404, detail=f"Default prompt not found: {data.key}")
+
+    db = get_prompt_database()
+
+    # Check if already exists in database
+    existing = db.get_prompt_by_key(data.key)
+    if existing:
+        # Update existing
+        variables = pm.detect_variables(data.content or default.content)
+        prompt = pm.update_prompt(
+            prompt_id=existing.id,
+            content=data.content or existing.content,
+            name=data.name or existing.name,
+            description=data.description or existing.description,
+            model=data.model or existing.model,
+            variables=variables,
+            change_note="Updated from admin UI",
+            updated_by="admin",
+        )
+        return prompt.to_dict() if prompt else existing.to_dict()
+
+    # Create new from default
+    content = data.content or default.content
+    variables = pm.detect_variables(content)
+
+    prompt = db.create_prompt(
+        key=data.key,
+        name=data.name or default.name,
+        content=content,
+        category=default.category,
+        description=data.description or default.description,
+        model=data.model or default.model,
+        variables=variables,
+        created_by="admin",
+    )
+    return prompt.to_dict()
+
+
+class PromptRollbackRequest(BaseModel):
+    """Request body for rollback."""
+
+    version: int
+
+
+@app.post("/api/admin/prompts/{prompt_id}/rollback", tags=["Prompts"])
+@limiter.limit("10/minute")
+async def api_prompt_rollback(
+    request: Request,
+    prompt_id: str,
+    data: Annotated[PromptRollbackRequest, Body()],
+    _: bool = Depends(verify_admin),
+):
+    """Rollback a prompt to a previous version."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    prompt = pm.rollback_prompt(prompt_id, data.version, rolled_back_by="admin")
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return prompt.to_dict()
+
+
+@app.post("/api/admin/prompts/initialize", tags=["Prompts"])
+@limiter.limit("5/minute")
+async def api_prompts_initialize(
+    request: Request,
+    force: bool = False,
+    _: bool = Depends(verify_admin),
+):
+    """Initialize database with default prompts."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    result = pm.initialize_defaults(force=force)
+    return result
+
+
+@app.post("/api/admin/prompts/reload", tags=["Prompts"])
+async def api_prompts_reload(
+    _: bool = Depends(verify_admin),
+):
+    """Reload all prompt caches (hot reload)."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    pm.reload_all()
+    return {"status": "ok", "message": "All prompt caches reloaded"}
+
+
+@app.get("/api/admin/prompts/cache-stats", tags=["Prompts"])
+async def api_prompts_cache_stats(
+    _: bool = Depends(verify_admin),
+):
+    """Get prompt cache statistics."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    return pm.get_cache_stats()
+
+
+class PromptTestRequest(BaseModel):
+    """Request body for testing a prompt."""
+
+    content: str
+    variables: dict[str, str] = Field(default_factory=dict)
+
+
+@app.post("/api/admin/prompts/test", tags=["Prompts"])
+@limiter.limit("20/minute")
+async def api_prompt_test(
+    request: Request,
+    data: Annotated[PromptTestRequest, Body()],
+    _: bool = Depends(verify_admin),
+):
+    """Test a prompt with variable substitution (no LLM call)."""
+    from clorag.services.prompt_manager import get_prompt_manager
+
+    pm = get_prompt_manager()
+    try:
+        result = pm._substitute_variables(data.content, data.variables)
+        return {
+            "success": True,
+            "result": result,
+            "detected_variables": pm.detect_variables(data.content),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+        }
 
 
 def create_app() -> FastAPI:

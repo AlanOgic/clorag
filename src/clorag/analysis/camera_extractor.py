@@ -18,84 +18,13 @@ from clorag.models.camera import (
     normalize_camera_create,
     validate_camera_extraction,
 )
+from clorag.services.prompt_manager import get_prompt
 from clorag.utils.logger import get_logger
 
 if TYPE_CHECKING:
     pass
 
 logger = get_logger(__name__)
-
-EXTRACTION_PROMPT = """Analyze this Cyanview documentation or support content and extract camera compatibility information.
-
-Cyanview makes camera control equipment (RCP, RIO, CI0, VP4). The documentation contains info about which cameras can be controlled and how.
-
-For each camera model mentioned with control/compatibility info, extract:
-- model: The camera model name ONLY, without manufacturer prefix (e.g., "HDC-5500", "C500 Mark II", "URSA Mini Pro 12K")
-- manufacturer: The camera manufacturer name ONLY (e.g., "Sony", "Canon", "Panasonic", "Blackmagic", "ARRI", "RED", "Grass Valley", "Ikegami", "Hitachi", "JVC")
-- Control ports (RS-422, RS-232, Ethernet, GPIO, LANC, etc.)
-- Protocols (VISCA, Sony RCP, Panasonic, LANC, IP, Blackmagic SDI, etc.)
-- Supported controls (Iris, Gain, Shutter, White Balance, ND, Focus, Zoom, Color, Gamma, etc.)
-- Important notes (firmware requirements, cable requirements, limitations, specific RIO/RCP needed)
-
-Return ONLY a JSON array of cameras found. If no cameras mentioned, return [].
-
-CRITICAL RULES:
-- "model" field must NOT include the manufacturer name - WRONG: "Sony HDC-5500", RIGHT: "HDC-5500"
-- "manufacturer" field must be the brand name ONLY - WRONG: "Sony HDC-5500", RIGHT: "Sony"
-- Only extract cameras with actual compatibility information (ports, protocols, or controls)
-- Do NOT include generic mentions like "any camera" or "most cameras"
-- Use exact model names when available
-- If a camera family is mentioned (e.g., "Sony HDC series"), list specific models if available
-- Merge duplicates - if same camera mentioned multiple times, combine the info
-
-Example output:
-[
-  {{
-    "model": "HDC-5500",
-    "manufacturer": "Sony",
-    "ports": ["RS-422", "Ethernet"],
-    "protocols": ["Sony RCP", "IP"],
-    "supported_controls": ["Iris", "Gain", "Shutter", "White Balance", "ND"],
-    "notes": ["Requires RIO for serial connection", "IP control available with firmware 2.0+"]
-  }},
-  {{
-    "model": "C500 Mark II",
-    "manufacturer": "Canon",
-    "ports": ["Ethernet"],
-    "protocols": ["IP"],
-    "supported_controls": ["Iris", "ISO", "Shutter", "White Balance"],
-    "notes": ["Use Cinema RAW Light for best results"]
-  }},
-  {{
-    "model": "URSA Mini Pro 12K",
-    "manufacturer": "Blackmagic",
-    "ports": ["SDI", "Ethernet"],
-    "protocols": ["Blackmagic SDI", "IP"],
-    "supported_controls": ["Iris", "ISO", "Shutter", "White Balance", "ND"],
-    "notes": []
-  }}
-]
-
-Content to analyze:
-{content}"""
-
-ENRICHMENT_PROMPT = """Extract technical specifications from this camera product page.
-
-Focus on:
-- Remote control capabilities (protocols, ports, APIs)
-- Connectivity options (SDI, HDMI, Ethernet, Serial)
-- Any technical specs relevant to camera control
-
-Return JSON:
-{{
-  "specs": {{"key": "value", ...}},
-  "features": ["feature1", "feature2", ...],
-  "connectivity": ["port1", "port2", ...],
-  "remote_control": ["protocol1", "capability1", ...]
-}}
-
-Content:
-{content}"""
 
 
 KNOWN_MANUFACTURERS = [
@@ -223,7 +152,7 @@ class CameraExtractor:
                 messages=[
                     {
                         "role": "user",
-                        "content": EXTRACTION_PROMPT.format(content=content),
+                        "content": get_prompt("analysis.camera_extractor", content=content),
                     }
                 ],
             )
@@ -395,7 +324,7 @@ class CameraExtractor:
                 messages=[
                     {
                         "role": "user",
-                        "content": ENRICHMENT_PROMPT.format(content=text_content),
+                        "content": get_prompt("analysis.camera_enrichment", content=text_content),
                     }
                 ],
             )

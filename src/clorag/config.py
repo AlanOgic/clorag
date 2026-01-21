@@ -191,6 +191,12 @@ class Settings(BaseSettings):
         description="Minimum confidence threshold for auto-applying RIO fixes during ingestion",
     )
 
+    # Prompt Management Configuration
+    prompts_cache_ttl: int = Field(
+        default=300,
+        description="TTL in seconds for prompt cache (default: 5 minutes)",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

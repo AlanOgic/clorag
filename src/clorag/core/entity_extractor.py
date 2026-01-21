@@ -23,6 +23,7 @@ from clorag.graph.schema import (
     GraphSolution,
     RelationType,
 )
+from clorag.services.prompt_manager import get_prompt
 
 logger = structlog.get_logger()
 
@@ -42,77 +43,6 @@ KNOWN_CONTROLS = [
     "ISO", "Gamma", "Color Matrix", "Knee", "Black Level", "Detail", "Skin Tone",
     "Pan", "Tilt", "PTZ", "Preset", "Tally", "Record", "Streaming",
 ]
-
-ENTITY_EXTRACTION_PROMPT = """Analyze this Cyanview documentation or support content and extract \
-entities and relationships for a knowledge graph.
-
-CONTEXT: Cyanview makes camera control equipment (RIO, RCP, CI0, VP4, Live Composer). \
-This content discusses camera compatibility, configurations, issues, and solutions.
-
-Extract the following entity types:
-1. CAMERAS - Camera models mentioned (e.g., "HDC-5500", "C500 Mark II", "URSA Mini Pro")
-2. PRODUCTS - Cyanview products (RIO, RCP, CI0, VP4, Live Composer, CY-CBL cables)
-3. PROTOCOLS - Communication protocols (VISCA, LANC, Pelco, Canon XC, IP, etc.)
-4. PORTS - Physical connectors (RS-422, Ethernet, USB, HDMI, SDI, etc.)
-5. CONTROLS - Camera control functions (Iris, Focus, Zoom, Gain, etc.)
-6. ISSUES - Problems or errors described
-7. SOLUTIONS - Resolutions or fixes provided
-8. FIRMWARE - Firmware versions mentioned
-
-Also extract RELATIONSHIPS between entities:
-- Camera COMPATIBLE_WITH Product
-- Camera USES_PROTOCOL Protocol
-- Camera HAS_PORT Port
-- Camera SUPPORTS_CONTROL Control
-- Product SUPPORTS_PROTOCOL Protocol
-- Issue AFFECTS Product/Camera
-- Issue RESOLVED_BY Solution
-- Firmware FIXES Issue
-- Firmware FOR_PRODUCT Product
-
-Return a JSON object with this structure:
-{{
-  "cameras": [
-    {{"name": "model name", "manufacturer": "brand"}}
-  ],
-  "products": [
-    {{"name": "product name", "product_type": "type"}}
-  ],
-  "protocols": [
-    {{"name": "protocol name", "protocol_type": "serial|network|proprietary"}}
-  ],
-  "ports": [
-    {{"name": "port name", "port_type": "network|serial|video"}}
-  ],
-  "controls": [
-    {{"name": "control name", "control_type": "exposure|lens|color"}}
-  ],
-  "issues": [
-    {{"description": "issue description", "symptoms": ["symptom1"], "error_codes": ["ERR001"]}}
-  ],
-  "solutions": [
-    {{"description": "solution description", "steps": ["step1", "step2"]}}
-  ],
-  "firmware": [
-    {{"version": "1.2.3", "changelog": "summary"}}
-  ],
-  "relationships": [
-    {{"source_type": "Camera", "source_id": "camera name", "relationship": "COMPATIBLE_WITH", \
-"target_type": "Product", "target_id": "RIO"}}
-  ]
-}}
-
-CRITICAL RULES:
-- Only extract entities that are explicitly mentioned with actionable information
-- Normalize entity names (e.g., "RIO Live" -> "RIO", "rio" -> "RIO")
-- For cameras, separate model from manufacturer \
-(e.g., "Sony HDC-5500" -> name: "HDC-5500", manufacturer: "Sony")
-- For issues/solutions, use concise descriptions (max 200 chars)
-- Only create relationships when there's clear evidence in the text
-- If no entities found, return empty arrays
-
-Content to analyze:
-{content}"""
 
 
 class EntityExtractor:
@@ -153,7 +83,7 @@ class EntityExtractor:
                 messages=[
                     {
                         "role": "user",
-                        "content": ENTITY_EXTRACTION_PROMPT.format(content=content),
+                        "content": get_prompt("graph.entity_extractor", content=content),
                     }
                 ],
             )
