@@ -124,9 +124,9 @@
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────┐     ┌───────────────┐     ┌───────────────┐
-│   SITEMAP     │     │   PARALLEL    │     │   CONTENT     │
-│    FETCH      │────▶│ PAGE FETCH    │────▶│  EXTRACTION   │
-│  sitemap.xml  │     │  (batch=10)   │     │ BeautifulSoup │
+│   SITEMAP     │     │  JINA READER  │     │   CONTENT     │
+│    FETCH      │────▶│  (primary)    │────▶│  EXTRACTION   │
+│  sitemap.xml  │     │ + BS4 fallback│     │   markdown    │
 └───────────────┘     └───────────────┘     └───────────────┘
                                                     │
         ┌───────────────────────────────────────────┘
@@ -155,13 +155,13 @@
                     </tr>
                     <tr>
                         <td>2. Page Fetch</td>
-                        <td>Parallel HTTP requests in batches of 10 with 30s timeout</td>
-                        <td>Raw HTML pages</td>
+                        <td>Jina Reader API (<code>r.jina.ai</code>) for clean markdown extraction; BeautifulSoup fallback on 429/503</td>
+                        <td>Markdown content</td>
                     </tr>
                     <tr>
                         <td>3. Content Extraction</td>
-                        <td>BeautifulSoup extracts main content, removes nav/sidebar/footer</td>
-                        <td>Clean text + title</td>
+                        <td>Jina: clean markdown with tables preserved. BeautifulSoup: HTML tables converted to markdown format</td>
+                        <td>Clean text + title + tables</td>
                     </tr>
                     <tr>
                         <td>4. Text Chunking</td>
@@ -189,6 +189,11 @@
                         <td>Camera database entries</td>
                     </tr>
                 </table>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Jina Reader + Table Preservation</div>
+                    <p>Jina Reader (<code>r.jina.ai</code>) provides clean markdown extraction with automatic table formatting. On rate limits (429) or errors (503), the system falls back to BeautifulSoup with automatic HTML table-to-markdown conversion. This ensures camera control matrices and feature comparison tables are preserved and searchable.</p>
+                </div>
 
                 <div class="info-box info-box--info">
                     <div class="info-box__title">URL Filtering</div>

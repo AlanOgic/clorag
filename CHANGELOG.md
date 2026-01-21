@@ -2,6 +2,28 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.5.8] - 2026-01-21
+
+### Added
+- **Jina Reader Integration**
+  - Primary web scraper using `r.jina.ai` API for clean markdown extraction
+  - Automatic retry logic (3 attempts) with exponential backoff on 429/503 errors
+  - BeautifulSoup fallback when Jina Reader is unavailable
+  - Statistics logging: success/fallback/total counts per ingestion run
+
+- **HTML Table Preservation**
+  - BeautifulSoup fallback now converts HTML tables to markdown format
+  - Tables preserved as atomic units during chunking (not split across chunks)
+  - Supports complex tables with headers, multiple rows, and varied column counts
+  - Camera control matrices and feature comparison tables now searchable
+
+### Changed
+- Docusaurus ingestion now uses Jina Reader as primary content extractor
+- Improved content quality for pages with structured data (tables, code blocks)
+
+### Files
+- `src/clorag/ingestion/docusaurus.py` - Added Jina Reader integration and table-to-markdown conversion
+
 ## [0.5.7] - 2026-01-20
 
 ### Added

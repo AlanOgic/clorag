@@ -46,7 +46,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool)
 
-**Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler), `chunker.py`, `base.py`
+**Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler with Jina Reader + BeautifulSoup fallback), `chunker.py`, `base.py`
 
 **Analysis** (`analysis/`): `thread_analyzer.py` (Haiku classification), `quality_controller.py` (Sonnet QC), `camera_extractor.py`, `rio_analyzer.py` (RIO terminology context analysis)
 
@@ -109,6 +109,13 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Atomic blocks**: Code blocks, tables, and markdown headings preserved as units
 - **Adaptive threshold**: Short content (< 200 tokens) stays as single chunk
 - **Backward compatible**: Set `CHUNK_USE_TOKENS=false` for character-based mode
+
+### Docusaurus Ingestion
+- **Jina Reader primary**: Uses `r.jina.ai` API for clean markdown extraction with table preservation
+- **BeautifulSoup fallback**: Automatic fallback on Jina 429/503 errors with retry logic (3 attempts)
+- **Table preservation**: HTML tables converted to markdown format before text extraction (BeautifulSoup fallback)
+- **RIO terminology fixes**: High-confidence fixes auto-applied during ingestion before embedding
+- **Camera extraction**: Claude Haiku extracts camera compatibility info post-ingestion
 
 ### Data Protection
 - **Anonymization**: Gmail threads use placeholders (`[SERIAL:XXX-N]`, `[EMAIL-N]`) before LLM processing

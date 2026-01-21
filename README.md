@@ -21,6 +21,7 @@ Agent intelligent de support combinant documentation Docusaurus et cas de suppor
 - **GraphRAG** - Neo4j knowledge graph enrichment with entity extraction from chunks
 - **Performance Monitoring** - Real-time metrics collection with percentile stats and slow operation alerts
 - **Token-Aware Chunking** - Configurable token-based chunking (tiktoken) with content-type specific sizing
+- **Jina Reader Integration** - Clean markdown extraction with table preservation, BeautifulSoup fallback
 
 ## Architecture
 
@@ -143,7 +144,7 @@ Two data ingestion pipelines populate the vector database:
 
 | Pipeline | Command | Description |
 |----------|---------|-------------|
-| Documentation | `uv run ingest-docs` | Fetches sitemap, scrapes pages, chunks, embeds |
+| Documentation | `uv run ingest-docs` | Fetches sitemap, scrapes via Jina Reader (BeautifulSoup fallback), chunks, embeds |
 | Support Cases | `uv run ingest-curated` | Gmail → Anonymize → Haiku → Filter → Sonnet QC → Embed |
 
 > **📖 Complete flow diagrams available in [Admin Docs](/admin/docs#data-ingestion)** after authentication.
@@ -224,6 +225,7 @@ Two data ingestion pipelines populate the vector database:
 | Orchestration | Claude Agent SDK 0.1.9+ |
 | Vector DB | Qdrant |
 | Graph DB | Neo4j (optional, for GraphRAG) |
+| Web Scraping | Jina Reader (BeautifulSoup fallback) |
 | Dense Embeddings | Voyage AI (voyage-context-3) |
 | Sparse Embeddings | FastEmbed BM25 |
 | Reranking | Voyage AI (rerank-2.5) |
