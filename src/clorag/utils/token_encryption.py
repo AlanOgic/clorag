@@ -73,12 +73,18 @@ def encrypt_token_data(data: dict[str, object]) -> str:
         data: Token data dictionary to encrypt.
 
     Returns:
-        Base64-encoded encrypted data, or JSON if encryption not available.
+        Base64-encoded encrypted data.
+
+    Raises:
+        RuntimeError: If ADMIN_PASSWORD is not configured (encryption unavailable).
     """
     fernet = _get_fernet()
     if fernet is None:
-        # Fall back to plain JSON if no password configured
-        return json.dumps(data)
+        # SECURITY: Never fall back to plaintext - OAuth tokens must be encrypted
+        raise RuntimeError(
+            "Cannot encrypt tokens: ADMIN_PASSWORD must be configured. "
+            "Set the ADMIN_PASSWORD environment variable to enable secure token storage."
+        )
 
     json_data = json.dumps(data).encode()
     encrypted = fernet.encrypt(json_data)

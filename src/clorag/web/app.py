@@ -1300,10 +1300,18 @@ def verify_csrf(
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return True
 
-    # Skip CSRF for API endpoints that use X-Admin-Password header authentication
+    # Skip CSRF for API endpoints that use valid X-Admin-Password header authentication
     # (these are typically programmatic API calls, not browser requests)
-    if request.headers.get("X-Admin-Password"):
-        return True
+    # SECURITY: Must verify password is correct before skipping CSRF to prevent bypass
+    x_admin_password = request.headers.get("X-Admin-Password")
+    if x_admin_password is not None:
+        settings = get_settings()
+        if settings.admin_password and secrets.compare_digest(
+            x_admin_password.encode("utf-8"),
+            settings.admin_password.get_secret_value().encode("utf-8"),
+        ):
+            return True
+        # Invalid password - don't skip CSRF, continue to normal validation
 
     if not x_csrf_token:
         raise HTTPException(
