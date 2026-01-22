@@ -11,7 +11,7 @@ import structlog
 from fastapi import APIRouter, Cookie, HTTPException, Request
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from itsdangerous import BadSignature, SignatureExpired
 from starlette.responses import JSONResponse
 
@@ -321,10 +321,10 @@ async def admin_openapi_json(
     return JSONResponse(content=_get_admin_openapi_schema(request.app.routes))
 
 
-@router.get("/admin/api-docs", include_in_schema=False)
+@router.get("/admin/api-docs", include_in_schema=False, response_model=None)
 async def admin_swagger_ui(
     admin_session: Annotated[str | None, Cookie()] = None,
-) -> HTMLResponse | RedirectResponse:
+) -> Response:
     """Serve Swagger UI for admin API (requires authentication)."""
     # Verify session
     if not admin_session:
