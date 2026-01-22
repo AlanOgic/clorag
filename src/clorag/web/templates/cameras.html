@@ -1169,7 +1169,7 @@
     <footer class="footer">
     </footer>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         // Embed camera data for modal display
         const camerasData = {
             {% for camera in cameras %}

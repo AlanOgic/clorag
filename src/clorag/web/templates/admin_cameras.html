@@ -200,7 +200,7 @@
         {% endif %}
     </main>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         // Check authentication status on page load
         async function checkAuth() {
             try {

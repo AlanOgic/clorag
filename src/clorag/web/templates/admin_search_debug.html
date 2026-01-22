@@ -499,7 +499,7 @@
         </div>
     </main>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         let lastResult = null;
         const authLoading = document.getElementById('authLoading');
         const logoutBtn = document.getElementById('logoutBtn');

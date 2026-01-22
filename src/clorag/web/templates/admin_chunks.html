@@ -213,7 +213,7 @@
         </div>
     </main>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         let currentOffset = null;
         let currentCollection = 'docusaurus_docs';
         let isSearchMode = false;

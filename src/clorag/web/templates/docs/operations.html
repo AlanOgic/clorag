@@ -256,7 +256,7 @@ NEO4J_URI=bolt://localhost:7687</code></pre>
         AI Search with Claude AI, Voyage AI &amp; Qdrant
     </footer>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         const authLoading = document.getElementById('authLoading');
         const logoutBtn = document.getElementById('logoutBtn');
         async function checkAuth() {

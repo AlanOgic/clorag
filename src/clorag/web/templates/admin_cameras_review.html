@@ -529,7 +529,7 @@
 
     <div id="toast" class="toast"></div>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         async function checkAuth() {
             try {
                 const response = await fetch('/api/admin/session');

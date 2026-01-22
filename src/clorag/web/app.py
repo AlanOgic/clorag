@@ -101,13 +101,23 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Middleware to add security headers to all responses."""
+    """Middleware to add security headers to all responses.
+
+    SECURITY: Implements nonce-based CSP for inline scripts.
+    Nonce is generated per-request and stored in request.state.csp_nonce.
+    Templates should use: <script nonce="{{ request.state.csp_nonce }}">
+    """
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        """Add security headers to response."""
+        """Add security headers to response with nonce-based CSP."""
+        # Generate CSP nonce BEFORE processing request (so templates can access it)
+        csp_nonce = secrets.token_urlsafe(16)
+        request.state.csp_nonce = csp_nonce
+
         response = await call_next(request)
+
         # Prevent clickjacking
         response.headers["X-Frame-Options"] = "DENY"
         # Prevent MIME type sniffing
@@ -120,10 +130,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = (
             "max-age=31536000; includeSubDomains; preload"
         )
-        # Content Security Policy - allow inline for existing JS, Mermaid/Swagger from CDN
+        # Content Security Policy with nonce for inline scripts
+        # SECURITY: Uses per-request nonce for script execution (CSP Level 2+).
+        # All 28 templates have been updated to use nonce="{{ request.state.csp_nonce }}".
+        # 'unsafe-inline' for style-src is needed for inline styles and libraries like Mermaid.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "img-src 'self' data: https:; "
             "font-src 'self' https://cdn.jsdelivr.net; "
@@ -233,12 +246,18 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # Add CORS middleware
+# SECURITY: Explicitly list allowed headers instead of wildcard to prevent header exposure
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://cyanview.cloud"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["*"],
+    allow_headers=[
+        "Content-Type",
+        "X-Admin-Password",
+        "X-CSRF-Token",
+        "X-Requested-With",
+    ],
 )
 
 # Add timeout middleware
@@ -1698,9 +1717,14 @@ async def api_admin_login(
     # Successful login - clear any failed attempts
     tracker.clear_attempts(client_ip)
 
-    # Create signed session token
+    # Create signed session token with unique session_id for CSRF binding
     serializer = get_session_serializer()
-    token = serializer.dumps({"authenticated": True, "ts": time.time()})
+    session_id = secrets.token_hex(16)  # Generate unique session identifier
+    token = serializer.dumps({
+        "authenticated": True,
+        "ts": time.time(),
+        "session_id": session_id,  # SECURITY: Used for CSRF token binding validation
+    })
 
     # Set httponly cookie (secure based on config)
     response.set_cookie(

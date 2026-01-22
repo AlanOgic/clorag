@@ -214,7 +214,7 @@
         </div>
     </main>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         const collection = '{{ collection }}';
         const chunkId = '{{ chunk_id }}';
         let originalText = '';

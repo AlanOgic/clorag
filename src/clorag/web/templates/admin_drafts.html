@@ -484,7 +484,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         let currentThreadId = null;
         const CACHE_KEY = 'drafts_cache';
         const CACHE_TTL = 5 * 60 * 1000; // 5 minutes

@@ -399,7 +399,7 @@
         </div>
     </main>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         const cameraId = {{ camera.id if camera else 'null' }};
 
         // Check authentication status on page load

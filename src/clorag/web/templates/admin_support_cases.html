@@ -383,7 +383,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         let currentPage = 0;
         let pageSize = 20;
         let totalCases = 0;

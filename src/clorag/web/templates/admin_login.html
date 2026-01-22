@@ -204,7 +204,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         const form = document.getElementById('loginForm');
         const passwordInput = document.getElementById('password');
         const submitBtn = document.getElementById('submitBtn');

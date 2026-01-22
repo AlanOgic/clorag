@@ -298,7 +298,7 @@ uv run import-docs ./your-folder</code></pre>
         AI Search with Claude AI, Voyage AI &amp; Qdrant
     </footer>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         const authLoading = document.getElementById('authLoading');
         const logoutBtn = document.getElementById('logoutBtn');
         async function checkAuth() {

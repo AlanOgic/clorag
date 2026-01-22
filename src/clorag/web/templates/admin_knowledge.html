@@ -394,7 +394,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         let categories = [];
         let selectedFile = null;
 

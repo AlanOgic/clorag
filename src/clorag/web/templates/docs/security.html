@@ -314,7 +314,7 @@ QDRANT_API_KEY=your_qdrant_key               # Secures vector database</code></p
         AI Search with Claude AI, Voyage AI &amp; Qdrant
     </footer>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         const authLoading = document.getElementById('authLoading');
         const logoutBtn = document.getElementById('logoutBtn');
         async function checkAuth() {

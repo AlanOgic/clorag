@@ -209,7 +209,7 @@
         </div>
     </main>
 
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
         let currentOffset = 0;
         let currentLimit = 50;
         let allFixes = [];
