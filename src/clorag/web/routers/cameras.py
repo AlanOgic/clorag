@@ -5,6 +5,7 @@ Provides read-only camera compatibility data for public consumption.
 
 import csv
 import io
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
@@ -137,7 +138,7 @@ async def api_cameras_search(request: Request, q: str) -> list[Camera]:
 
 @router.get("/api/cameras/stats")
 @limiter.limit("60/minute")
-async def api_cameras_stats(request: Request) -> dict[str, int]:
+async def api_cameras_stats(request: Request) -> dict[str, Any]:
     """Get camera database statistics."""
     db = get_camera_database()
     return db.get_stats()

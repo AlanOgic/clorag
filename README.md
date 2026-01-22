@@ -1,388 +1,524 @@
-# CLORAG - Multi-RAG Agent avec Claude Agent SDK
+```
+   ██████╗██╗      ██████╗ ██████╗  █████╗  ██████╗
+  ██╔════╝██║     ██╔═══██╗██╔══██╗██╔══██╗██╔════╝
+  ██║     ██║     ██║   ██║██████╔╝███████║██║  ███╗
+  ██║     ██║     ██║   ██║██╔══██╗██╔══██║██║   ██║
+  ╚██████╗███████╗╚██████╔╝██║  ██║██║  ██║╚██████╔╝
+   ╚═════╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝
+```
 
-Agent intelligent de support combinant documentation Docusaurus et cas de support Gmail via RAG (Retrieval-Augmented Generation).
+# Multi-Source RAG Agent for Cyanview Support
 
-## Features
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Claude SDK](https://img.shields.io/badge/Claude-Agent%20SDK-orange.svg)](https://github.com/anthropics/anthropic-sdk-python)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-- **AI-Powered Search** - Natural language queries with Claude Sonnet 4.5 synthesis
-- **Follow-up Conversations** - Ask follow-up questions with context from last 3 exchanges
-- **Hybrid RAG Search** - Combines semantic (Voyage AI) and keyword (BM25) matching with RRF fusion + Voyage rerank-2.5 cross-encoder
-- **Custom Knowledge Base** - Upload .txt, .md, .pdf files or paste text to add custom documents
-- **Camera Compatibility Database** - Structured camera info with automatic extraction from docs/support
-- **Camera Comparison** - Side-by-side comparison of up to 5 cameras with highlighted common specs
-- **FTS5 Full-Text Search** - SQLite FTS5 with BM25 ranking for fast camera search
-- **Support Cases Database** - SQLite storage for Gmail cases with FTS5 search and thread cleaning
-- **Search Analytics** - Track popular queries, response times, and usage patterns
-- **Session-Based Admin** - Secure login with signed cookies for all admin features
-- **Streaming Responses** - Real-time answer streaming for better UX
-- **Draft Auto-Reply System** - AI-powered draft creation for unanswered support threads
-- **Query Embedding Cache** - LRU cache reduces API calls for repeated queries
-- **Dynamic Score Thresholds** - Adaptive filtering based on query characteristics
-- **GraphRAG** - Neo4j knowledge graph enrichment with entity extraction from chunks
-- **Performance Monitoring** - Real-time metrics collection with percentile stats and slow operation alerts
-- **Token-Aware Chunking** - Configurable token-based chunking (tiktoken) with content-type specific sizing
-- **Jina Reader Integration** - Clean markdown extraction with table preservation, BeautifulSoup fallback
+An intelligent support agent combining **Docusaurus documentation**, **Gmail support threads**, and **custom knowledge documents** through a hybrid RAG (Retrieval-Augmented Generation) system with Claude AI synthesis.
 
-## Architecture
+---
 
-### Query Flow
+## Table of Contents
+
+- [Overview](#overview)
+  - [Key Features](#key-features)
+  - [Technology Stack](#technology-stack)
+- [RAG System Architecture](#rag-system-architecture)
+  - [Query Pipeline](#query-pipeline)
+  - [Hybrid Search Strategy](#hybrid-search-strategy)
+  - [Reranking Pipeline](#reranking-pipeline)
+  - [Vector Collections](#vector-collections)
+  - [GraphRAG Enrichment](#graphrag-enrichment)
+- [Data Ingestion](#data-ingestion)
+  - [Documentation Pipeline](#documentation-pipeline)
+  - [Gmail Support Cases Pipeline](#gmail-support-cases-pipeline)
+  - [Custom Documents](#custom-documents)
+- [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Quick Start](#quick-start)
+  - [Configuration](#configuration)
+- [Usage](#usage)
+  - [CLI Commands](#cli-commands)
+  - [Web Interface](#web-interface)
+  - [API Reference](#api-reference)
+- [Administration](#administration)
+  - [Admin Features](#admin-features)
+  - [Camera Database](#camera-database)
+  - [Prompt Management](#prompt-management)
+- [Deployment](#deployment)
+- [Security](#security)
+- [Project Structure](#project-structure)
+- [License](#license)
+
+---
+
+## Overview
+
+CLORAG is a production-ready Multi-RAG agent designed to power Cyanview's technical support. It intelligently searches across multiple knowledge sources, understands context from previous interactions, and synthesizes comprehensive answers with relevant documentation links.
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Hybrid RAG Search** | Dense vectors (Voyage AI) + sparse BM25 with RRF fusion |
+| **Cross-Encoder Reranking** | Voyage rerank-2.5 for +15-40% relevance improvement |
+| **Streaming Responses** | Real-time SSE streaming with Claude Sonnet synthesis |
+| **Follow-up Conversations** | Context-aware with last 3 Q&A exchanges |
+| **GraphRAG Enrichment** | Optional Neo4j knowledge graph for entity relationships |
+| **Camera Compatibility DB** | Structured camera info with FTS5 full-text search |
+| **Auto-Draft System** | AI-powered draft replies for unanswered support threads |
+| **Admin Dashboard** | Full CRUD for cameras, documents, chunks, and analytics |
+| **Token-Aware Chunking** | Configurable tiktoken-based chunking by content type |
+| **Performance Monitoring** | Real-time metrics with percentile stats and alerts |
+
+### Technology Stack
+
+| Component | Technology |
+|-----------|------------|
+| **Orchestration** | Claude Agent SDK 0.1.9+ |
+| **LLM Synthesis** | Claude Sonnet 4.5 (streaming) |
+| **Dense Embeddings** | Voyage AI (voyage-context-3, 1024-dim) |
+| **Sparse Embeddings** | FastEmbed BM25 |
+| **Reranking** | Voyage AI (rerank-2.5) |
+| **Vector Database** | Qdrant (hybrid search) |
+| **Graph Database** | Neo4j (optional GraphRAG) |
+| **Relational Database** | SQLite (cameras, analytics, support cases, prompts) |
+| **Web Framework** | FastAPI + Jinja2 |
+| **Web Scraping** | Jina Reader (BeautifulSoup fallback) |
+| **Package Manager** | uv |
+
+---
+
+## RAG System Architecture
+
+### Query Pipeline
+
+The RAG system processes queries through a multi-stage pipeline optimized for accuracy and speed:
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                        USER QUERY                          │
-│                    "How to configure RIO?"                 │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                   EMBEDDING GENERATION                     │
-│  ┌─────────────────────┐    ┌─────────────────────┐        │
-│  │  Dense Embeddings   │    │  Sparse Embeddings  │        │
-│  │  voyage-context-3   │    │   FastEmbed BM25    │        │
-│  │     (1024 dim)      │    │   (keyword match)   │        │
-│  └─────────────────────┘    └─────────────────────┘        │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                      HYBRID SEARCH                         │
-│  ┌───────────────────────────────────────────────────────┐ │
-│  │                    Qdrant Vector DB                   │ │
-│  │  ┌──────────────────┐      ┌──────────────────┐       │ │
-│  │  │  docusaurus_docs │      │   gmail_cases    │       │ │
-│  │  │  (documentation) │      │ (support cases)  │       │ │
-│  │  └──────────────────┘      └──────────────────┘       │ │
-│  └───────────────────────────────────────────────────────┘ │
-│                              │                             │
-│                              ▼                             │
-│                 RRF Fusion (k=60)                          │
-│         Combines semantic + keyword results                │
-│                     (over-fetch 3x)                        │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                       RERANKING                            │
-│              Voyage AI rerank-2.5 cross-encoder            │
-│         Refines relevance (+15-40% improvement)            │
-│                    Returns top-K results                   │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                    ANSWER SYNTHESIS                        │
-│              Claude Sonnet 4.5 (streaming)                 │
-│         Warm, professional Cyanview support tone           │
-│           + Conversation context (last 3 Q&A)              │
-│                 + Related documentation links              │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                     STREAMING RESPONSE                     │
-│                  Real-time SSE to frontend                 │
-│             + Session ID for follow-up questions           │
-└────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              USER QUERY                                      │
+│                        "How to configure RIO?"                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │ 
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         EMBEDDING GENERATION                                 │
+│  ┌────────────────────────────┐    ┌────────────────────────────┐            │
+│  │     Dense Embeddings       │    │     Sparse Embeddings      │            │
+│  │     voyage-context-3       │    │      FastEmbed BM25        │            │
+│  │       (1024 dim)           │    │     (keyword match)        │            │
+│  └────────────────────────────┘    └────────────────────────────┘            │
+│                    └──────────────┬──────────────┘                           │
+│                                   │                                          │
+│                      LRU Cache (200 entries)                                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           HYBRID SEARCH                                      │
+│  ┌───────────────────────────────────────────────────────────────────┐       │
+│  │                        Qdrant Vector DB                           │       │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐    │       │
+│  │  │ docusaurus_docs │  │   gmail_cases   │  │   custom_docs   │    │       │
+│  │  │ (documentation) │  │ (support cases) │  │ (admin uploads) │    │       │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘    │       │
+│  └───────────────────────────────────────────────────────────────────┘       │
+│                                   │                                          │
+│                        RRF Fusion (k=60)                                     │
+│                   Over-fetch 3x, Dynamic Prefetch                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐ 
+│                            RERANKING                                         │
+│                   Voyage AI rerank-2.5 cross-encoder                         │
+│               +15-40% relevance improvement on top results                   │
+│                     LRU Cache (100 entries)                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                      OPTIONAL: GRAPH ENRICHMENT                              │
+│              Neo4j traversal for entity relationships                        │
+│        (cameras, protocols, ports, issues, solutions)                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         ANSWER SYNTHESIS                                     │
+│                    Claude Sonnet 4.5 (streaming)                             │
+│          • Warm, professional Cyanview support tone                          │
+│          • Conversation context (last 3 Q&A)                                 │
+│          • Related documentation links                                       │
+│          • Automatic Mermaid diagrams for integrations                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        STREAMING RESPONSE                                    │
+│                     Real-time SSE to frontend                                │
+│              Session ID for follow-up questions (30min TTL)                  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Hybrid Search Strategy
+
+The system combines semantic understanding with keyword matching for optimal retrieval:
+
+| Strategy | Technology | Purpose |
+|----------|------------|---------|
+| **Dense Vectors** | voyage-context-3 (1024-dim) | Semantic similarity, concept matching |
+| **Sparse Vectors** | BM25 via FastEmbed | Exact keyword matching, technical terms |
+| **Fusion** | Reciprocal Rank Fusion (k=60) | Combines rankings from both strategies |
+| **Over-fetch** | 3x limit, max 50 | Retrieves more results for better reranking |
+
+**Dynamic Score Thresholds:**
+- ≤2 words: 0.15 minimum score
+- 3-5 words: 0.20 minimum score
+- >5 words: 0.25 minimum score
+- Technical terms: +0.05 boost
+- Minimum 3 results always returned
+
+### Reranking Pipeline
+
+After hybrid search, results are refined using a cross-encoder model:
+
+```
+Initial Results (15-30 chunks)
+           │
+           ▼
+┌─────────────────────────────┐
+│   Voyage rerank-2.5         │
+│   Cross-encoder scoring     │
+│   Query ↔ Document pairs    │
+└─────────────────────────────┘
+           │
+           ▼
+   Top-K Results (default: 5)
+   Sorted by relevance score
+```
+
+Configuration:
+- `RERANK_ENABLED=true` - Enable/disable reranking
+- `VOYAGE_RERANK_MODEL=rerank-2.5` - Model selection
+- `RERANK_TOP_K=5` - Final results count
+
+### Vector Collections
+
+Three Qdrant collections store the knowledge base:
+
+| Collection | Source | Content |
+|------------|--------|---------|
+| `docusaurus_docs` | Sitemap crawler | Official documentation pages |
+| `gmail_cases` | Gmail API | Curated, anonymized support threads |
+| `custom_docs` | Admin uploads | Custom knowledge (.txt, .md, .pdf) |
+
+Each collection contains:
+- **Dense vectors**: 1024-dimensional voyage-context-3 embeddings
+- **Sparse vectors**: BM25 vectors for keyword matching
+- **Metadata**: Source URL, timestamps, categories, extracted entities
 
 ### GraphRAG Enrichment
 
 When Neo4j is configured, search results are enriched with knowledge graph context:
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                    VECTOR SEARCH RESULTS                   │
-│              Top N chunks from Qdrant hybrid search        │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                    GRAPH ENRICHMENT                        │
-│  ┌───────────────────────────────────────────────────────┐ │
-│  │  1. enrich_from_chunks()                              │ │
-│  │     Traverse graph from chunk IDs to find:            │ │
-│  │     • Related cameras and their protocols             │ │
-│  │     • Products with compatibility info                │ │
-│  │     • Known issues and solutions                      │ │
-│  │                                                       │ │
-│  │  2. enrich_from_query()                               │ │
-│  │     Full-text search for query-relevant entities:     │ │
-│  │     • Cameras matching query terms                    │ │
-│  │     • Protocols and ports mentioned                   │ │
-│  │     • Firmware versions                               │ │
-│  └───────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                 CLAUDE SYNTHESIS                           │
-│      Vector chunks + Graph context → Rich answer           │
-│  Example: "Sony cameras use Visca protocol via RS-422"     │
-└────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      VECTOR SEARCH RESULTS                                  │
+│                 Top N chunks from Qdrant hybrid search                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        GRAPH ENRICHMENT                                     │
+│  ┌────────────────────────────────────────────────────────────────────┐     │
+│  │  1. enrich_from_chunks()                                           │     │
+│  │     Traverse graph from chunk IDs to find:                         │     │
+│  │     • Related cameras and their protocols                          │     │
+│  │     • Products with compatibility info                             │     │
+│  │     • Known issues and solutions                                   │     │
+│  │                                                                    │     │
+│  │  2. enrich_from_query()                                            │     │
+│  │     Full-text search for query-relevant entities:                  │     │
+│  │     • Cameras matching query terms                                 │     │
+│  │     • Protocols and ports mentioned                                │     │
+│  │     • Firmware versions                                            │     │
+│  └────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          CLAUDE SYNTHESIS                                   │
+│           Vector chunks + Graph context → Rich answer                       │
+│      Example: "Sony cameras use Visca protocol via RS-422"                  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Graph Population Pipeline
+**Entity Types:** Camera, Product, Protocol, Port, Control, Issue, Solution, Firmware, Chunk
+
+**Relationships:** COMPATIBLE_WITH, USES_PROTOCOL, HAS_PORT, AFFECTS, RESOLVED_BY, MENTIONS
+
+---
+
+## Data Ingestion
+
+### Documentation Pipeline
+
+Fetches and processes Docusaurus documentation pages:
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Sitemap.xml    │ ──▶ │   Jina Reader   │ ──▶ │    Chunking     │
+│  URL Discovery  │     │   (+ fallback)  │     │  (token-based)  │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│     Qdrant      │ ◀── │   Embedding     │ ◀── │  RIO Fix        │
+│    Storage      │     │ (contextualized)│     │ (auto-apply)    │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+**Features:**
+- Jina Reader primary (clean markdown with table preservation)
+- BeautifulSoup fallback on 429/503 errors
+- Token-based chunking (450 tokens for docs)
+- RIO terminology auto-correction before embedding
+- Camera extraction post-ingestion via Claude Haiku
 
 ```bash
-# Extract entities from Qdrant chunks and populate Neo4j
-uv run populate-graph
-
-# Process specific collections
-uv run populate-graph --collections docusaurus_docs gmail_cases
-
-# Limit for testing
-uv run populate-graph --max-chunks 100
+uv run ingest-docs                    # Full ingestion
+uv run ingest-docs https://custom.url # Custom URL
 ```
 
-**Entity Types**: Camera, Product, Protocol, Port, Control, Issue, Solution, Firmware, Chunk
+### Gmail Support Cases Pipeline
 
-**Relationships**: COMPATIBLE_WITH, USES_PROTOCOL, HAS_PORT, AFFECTS, RESOLVED_BY, MENTIONS
-
-### Ingestion Pipelines
-
-Two data ingestion pipelines populate the vector database:
-
-| Pipeline | Command | Description |
-|----------|---------|-------------|
-| Documentation | `uv run ingest-docs` | Fetches sitemap, scrapes via Jina Reader (BeautifulSoup fallback), chunks, embeds |
-| Support Cases | `uv run ingest-curated` | Gmail → Anonymize → Haiku → Filter → Sonnet QC → Embed |
-
-> **📖 Complete flow diagrams available in [Admin Docs](/admin/docs#data-ingestion)** after authentication.
-
-#### Gmail Support Cases Pipeline
+A 7-step pipeline processes Gmail threads into high-quality knowledge:
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                    GMAIL API                               │
-│                 Fetch threads from label                   │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                    ANONYMIZATION                           │
-│  ┌───────────────────────────────────────────--──────────┐ │
-│  │  PII Removal                                          │ │
-│  │  • Serial numbers: CY-RIO-48-12 → [SERIAL:RIO-1]      │ │
-│  │  • Emails: john@company.com → [EMAIL-1]               │ │
-│  │  • Phone numbers: +1-555-1234 → [PHONE-1]             │ │
-│  │  • Cyanview emails preserved: support@cyanview.com    │ │
-│  └───────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                  HAIKU ANALYSIS (parallel)                 │
-│  ┌───────────────────────────────────────────────────────┐ │
-│  │  Extract:                                             │ │
-│  │  • Problem summary                                    │ │
-│  │  • Solution steps                                     │ │
-│  │  • Technical keywords                                 │ │
-│  │  • Resolution confidence                              │ │
-│  │  • Case status (resolved/pending/abandoned)           │ │
-│  └───────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                    FILTER: RESOLVED ONLY                   │
-│              Keep cases with confidence >= 0.7             │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                  SONNET QC (quality control)               │
-│                Refine and validate extractions             │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────-───┐
-│                CONTEXTUALIZED EMBEDDING                    │
-│         voyage-context-3 with document context             │
-│             + BM25 sparse vectors                          │
-└────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌────────────────────────────────────────────────────────────┐
-│                    QDRANT STORAGE                          │
-│                 gmail_cases collection                     │
-│              Rich metadata for filtering                   │
-└────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 1: GMAIL API FETCH                                                    │
+│  Fetch threads from configured label (supports)                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 2: ANONYMIZATION                                                      │
+│  ┌────────────────────────────────────────────────────────────────────┐     │
+│  │  PII Removal (regex patterns):                                     │     │
+│  │  • Serial numbers: CY-RIO-48-12 → [SERIAL:RIO-1]                   │     │
+│  │  • Emails: john@company.com → [EMAIL-1]                            │     │
+│  │  • Phone numbers: +1-555-1234 → [PHONE-1]                          │     │
+│  │  • Cyanview emails preserved: support@cyanview.com                 │     │
+│  └────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 3: HAIKU ANALYSIS (parallel processing)                               │
+│  Extract: problem summary, solution steps, keywords, confidence, status     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 4: FILTER                                                             │
+│  Keep only resolved cases with confidence >= 0.7                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 5: SONNET QC (quality control)                                        │
+│  Refine and validate Haiku extractions                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 6: CONTEXTUALIZED EMBEDDING                                           │
+│  voyage-context-3 with full document context + BM25 sparse vectors          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 7: STORAGE                                                            │
+│  Qdrant (gmail_cases) + SQLite (support_cases with FTS5)                    │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Sources
+```bash
+uv run ingest-curated --max-threads 300      # Full ingestion
+uv run ingest-curated --offset 300           # Incremental
+```
 
-| Source | Description | Vector Collection |
-|--------|-------------|-------------------|
-| Documentation | Docusaurus support site pages | `docusaurus_docs` |
-| Support Cases | Curated, anonymized Gmail threads | `gmail_cases` |
-| Custom Knowledge | Admin-uploaded documents (.txt, .md, .pdf) | `custom_docs` |
-| Camera Database | Structured camera compatibility data | SQLite (relational) |
+### Custom Documents
 
-## Stack Technique
+Admin-uploaded documents for specialized knowledge:
 
-| Composant | Technologie |
-|-----------|-------------|
-| Orchestration | Claude Agent SDK 0.1.9+ |
-| Vector DB | Qdrant |
-| Graph DB | Neo4j (optional, for GraphRAG) |
-| Web Scraping | Jina Reader (BeautifulSoup fallback) |
-| Dense Embeddings | Voyage AI (voyage-context-3) |
-| Sparse Embeddings | FastEmbed BM25 |
-| Reranking | Voyage AI (rerank-2.5) |
-| LLM Synthesis | Claude Sonnet 4.5 |
-| Database | SQLite (camera + analytics) |
-| Web | FastAPI + Jinja2 |
-| Sessions | itsdangerous (signed cookies) |
-| Config | Pydantic Settings |
-| Async | AnyIO |
+**Supported formats:** .txt, .md, .pdf
+
+**Categories:**
+| Category | Description |
+|----------|-------------|
+| `product_info` | Product specifications and datasheets |
+| `troubleshooting` | Problem-solving guides |
+| `configuration` | Setup and configuration guides |
+| `firmware` | Firmware documentation |
+| `release_notes` | Version release notes |
+| `faq` | Frequently asked questions |
+| `best_practices` | Recommended practices |
+| `pre_sales` | Pre-sales technical information |
+| `internal` | Internal documentation |
+| `other` | Miscellaneous documents |
+
+```bash
+uv run import-docs ./folder --category pre_sales  # Bulk import
+```
+
+---
 
 ## Installation
 
-### Prerequis
+### Prerequisites
 
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/) package manager
-- Qdrant server (local Docker ou VPS)
+- **Python 3.10+**
+- **[uv](https://docs.astral.sh/uv/)** package manager
+- **Qdrant** server (local Docker or remote)
+- **API Keys**: Anthropic, Voyage AI
+- **Optional**: Neo4j for GraphRAG, Gmail OAuth for support cases
 
-### Setup
+### Quick Start
 
 ```bash
-# Clone le repo
+# Clone and install
 cd clorag
-
-# Installer les dependances
 uv sync
 
-# Copier et configurer l'environnement
+# Configure environment
 cp .env.example .env
-# Editer .env avec vos cles API
+# Edit .env with your API keys
+
+# Start the web server
+uv run rag-web
 ```
 
 ### Configuration
 
-Creer un fichier `.env` avec :
+Create a `.env` file with the following variables:
 
 ```env
-# API Keys (required)
+# ═══════════════════════════════════════════════════════════════════════════
+# REQUIRED - API Keys
+# ═══════════════════════════════════════════════════════════════════════════
 ANTHROPIC_API_KEY=your_anthropic_key
 VOYAGE_API_KEY=your_voyage_key
 
-# Qdrant (required)
+# ═══════════════════════════════════════════════════════════════════════════
+# REQUIRED - Qdrant Vector Database
+# ═══════════════════════════════════════════════════════════════════════════
 QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=your_qdrant_key  # optionnel
+QDRANT_API_KEY=your_qdrant_key                # Optional for local
 
-# Sources
+# ═══════════════════════════════════════════════════════════════════════════
+# REQUIRED - Admin Authentication
+# ═══════════════════════════════════════════════════════════════════════════
+ADMIN_PASSWORD=your_secure_password           # Also used for OAuth encryption
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OPTIONAL - Data Sources
+# ═══════════════════════════════════════════════════════════════════════════
 DOCUSAURUS_URL=https://your-docs-site.com
 GMAIL_LABEL=supports
 
-# Database paths (optional, defaults shown)
-DATABASE_PATH=data/clorag.db
-ANALYTICS_DATABASE_PATH=data/analytics.db
+# ═══════════════════════════════════════════════════════════════════════════
+# OPTIONAL - Database Paths
+# ═══════════════════════════════════════════════════════════════════════════
+DATABASE_PATH=data/clorag.db                  # Camera database
+ANALYTICS_DATABASE_PATH=data/analytics.db     # Search analytics
 
-# Admin authentication (required for admin features)
-ADMIN_PASSWORD=your_secure_password
-
-# SearXNG (optional, for web search augmentation)
-SEARXNG_URL=https://search.sapti.me
-
-# Neo4j (optional, for GraphRAG enrichment)
+# ═══════════════════════════════════════════════════════════════════════════
+# OPTIONAL - Neo4j GraphRAG
+# ═══════════════════════════════════════════════════════════════════════════
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_neo4j_password
+NEO4J_DATABASE=neo4j
 
-# Chunking (optional, defaults shown)
-CHUNK_USE_TOKENS=true          # Token-based chunking (recommended)
-CHUNK_SIZE_DOCS=450            # Chunk size for documentation (tokens)
-CHUNK_SIZE_CASES=350           # Chunk size for support cases (tokens)
-CHUNK_SIZE_DEFAULT=400         # Default chunk size (tokens)
-CHUNK_OVERLAP=50               # Chunk overlap (~12.5%)
+# ═══════════════════════════════════════════════════════════════════════════
+# OPTIONAL - Reranking
+# ═══════════════════════════════════════════════════════════════════════════
+RERANK_ENABLED=true
+VOYAGE_RERANK_MODEL=rerank-2.5
+RERANK_TOP_K=5
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OPTIONAL - Chunking Configuration
+# ═══════════════════════════════════════════════════════════════════════════
+CHUNK_USE_TOKENS=true                         # Token-based (recommended)
+CHUNK_SIZE_DOCS=450                           # Documentation (tokens)
+CHUNK_SIZE_CASES=350                          # Support cases (tokens)
+CHUNK_SIZE_DEFAULT=400                        # Default (tokens)
+CHUNK_OVERLAP=50                              # Overlap (~12.5%)
+CHUNK_ADAPTIVE_THRESHOLD=200                  # Single-chunk threshold
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OPTIONAL - Other Settings
+# ═══════════════════════════════════════════════════════════════════════════
+SEARXNG_URL=https://search.sapti.me           # Web search augmentation
+SECURE_COOKIES=true                           # Set false for local dev
+PROMPTS_CACHE_TTL=300                         # Prompt cache TTL (seconds)
 ```
+
+---
 
 ## Usage
 
-### Lancer l'agent (mode interactif)
+### CLI Commands
 
+#### Core Operations
 ```bash
-uv run clorag
+uv run rag-web                                # Start web server (port 8080)
+uv run clorag "query"                         # CLI agent query
+uv run clorag                                 # Interactive mode
 ```
 
-### Query unique
-
+#### Data Ingestion
 ```bash
-uv run clorag "Comment configurer l'authentification ?"
+uv run ingest-docs                            # Docusaurus documentation
+uv run ingest-curated --max-threads 300       # Gmail support threads
+uv run ingest-curated --offset N              # Incremental ingestion
+uv run import-docs ./folder --category X      # Bulk import custom docs
 ```
 
-### Ingestion des donnees
-
+#### Maintenance
 ```bash
-# Ingerer la documentation Docusaurus
-uv run ingest-docs
-
-# Ou avec URL specifique
-uv run ingest-docs https://docs.example.com
-
-# Ingerer les threads Gmail (label: supports)
-uv run ingest-gmail
-
-# Ingestion curatee avec analyse LLM (recommande)
-uv run ingest-curated --max-threads 300
-
-# Ingestion incrementale (skip premiers N threads)
-uv run ingest-curated --offset 300 --max-threads 300
+uv run enrich-cameras                         # Extract camera info from docs
+uv run populate-graph                         # Build Neo4j knowledge graph
+uv run rebuild-fts                            # Rebuild camera FTS5 index
+uv run draft-support                          # Generate auto-reply drafts
+uv run draft-support --preview                # Preview without creating
 ```
 
-### Draft Auto-Reply
-
+#### RIO Terminology Fixes
 ```bash
-# Process all unanswered threads (max 10)
-uv run draft-support
-
-# Preview drafts without creating
-uv run draft-support --preview
-
-# Process specific thread
-uv run draft-support --thread THREAD_ID
-
-# Increase limit
-uv run draft-support --max 20
+uv run fix-rio-terminology --preview          # Scan for issues
+uv run fix-rio-terminology --stats            # View statistics
+uv run fix-rio-terminology --apply            # Apply approved fixes
 ```
 
-### Database Maintenance
-
+#### Prompt Management
 ```bash
-# Rebuild camera FTS5 search index
-uv run rebuild-fts
-
-# Check FTS index status
-uv run rebuild-fts --check
+uv run init-prompts                           # Initialize prompt database
+uv run init-prompts --list                    # List all prompts
+uv run init-prompts --stats                   # Show statistics
 ```
 
-### RIO Terminology Fix
-
+#### Quality Checks
 ```bash
-# Scan chunks for RIO terminology issues
-uv run fix-rio-terminology --preview
-
-# View statistics
-uv run fix-rio-terminology --stats
-
-# Apply approved fixes (after review in admin UI)
-uv run fix-rio-terminology --apply
+uv run ruff check src/                        # Linting
+uv run mypy src/clorag --strict               # Type checking
+uv run pytest                                 # Tests
 ```
-
-**RIO Product Terminology:**
-- **RIO +WAN** - Full-featured RIO, works via LAN and WAN, for 1-128 distant cameras (REMI toolbox)
-- **RIO +LAN** - Local version, LAN only, designed as companion for 1 camera
-- **RIO** - Generic reference to hardware (when license isn't relevant)
-- Legacy terms ("RIO-Live", "RIO Live", "RIO +WAN Live") → "RIO +LAN" in license context
-- Hardware context (grounding, power, wiring) → generic "RIO"
 
 ### Web Interface
-
-```bash
-# Launch web server (port 8080)
-uv run rag-web
-```
 
 #### Public Pages
 
@@ -396,32 +532,29 @@ uv run rag-web
 
 | URL | Description |
 |-----|-------------|
-| `/admin/login` | Admin login page |
-| `/admin` | Admin dashboard with links to all features |
+| `/admin` | Dashboard with links to all features |
 | `/admin/cameras` | Camera CRUD management |
-| `/admin/knowledge` | Custom knowledge base: upload files or paste text |
+| `/admin/knowledge` | Custom knowledge base (upload/paste) |
 | `/admin/analytics` | Search analytics and statistics |
 | `/admin/drafts` | Draft auto-reply management |
-| `/admin/support-cases` | Browse and search ingested Gmail support cases |
-| `/admin/search-debug` | Debug RAG: view chunks, prompts, timing |
+| `/admin/support-cases` | Browse ingested Gmail cases |
+| `/admin/chunks` | Vector chunk browser/editor |
+| `/admin/graph` | Knowledge Graph Explorer |
+| `/admin/prompts` | LLM prompt editor with version history |
+| `/admin/terminology-fixes` | RIO terminology review |
+| `/admin/search-debug` | Debug RAG: chunks, prompts, timing |
 | `/admin/docs` | Technical documentation |
-| `/admin/chunks` | Chunk editor: browse, search, edit, delete vectors |
-| `/admin/terminology-fixes` | RIO terminology review: approve/reject fixes, batch apply |
-| `/admin/graph` | Knowledge Graph Explorer: browse entities, edit/delete relationships |
 
-Admin authentication uses secure session cookies (24-hour expiry). Set `ADMIN_PASSWORD` in your `.env` file.
+### API Reference
 
-## API Endpoints
-
-### Search
+#### Search Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/search` | RAG search with synthesis |
-| POST | `/api/search/stream` | Streaming search (SSE) |
+| `POST` | `/api/search` | RAG search with synthesis |
+| `POST` | `/api/search/stream` | Streaming search (SSE) |
 
-Both search endpoints support follow-up conversations via `session_id`:
-
+**Follow-up conversations:**
 ```json
 {
   "query": "What ports does it support?",
@@ -430,240 +563,69 @@ Both search endpoints support follow-up conversations via `session_id`:
 }
 ```
 
-Sessions maintain the last 3 Q&A exchanges for context. Session timeout: 30 minutes.
-
-### Cameras (Public)
+#### Camera Endpoints (Public)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/cameras` | List all cameras (with filters) |
-| GET | `/api/cameras/search?q=` | Search cameras (FTS5 with BM25 ranking) |
-| GET | `/api/cameras/{id}` | Get single camera |
-| GET | `/api/cameras/{id}/related` | Get similar cameras |
-| GET | `/api/cameras/stats` | Database statistics |
-| POST | `/api/cameras/compare` | Compare multiple cameras (max 5) |
-| GET | `/api/cameras/export.csv` | Export cameras as CSV |
+| `GET` | `/api/cameras` | List cameras (with filters) |
+| `GET` | `/api/cameras/search?q=` | FTS5 search with BM25 |
+| `GET` | `/api/cameras/{id}` | Get single camera |
+| `GET` | `/api/cameras/{id}/related` | Similar cameras |
+| `POST` | `/api/cameras/compare` | Compare up to 5 cameras |
+| `GET` | `/api/cameras/export.csv` | CSV export |
 
-### Cameras (Admin)
+#### Admin Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/admin/cameras` | Create camera |
-| PUT | `/api/admin/cameras/{id}` | Update camera |
-| DELETE | `/api/admin/cameras/{id}` | Delete camera |
-| POST | `/api/admin/cameras/import` | Import cameras from CSV |
+See the [API documentation](/admin/docs) for complete admin endpoint reference including:
+- Camera CRUD
+- Knowledge base management
+- Chunk editing
+- Graph operations
+- Analytics
+- Draft management
+- Support cases
+- Prompt management
 
-### Analytics (Admin)
+---
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/admin/search-stats?days=30` | Search statistics |
-| GET | `/api/admin/search/{id}` | Get stored search details |
+## Administration
 
-### Drafts (Admin)
+### Admin Features
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/admin/drafts/status` | Draft system status |
-| GET | `/api/admin/drafts/pending` | List unanswered threads |
-| GET | `/api/admin/drafts/thread/{id}` | Get thread with messages |
-| POST | `/api/admin/drafts/preview/{id}` | Preview AI-generated draft |
-| POST | `/api/admin/drafts/create/{id}` | Create draft in Gmail |
-| POST | `/api/admin/drafts/run` | Run draft pipeline |
+- **Session-based auth** with signed cookies (24-hour expiry)
+- **Brute force protection** (5 attempts → 5min lockout per IP)
+- **Rate limiting** on login and admin endpoints
 
-### Chunks (Admin)
+### Camera Database
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/admin/chunks` | List/search chunks (paginated) |
-| GET | `/api/admin/chunks/{collection}/{id}` | Get chunk details |
-| PUT | `/api/admin/chunks/{collection}/{id}` | Update chunk (re-embeds if text changed) |
-| DELETE | `/api/admin/chunks/{collection}/{id}` | Delete chunk |
+SQLite database with:
+- **FTS5 full-text search** with BM25 ranking and Porter stemming
+- **Connection pool** (5 connections, WAL mode, 64MB cache)
+- **TTL cache** (100 entries, 5-min TTL)
+- **CSV import/export** with upsert logic
+- **Side-by-side comparison** (up to 5 cameras)
+- **Related cameras** based on similarity scoring
 
-### Knowledge Base (Admin)
+### Prompt Management
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/admin/knowledge` | List custom documents |
-| GET | `/api/admin/knowledge/categories` | Get available categories |
-| GET | `/api/admin/knowledge/{id}` | Get document by ID |
-| POST | `/api/admin/knowledge` | Create document (JSON body) |
-| POST | `/api/admin/knowledge/upload` | Upload file (.txt, .md, .pdf) |
-| PUT | `/api/admin/knowledge/{id}` | Update document |
-| DELETE | `/api/admin/knowledge/{id}` | Delete document |
+All 11 LLM prompts are stored in SQLite and editable via admin UI:
 
-### Support Cases (Admin)
+| Category | Prompts |
+|----------|---------|
+| `agent` | System prompt, tool descriptions |
+| `analysis` | Thread analyzer, quality controller |
+| `synthesis` | Answer generation, Mermaid diagrams |
+| `drafts` | Auto-reply generation |
+| `graph` | Entity extraction |
+| `scripts` | Camera extraction, RIO analysis |
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/admin/support-cases` | List cases (paginated) |
-| GET | `/api/admin/support-cases/stats` | Statistics by category/product/quality |
-| GET | `/api/admin/support-cases/search?q=` | FTS5 full-text search |
-| GET | `/api/admin/support-cases/{id}` | Get case details |
-| GET | `/api/admin/support-cases/{id}/raw-thread` | Get cleaned raw thread |
-| DELETE | `/api/admin/support-cases/{id}` | Delete case |
+**Features:**
+- Version history for audit and rollback
+- Variable substitution with `{placeholder}` syntax
+- In-memory caching with configurable TTL
+- Fallback to hardcoded defaults
 
-### Graph (Admin)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/admin/graph/stats` | Knowledge graph statistics |
-| GET | `/api/admin/graph/entity-types` | List entity types with counts |
-| GET | `/api/admin/graph/relationship-types` | List relationship types with counts |
-| GET | `/api/admin/graph/entities` | List entities (paginated, filterable) |
-| GET | `/api/admin/graph/entities/{type}/{id}` | Get entity with relationships |
-| GET | `/api/admin/graph/relationships` | List relationships (filterable) |
-| DELETE | `/api/admin/graph/relationships` | Delete a relationship |
-| PATCH | `/api/admin/graph/relationships` | Update relationship type |
-
-### Authentication
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/admin/login` | Login (returns session cookie) |
-| POST | `/api/admin/logout` | Logout (clears cookie) |
-| GET | `/api/admin/session` | Check session status |
-
-## Tools RAG disponibles
-
-L'agent dispose de 4 outils de recherche avec hybrid RRF (dense + sparse vectors) + reranking :
-
-| Tool | Description |
-|------|-------------|
-| `search_docs` | Recherche dans la documentation officielle |
-| `search_cases` | Recherche dans les cas de support Gmail |
-| `search_custom` | Recherche dans les documents custom (admin-managed) |
-| `hybrid_search` | Recherche combinee (docs + cases + custom) avec RRF fusion + rerank-2.5 |
-
-## Structure du Projet
-
-```
-clorag/
-   src/clorag/
-      main.py              # Point d'entree agent
-      config.py            # Configuration Pydantic
-      core/
-         embeddings.py     # Client Voyage AI
-         sparse_embeddings.py  # FastEmbed BM25
-         reranker.py       # Voyage AI rerank-2.5 cross-encoder
-         vectorstore.py    # Client Qdrant
-         graph_store.py    # Neo4j async client
-         entity_extractor.py  # LLM entity extraction
-         retriever.py      # Multi-source retriever with reranking
-         database.py       # SQLite camera database
-         analytics_db.py   # SQLite analytics database
-         support_case_db.py  # SQLite support cases database
-      agent/
-         tools.py          # MCP tools RAG
-         prompts.py        # System prompts
-      analysis/
-         thread_analyzer.py     # Haiku analysis
-         quality_controller.py  # Sonnet QC
-         camera_extractor.py    # LLM camera extraction
-      models/
-         support_case.py   # Data models
-         camera.py         # Camera models
-      drafts/
-         gmail_service.py      # Gmail API with draft creation
-         draft_generator.py    # RAG-based response generator
-         draft_pipeline.py     # Draft creation orchestration
-         models.py             # Draft data models
-      ingestion/
-         docusaurus.py     # Pipeline Docusaurus
-         gmail.py          # Pipeline Gmail
-         curated_gmail.py  # Pipeline curated
-         chunker.py        # Text chunking
-      graph/
-         schema.py         # Graph entity models
-         enrichment.py     # Context enrichment service
-      web/
-         app.py            # FastAPI application
-         templates/        # Jinja2 templates
-            index.html           # AI Search page
-            cameras.html         # Camera compatibility
-            help.html            # User guide
-            admin_index.html     # Admin dashboard
-            admin_login.html     # Admin login
-            admin_cameras.html   # Camera management
-            admin_knowledge.html # Knowledge base (file upload)
-            admin_analytics.html # Analytics dashboard
-            admin_drafts.html    # Draft management
-            admin_support_cases.html # Support cases browser
-            admin_search_debug.html  # Search debug
-            admin_docs.html      # Technical documentation
-            admin_chunks.html    # Chunk browser
-            admin_chunk_edit.html # Chunk editor
-            camera_edit.html     # Camera edit form
-         static/           # CSS, JS assets
-      scripts/
-         ingest_docs.py    # CLI ingestion docs
-         ingest_gmail.py   # CLI ingestion Gmail
-         ingest_curated.py # CLI ingestion curated
-         populate_graph.py # CLI graph population
-         draft_support.py  # CLI draft creation
-         fix_rio_terminology.py # CLI RIO terminology fix
-         run_web.py        # CLI run web server
-   tests/
-   data/
-      clorag.db           # Camera database
-      analytics.db        # Search analytics
-```
-
-## Setup Qdrant (Docker)
-
-```bash
-docker run -d \
-  --name qdrant \
-  -p 6333:6333 \
-  -v $(pwd)/qdrant_storage:/qdrant/storage:z \
-  -e QDRANT__SERVICE__API_KEY=your_api_key \
-  qdrant/qdrant
-```
-
-## Setup Neo4j (Docker) - Optional
-
-Neo4j enables GraphRAG for knowledge graph enrichment:
-
-```bash
-docker run -d \
-  --name neo4j \
-  -p 7474:7474 -p 7687:7687 \
-  -v $(pwd)/neo4j_data:/data \
-  -e NEO4J_AUTH=neo4j/your_password \
-  neo4j:5-community
-```
-
-After starting Neo4j, populate the graph from Qdrant chunks:
-
-```bash
-uv run populate-graph
-```
-
-**Note**: GraphRAG is optional. The system gracefully degrades to vector-only search when Neo4j is not configured.
-
-## Setup Gmail OAuth
-
-1. Creer un projet sur [Google Cloud Console](https://console.cloud.google.com/)
-2. Activer Gmail API
-3. Creer OAuth 2.0 Client ID (Desktop app)
-4. Telecharger `credentials.json` a la racine du projet
-5. Au premier run, suivre le flow d'authentification
-
-## Developpement
-
-```bash
-# Installer les dependances de developpement
-uv sync --dev
-
-# Linter
-uv run ruff check src/
-
-# Type checking
-uv run mypy src/clorag --strict
-
-# Tests
-uv run pytest
-```
+---
 
 ## Deployment
 
@@ -673,38 +635,150 @@ uv run pytest
 # Build and deploy
 docker compose build
 docker compose up -d
+```
 
-# Or manual deployment
+### Manual Deployment
+
+```bash
 rsync -avz --exclude '.venv' --exclude 'data' . root@server:/opt/clorag/
 ssh root@server "cd /opt/clorag && docker compose build && docker compose up -d"
 ```
 
-### Environment Variables for Production
+### Infrastructure Setup
 
-Ensure all required environment variables are set in your deployment environment:
-
+#### Qdrant (required)
 ```bash
-ANTHROPIC_API_KEY=...
-VOYAGE_API_KEY=...
-QDRANT_URL=...
-ADMIN_PASSWORD=...  # Strong password for admin access
+docker run -d \
+  --name qdrant \
+  -p 6333:6333 \
+  -v $(pwd)/qdrant_storage:/qdrant/storage:z \
+  -e QDRANT__SERVICE__API_KEY=your_api_key \
+  qdrant/qdrant
 ```
 
-## Security Features
+#### Neo4j (optional)
+```bash
+docker run -d \
+  --name neo4j \
+  -p 7474:7474 -p 7687:7687 \
+  -v $(pwd)/neo4j_data:/data \
+  -e NEO4J_AUTH=neo4j/your_password \
+  neo4j:5-community
 
-- **Session-based authentication** with signed cookies (itsdangerous)
-- **Brute force protection** - 5 failed attempts triggers 5-minute lockout per IP
-- **Rate limiting** on login (10/min) and admin API endpoints
-- **XSS protection** with DOMPurify sanitization and HTML escaping
-- **Open redirect prevention** on login redirects
-- **HTTPS-only cookies** in production (Secure, HttpOnly, SameSite=Strict)
-- **Timing-safe password comparison** to prevent timing attacks
-- **OAuth token encryption** - Fernet encryption with PBKDF2 key derivation (480K iterations)
-- **PII anonymization** - Customer data anonymized before LLM processing
-- **SQL injection prevention** - Parameterized queries with column whitelist
+# Then populate the graph
+uv run populate-graph
+```
 
-For detailed security documentation, see [Admin Docs](/admin/docs#security) after authentication.
+---
 
-## Licence
+## Security
 
-MIT
+| Feature | Implementation |
+|---------|---------------|
+| **Session Authentication** | Signed cookies (itsdangerous) |
+| **Brute Force Protection** | 5 failed attempts → 5min lockout/IP |
+| **Rate Limiting** | 10/min login, configurable admin |
+| **XSS Protection** | DOMPurify with SVG allowlist |
+| **Open Redirect Prevention** | Validated login redirects |
+| **HTTPS Cookies** | Secure, HttpOnly, SameSite=Strict |
+| **Timing-Safe Comparison** | Prevents timing attacks |
+| **OAuth Token Encryption** | Fernet + PBKDF2 (480K iterations) |
+| **PII Anonymization** | Before LLM processing |
+| **SQL Injection Prevention** | Parameterized queries |
+
+---
+
+## Project Structure
+
+```
+clorag/
+├── src/clorag/
+│   ├── main.py                    # CLI entry point
+│   ├── config.py                  # Pydantic settings
+│   │
+│   ├── core/                      # Core infrastructure
+│   │   ├── vectorstore.py         # Qdrant client, RRF fusion
+│   │   ├── embeddings.py          # Voyage AI dense embeddings
+│   │   ├── sparse_embeddings.py   # FastEmbed BM25
+│   │   ├── reranker.py            # Voyage rerank-2.5
+│   │   ├── retriever.py           # Multi-source retriever
+│   │   ├── graph_store.py         # Neo4j async client
+│   │   ├── entity_extractor.py    # LLM entity extraction
+│   │   ├── database.py            # Camera SQLite
+│   │   ├── analytics_db.py        # Analytics SQLite
+│   │   ├── support_case_db.py     # Support cases SQLite
+│   │   ├── prompt_db.py           # Prompts SQLite
+│   │   └── metrics.py             # Performance instrumentation
+│   │
+│   ├── agent/                     # Claude Agent SDK
+│   │   ├── tools.py               # MCP tools (RAG)
+│   │   └── prompts.py             # System prompts
+│   │
+│   ├── analysis/                  # LLM analysis
+│   │   ├── thread_analyzer.py     # Haiku classification
+│   │   ├── quality_controller.py  # Sonnet QC
+│   │   ├── camera_extractor.py    # Camera info extraction
+│   │   └── rio_analyzer.py        # RIO terminology analysis
+│   │
+│   ├── ingestion/                 # Data pipelines
+│   │   ├── docusaurus.py          # Documentation crawler
+│   │   ├── curated_gmail.py       # Gmail 7-step pipeline
+│   │   ├── chunker.py             # Token-aware chunking
+│   │   └── base.py                # Base classes
+│   │
+│   ├── graph/                     # GraphRAG
+│   │   ├── schema.py              # Entity models
+│   │   └── enrichment.py          # Context enrichment
+│   │
+│   ├── services/                  # Business logic
+│   │   ├── custom_docs.py         # Document CRUD
+│   │   ├── prompt_manager.py      # Prompt management
+│   │   └── default_prompts.py     # Hardcoded defaults
+│   │
+│   ├── drafts/                    # Auto-reply system
+│   │   ├── gmail_service.py       # Gmail API
+│   │   ├── draft_generator.py     # RAG-based generation
+│   │   ├── draft_pipeline.py      # Orchestration
+│   │   └── models.py              # Data models
+│   │
+│   ├── models/                    # Data models
+│   │   ├── camera.py
+│   │   ├── custom_document.py
+│   │   └── support_case.py
+│   │
+│   ├── utils/                     # Utilities
+│   │   ├── token_encryption.py    # Fernet/PBKDF2
+│   │   ├── anonymizer.py          # PII removal
+│   │   ├── logger.py              # Logging
+│   │   └── tokenizer.py           # tiktoken counting
+│   │
+│   ├── web/                       # FastAPI application
+│   │   ├── app.py                 # Routes and handlers
+│   │   ├── templates/             # Jinja2 templates
+│   │   └── static/                # CSS, JS assets
+│   │
+│   └── scripts/                   # CLI scripts
+│       ├── ingest_docs.py
+│       ├── ingest_curated.py
+│       ├── populate_graph.py
+│       ├── draft_support.py
+│       ├── fix_rio_terminology.py
+│       └── run_web.py
+│
+├── tests/                         # Test suite
+├── data/                          # SQLite databases
+├── pyproject.toml                 # Project configuration
+└── docker-compose.yml             # Deployment config
+```
+
+---
+
+## License
+
+MIT License - See [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  <strong>Built for <a href="https://cyanview.com">Cyanview</a> Technical Support</strong>
+</p>
