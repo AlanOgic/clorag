@@ -47,7 +47,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 ### Source Layout
 
-**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool), `prompt_db.py` (LLM prompts SQLite with version history)
+**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool), `prompt_db.py` (LLM prompts SQLite with version history), `terminology_db.py` (RIO terminology fixes SQLite storage)
 
 **Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler with Jina Reader + BeautifulSoup fallback), `chunker.py`, `base.py`
 
@@ -61,11 +61,19 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Drafts** (`drafts/`): `gmail_service.py`, `draft_generator.py`, `draft_pipeline.py`
 
-**Web** (`web/app.py`): FastAPI with streaming, admin UI at `/admin/{cameras,knowledge,analytics,drafts,chunks,graph,support-cases,prompts}`, REST APIs at `/api/`
+**Web** (`web/`): FastAPI application with modular router architecture
+- `app.py` - Middleware, lifespan, app initialization
+- `routers/` - API routes by domain: `cameras.py`, `pages.py`, `search.py`, `admin/` (12 routers: analytics, auth, cameras, chunks, debug, documents, drafts, graph, prompts, support, terminology)
+- `auth/` - Authentication: `admin.py`, `csrf.py`, `sessions.py`
+- `schemas.py` - Request/response Pydantic models
+- `search/` - Search pipeline: `pipeline.py`, `synthesis.py`, `utils.py`
+- `dependencies.py` - FastAPI dependency injection
+- `templates/` - 29 Jinja2 templates including `/admin/docs` (10 doc pages)
+- Admin UI at `/admin/{cameras,knowledge,analytics,drafts,chunks,graph,support-cases,prompts,terminology-fixes}`, REST APIs at `/api/`
 
 **Models** (`models/`): `camera.py`, `custom_document.py` (10 categories), `support_case.py`
 
-**Utils** (`utils/`): `token_encryption.py` (Fernet/PBKDF2), `anonymizer.py`, `logger.py`, `tokenizer.py` (tiktoken token counting)
+**Utils** (`utils/`): `token_encryption.py` (Fernet/PBKDF2), `anonymizer.py`, `logger.py`, `tokenizer.py` (tiktoken token counting), `text_transforms.py` (RIO product name transformations)
 
 ### Vector Collections
 

@@ -708,6 +708,7 @@ clorag/
 │   │   ├── analytics_db.py        # Analytics SQLite
 │   │   ├── support_case_db.py     # Support cases SQLite
 │   │   ├── prompt_db.py           # Prompts SQLite
+│   │   ├── terminology_db.py      # RIO terminology fixes SQLite
 │   │   └── metrics.py             # Performance instrumentation
 │   │
 │   ├── agent/                     # Claude Agent SDK
@@ -750,11 +751,21 @@ clorag/
 │   │   ├── token_encryption.py    # Fernet/PBKDF2
 │   │   ├── anonymizer.py          # PII removal
 │   │   ├── logger.py              # Logging
-│   │   └── tokenizer.py           # tiktoken counting
+│   │   ├── tokenizer.py           # tiktoken counting
+│   │   └── text_transforms.py     # RIO product name transforms
 │   │
 │   ├── web/                       # FastAPI application
-│   │   ├── app.py                 # Routes and handlers
-│   │   ├── templates/             # Jinja2 templates
+│   │   ├── app.py                 # Middleware and app init
+│   │   ├── routers/               # API routes by domain
+│   │   │   ├── admin/             # Admin endpoints (12 files)
+│   │   │   ├── cameras.py         # Camera API
+│   │   │   ├── pages.py           # Page routes
+│   │   │   └── search.py          # Search API
+│   │   ├── auth/                  # Authentication module
+│   │   ├── schemas.py             # Request/response models
+│   │   ├── search/                # Search pipeline
+│   │   ├── dependencies.py        # FastAPI dependencies
+│   │   ├── templates/             # Jinja2 templates (29 files)
 │   │   └── static/                # CSS, JS assets
 │   │
 │   └── scripts/                   # CLI scripts
