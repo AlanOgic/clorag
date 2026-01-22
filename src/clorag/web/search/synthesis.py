@@ -13,7 +13,6 @@ from clorag.config import get_settings
 from clorag.services.prompt_manager import get_prompt
 from clorag.web.search.utils import build_context
 
-
 # Lazy-loaded Anthropic client
 _anthropic_client: anthropic.AsyncAnthropic | None = None
 
