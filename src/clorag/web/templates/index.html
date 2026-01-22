@@ -450,6 +450,102 @@
             color: #2e7d32;
         }
 
+        /* Export dropdown */
+        .export-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .export-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.8rem;
+            background: transparent;
+            border: 1px solid #d0e3ff;
+            border-radius: 6px;
+            color: var(--cyan-dark);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .export-btn:hover {
+            background: #e8f4fc;
+            border-color: var(--cyan-dark);
+        }
+
+        .export-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .export-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+            min-width: 180px;
+            overflow: hidden;
+        }
+
+        .export-dropdown:hover .export-menu,
+        .export-dropdown.active .export-menu {
+            display: block;
+        }
+
+        .export-menu button {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            padding: 0.6rem 1rem;
+            border: none;
+            background: none;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #333;
+            transition: background 0.15s;
+        }
+
+        .export-menu button:hover {
+            background: #f5f5f5;
+        }
+
+        .export-menu button svg {
+            width: 16px;
+            height: 16px;
+            color: #666;
+        }
+
+        .export-menu-divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 0.25rem 0;
+        }
+
+        .export-menu-label {
+            padding: 0.4rem 1rem 0.2rem;
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .answer-header-actions {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
         /* Mermaid styling is handled by applyMermaidStyles() in JavaScript */
         /* Only keep edge label styling as CSS fallback */
         .answer-content .mermaid-container svg .edgeLabel {
@@ -1149,6 +1245,9 @@
         let currentExchangeId = 0;
         let mermaidCounter = 0;
 
+        // Storage for export functionality - stores raw markdown and sources per exchange
+        const answerStore = {};
+
         // Render Mermaid diagrams in a container after streaming completes
         async function renderMermaidDiagrams(container) {
             if (!window.mermaid || !container) return;
@@ -1326,6 +1425,263 @@
             }
         }
 
+        // Toggle export menu visibility (for mobile tap)
+        function toggleExportMenu(exchangeId) {
+            const dropdown = document.getElementById(`export-dropdown-${exchangeId}`);
+            dropdown.classList.toggle('active');
+
+            // Close when clicking outside
+            const closeHandler = (e) => {
+                if (!dropdown.contains(e.target)) {
+                    dropdown.classList.remove('active');
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
+
+        // Main export dispatcher
+        async function exportAnswer(format, exchangeId) {
+            const data = answerStore[exchangeId];
+            if (!data) {
+                console.error('No data found for exchange:', exchangeId);
+                return;
+            }
+
+            // Close the dropdown menu
+            const dropdown = document.getElementById(`export-dropdown-${exchangeId}`);
+            if (dropdown) dropdown.classList.remove('active');
+
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+
+            switch (format) {
+                case 'text':
+                    exportAsText(exchangeId, timestamp);
+                    break;
+                case 'markdown':
+                    exportAsMarkdown(exchangeId, timestamp);
+                    break;
+                case 'html-svg':
+                    await exportAsHtml(exchangeId, 'svg', timestamp);
+                    break;
+                case 'html-png':
+                    await exportAsHtml(exchangeId, 'png', timestamp);
+                    break;
+            }
+        }
+
+        // Export as plain text
+        function exportAsText(exchangeId, timestamp) {
+            const content = document.getElementById(`answer-content-${exchangeId}`);
+
+            // Get text content (strips HTML)
+            const text = content.innerText || content.textContent;
+
+            downloadFile(`cyanview-answer-${timestamp}.txt`, text, 'text/plain');
+        }
+
+        // Export as raw markdown
+        function exportAsMarkdown(exchangeId, timestamp) {
+            const data = answerStore[exchangeId];
+            const markdown = data.markdown || '';
+
+            downloadFile(`cyanview-answer-${timestamp}.md`, markdown, 'text/markdown');
+        }
+
+        // Export as HTML with embedded diagrams
+        async function exportAsHtml(exchangeId, diagramFormat, timestamp) {
+            const content = document.getElementById(`answer-content-${exchangeId}`);
+            const data = answerStore[exchangeId];
+
+            // Clone the content to avoid modifying the original
+            const clone = content.cloneNode(true);
+
+            // Remove copy buttons from mermaid containers
+            clone.querySelectorAll('.mermaid-copy-btn').forEach(btn => btn.remove());
+
+            // Convert SVG diagrams to embedded images
+            const mermaidContainers = clone.querySelectorAll('.mermaid-container');
+
+            for (const container of mermaidContainers) {
+                const svg = container.querySelector('svg');
+                if (svg) {
+                    try {
+                        let imgSrc;
+                        if (diagramFormat === 'png') {
+                            imgSrc = await svgToPngBase64(svg);
+                        } else {
+                            imgSrc = svgToBase64(svg);
+                        }
+
+                        // Create img element to replace SVG
+                        const img = document.createElement('img');
+                        img.src = imgSrc;
+                        img.alt = 'Mermaid diagram';
+                        img.style.maxWidth = '100%';
+                        img.style.height = 'auto';
+
+                        // Replace container content with img
+                        container.innerHTML = '';
+                        container.appendChild(img);
+                    } catch (error) {
+                        console.error('Failed to convert diagram:', error);
+                    }
+                }
+            }
+
+            // Get the modified HTML
+            const bodyHtml = clone.innerHTML;
+
+            // Wrap in full HTML document
+            const fullHtml = wrapInHtmlDocument(bodyHtml, data.query);
+
+            downloadFile(`cyanview-answer-${timestamp}.html`, fullHtml, 'text/html');
+        }
+
+        // Convert SVG element to base64 data URL
+        function svgToBase64(svgElement) {
+            // Clone to avoid modifying original
+            const clone = svgElement.cloneNode(true);
+
+            // Ensure xmlns attribute for cross-browser compatibility
+            if (!clone.getAttribute('xmlns')) {
+                clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            }
+
+            const svgString = new XMLSerializer().serializeToString(clone);
+            // encodeURIComponent handles Unicode characters properly
+            return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+        }
+
+        // Convert SVG element to PNG base64 via Canvas API
+        async function svgToPngBase64(svgElement) {
+            // Clone to avoid modifying original
+            const clone = svgElement.cloneNode(true);
+
+            // Ensure xmlns for proper image loading
+            if (!clone.getAttribute('xmlns')) {
+                clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            }
+
+            const svgString = new XMLSerializer().serializeToString(clone);
+            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Get actual rendered dimensions
+                    const rect = svgElement.getBoundingClientRect();
+                    const scale = 2;  // 2x for retina/HiDPI displays
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = rect.width * scale;
+                    canvas.height = rect.height * scale;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.scale(scale, scale);
+                    ctx.drawImage(img, 0, 0, rect.width, rect.height);
+
+                    URL.revokeObjectURL(url);  // Memory cleanup
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('Failed to load SVG as image'));
+                };
+                img.src = url;
+            });
+        }
+
+        // Wrap content in a full HTML document
+        function wrapInHtmlDocument(bodyContent, query) {
+            const title = query ? `Cyanview: ${query.slice(0, 50)}${query.length > 50 ? '...' : ''}` : 'Cyanview Answer Export';
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(title)}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+            color: #333;
+        }
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            background: #f0f0f0;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1rem auto;
+        }
+        .mermaid-container {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+        }
+        h1, h2, h3 {
+            color: #1a1a2e;
+            margin-top: 1.5rem;
+        }
+        a {
+            color: #0077b6;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #e0e0e0;
+            margin: 2rem 0;
+        }
+        ul, ol {
+            margin-left: 1.5rem;
+        }
+        li {
+            margin-bottom: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+${bodyContent}
+</body>
+</html>`;
+        }
+
+        // Download file utility
+        function downloadFile(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);  // Memory cleanup
+        }
+
         // Help modal
         const helpLink = document.getElementById('help-link');
         const helpModal = document.getElementById('help-modal');
@@ -1407,6 +1763,44 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                         </svg>
                         <span class="answer-title">AI Answer</span>
+                        <div class="answer-header-actions">
+                            <div class="export-dropdown" id="export-dropdown-${exchangeId}">
+                                <button class="export-btn" title="Export answer" onclick="toggleExportMenu(${exchangeId})">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    <span>Export</span>
+                                </button>
+                                <div class="export-menu">
+                                    <button onclick="exportAnswer('text', ${exchangeId})">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Text (.txt)
+                                    </button>
+                                    <button onclick="exportAnswer('markdown', ${exchangeId})">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                        </svg>
+                                        Markdown (.md)
+                                    </button>
+                                    <div class="export-menu-divider"></div>
+                                    <div class="export-menu-label">HTML with diagrams</div>
+                                    <button onclick="exportAnswer('html-svg', ${exchangeId})">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        SVG (vector)
+                                    </button>
+                                    <button onclick="exportAnswer('html-png', ${exchangeId})">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        PNG (raster)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="answer-content" id="answer-content-${exchangeId}"></div>
                 </div>
@@ -1515,10 +1909,19 @@
                                     // Hide info section when streaming begins
                                     if (fullText === '' && infoSection) {
                                         infoSection.style.display = 'none';
+                                        // Initialize answerStore for this exchange
+                                        answerStore[exchangeId] = { markdown: '', sources: [], query: query };
                                     }
                                     fullText += data.text;
+                                    // Store raw markdown for export
+                                    answerStore[exchangeId].markdown = fullText;
                                     // Render markdown incrementally with XSS protection
                                     answerContentEl.innerHTML = safeMarkdown(fullText);
+                                } else if (data.type === 'sources') {
+                                    // Store sources for export
+                                    if (answerStore[exchangeId]) {
+                                        answerStore[exchangeId].sources = data.sources || [];
+                                    }
                                 } else if (data.type === 'done') {
                                     // Final render with XSS protection
                                     answerContentEl.innerHTML = safeMarkdown(fullText);

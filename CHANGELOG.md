@@ -2,6 +2,27 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.6.2] - 2026-01-22
+
+### Added
+- **Answer Export Feature**
+  - Export AI answers in multiple formats: Text (.txt), Markdown (.md), HTML with diagrams
+  - HTML export options: SVG (vector quality) or PNG (raster, universal compatibility)
+  - Export dropdown menu in each answer card header
+  - Mermaid diagrams converted to embedded base64 images in HTML exports
+  - PNG export uses 2x scaling for retina/HiDPI display quality
+  - Mobile-friendly dropdown with tap-to-toggle support
+  - Filenames: `cyanview-answer-YYYY-MM-DD-HH-MM-SS.{txt|md|html}`
+
+### Technical Details
+- Client-side JavaScript implementation (no server changes required)
+- `answerStore` object stores raw markdown during streaming for accurate markdown export
+- SVG to PNG conversion via Canvas API with `XMLSerializer`
+- Blob-based file download with automatic memory cleanup via `URL.revokeObjectURL()`
+
+### Files
+- `src/clorag/web/templates/index.html` - Export dropdown UI, CSS, and JavaScript functions
+
 ## [0.5.8] - 2026-01-21
 
 ### Added
