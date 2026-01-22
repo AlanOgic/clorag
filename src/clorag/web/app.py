@@ -1,24 +1,18 @@
 """FastAPI web application for AI Search with Claude synthesis."""
 
-import asyncio
 import io
 import json
 import secrets
 import time
-import uuid
 import zipfile
-from collections import OrderedDict
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 if TYPE_CHECKING:
-    from qdrant_client.http.models import SparseVector
+    pass
 
-import anthropic
 import anyio
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -41,8 +35,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from pydantic import BaseModel, Field
+from itsdangerous import BadSignature, SignatureExpired
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -52,33 +45,66 @@ from starlette.responses import JSONResponse
 from clorag.config import get_settings
 from clorag.core.analytics_db import AnalyticsDatabase
 from clorag.core.database import get_camera_database
-from clorag.core.embeddings import EmbeddingsClient
-from clorag.core.metrics import (
-    get_metrics_collector,
-    measure_embedding_generation,
-    measure_total_search,
-    measure_vector_search,
-)
-from clorag.core.reranker import RerankerClient
-from clorag.core.sparse_embeddings import SparseEmbeddingsClient
-from clorag.core.vectorstore import VectorStore
+from clorag.core.metrics import get_metrics_collector
 from clorag.models.camera import Camera, CameraCreate, CameraSource, CameraUpdate
 from clorag.models.custom_document import (
     CustomDocument,
     CustomDocumentCreate,
-    CustomDocumentListItem,
     CustomDocumentUpdate,
     DocumentCategory,
 )
 from clorag.services.custom_docs import CustomDocumentService
 from clorag.services.prompt_manager import get_prompt
 
+# Import auth module
+from clorag.web.auth import (
+    ADMIN_SESSION_COOKIE,
+    ADMIN_SESSION_MAX_AGE,
+    LOGIN_LOCKOUT_DURATION,
+    generate_csrf_token,
+    get_login_tracker,
+    get_session_serializer,
+    get_session_store,
+    verify_admin,
+)
+
+# Import schemas
+from clorag.web.schemas import (
+    ChunkCollection,
+    ChunkDetail,
+    ChunkListItem,
+    ChunkListResponse,
+    ChunkUpdate,
+    DebugSearchResponse,
+    KnowledgeListResponse,
+    LoginRequest,
+    LoginResponse,
+    PromptCreateFromDefaultRequest,
+    PromptRollbackRequest,
+    PromptTestRequest,
+    PromptUpdateRequest,
+    RelationshipDeleteRequest,
+    RelationshipUpdateRequest,
+    SearchRequest,
+    SearchResponse,
+    TerminologyBatchStatusUpdate,
+    TerminologyStatusUpdate,
+)
+
+# Import search module
+from clorag.web.search import (
+    extract_source_links,
+    get_anthropic,
+    get_embeddings,
+    get_sparse_embeddings,
+    get_vectorstore,
+    perform_search,
+    synthesize_answer,
+    synthesize_answer_stream,
+)
+
 # Initialize logger
 logger = structlog.get_logger()
-
-# Graph enrichment (optional - graceful degradation if Neo4j unavailable)
-_graph_enrichment_available: bool | None = None
-_graph_enrichment_service = None
 
 
 # =============================================================================
@@ -274,54 +300,8 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # Initialize clients (lazy loading)
-_vectorstore: VectorStore | None = None
-_embeddings: EmbeddingsClient | None = None
-_sparse_embeddings: SparseEmbeddingsClient | None = None
-_reranker: RerankerClient | None = None
-_anthropic: anthropic.AsyncAnthropic | None = None
 _analytics_db: AnalyticsDatabase | None = None
 _custom_docs_service: CustomDocumentService | None = None
-
-
-def get_vectorstore() -> VectorStore:
-    """Get or create VectorStore instance."""
-    global _vectorstore
-    if _vectorstore is None:
-        _vectorstore = VectorStore()
-    return _vectorstore
-
-
-def get_embeddings() -> EmbeddingsClient:
-    """Get or create EmbeddingsClient instance."""
-    global _embeddings
-    if _embeddings is None:
-        _embeddings = EmbeddingsClient()
-    return _embeddings
-
-
-def get_sparse_embeddings() -> SparseEmbeddingsClient:
-    """Get or create SparseEmbeddingsClient instance for BM25."""
-    global _sparse_embeddings
-    if _sparse_embeddings is None:
-        _sparse_embeddings = SparseEmbeddingsClient()
-    return _sparse_embeddings
-
-
-def get_reranker() -> RerankerClient:
-    """Get or create RerankerClient instance for result reranking."""
-    global _reranker
-    if _reranker is None:
-        _reranker = RerankerClient()
-    return _reranker
-
-
-def get_anthropic() -> anthropic.AsyncAnthropic:
-    """Get or create Anthropic client."""
-    global _anthropic
-    if _anthropic is None:
-        settings = get_settings()
-        _anthropic = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value())
-    return _anthropic
 
 
 def get_analytics_db() -> AnalyticsDatabase:
@@ -339,336 +319,6 @@ def get_custom_docs_service() -> CustomDocumentService:
     if _custom_docs_service is None:
         _custom_docs_service = CustomDocumentService()
     return _custom_docs_service
-
-
-async def get_graph_enrichment():
-    """Get graph enrichment service if Neo4j is available.
-
-    Returns None if Neo4j is not configured or unavailable.
-    Caches availability check to avoid repeated connection attempts.
-    """
-    global _graph_enrichment_available, _graph_enrichment_service
-
-    # Already checked and not available
-    if _graph_enrichment_available is False:
-        return None
-
-    # Already initialized
-    if _graph_enrichment_service is not None:
-        return _graph_enrichment_service
-
-    # Try to initialize
-    settings = get_settings()
-    if not settings.neo4j_password:
-        _graph_enrichment_available = False
-        logger.info("graph_enrichment_disabled", reason="no_neo4j_password")
-        return None
-
-    try:
-        from clorag.graph.enrichment import get_enrichment_service
-        _graph_enrichment_service = await get_enrichment_service()
-        _graph_enrichment_available = True
-        logger.info("graph_enrichment_enabled")
-        return _graph_enrichment_service
-    except Exception as e:
-        _graph_enrichment_available = False
-        logger.warning("graph_enrichment_unavailable", error=str(e))
-        return None
-
-
-# =============================================================================
-# Conversation Session Management
-# =============================================================================
-
-MAX_CONVERSATION_HISTORY = 3  # Keep last 3 Q&A exchanges
-SESSION_TTL_SECONDS = 30 * 60  # 30 minutes session timeout
-MAX_SESSIONS = 1000  # Maximum concurrent sessions
-
-
-@dataclass
-class ConversationExchange:
-    """A single Q&A exchange in the conversation."""
-
-    query: str
-    answer: str
-    timestamp: float = field(default_factory=time.time)
-
-
-@dataclass
-class ConversationSession:
-    """Server-side conversation session with history."""
-
-    session_id: str
-    exchanges: list[ConversationExchange] = field(default_factory=list)
-    created_at: float = field(default_factory=time.time)
-    last_accessed: float = field(default_factory=time.time)
-
-    def add_exchange(self, query: str, answer: str) -> None:
-        """Add a new exchange and trim to max history."""
-        self.exchanges.append(ConversationExchange(query=query, answer=answer))
-        # Keep only the last N exchanges
-        if len(self.exchanges) > MAX_CONVERSATION_HISTORY:
-            self.exchanges = self.exchanges[-MAX_CONVERSATION_HISTORY:]
-        self.last_accessed = time.time()
-
-    def get_context_messages(self) -> list[dict]:
-        """Get conversation history as Claude message format."""
-        messages = []
-        for exchange in self.exchanges:
-            messages.append({"role": "user", "content": exchange.query})
-            messages.append({"role": "assistant", "content": exchange.answer})
-        return messages
-
-    def is_expired(self) -> bool:
-        """Check if session has expired."""
-        return (time.time() - self.last_accessed) > SESSION_TTL_SECONDS
-
-
-class SessionStore:
-    """Thread-safe session store with LRU eviction and TTL."""
-
-    def __init__(self, max_sessions: int = MAX_SESSIONS) -> None:
-        self._sessions: OrderedDict[str, ConversationSession] = OrderedDict()
-        self._max_sessions = max_sessions
-
-    def create_session(self) -> ConversationSession:
-        """Create a new conversation session."""
-        self._cleanup_expired()
-        session_id = str(uuid.uuid4())
-        session = ConversationSession(session_id=session_id)
-        self._sessions[session_id] = session
-        self._sessions.move_to_end(session_id)
-        # Evict oldest if over limit
-        while len(self._sessions) > self._max_sessions:
-            self._sessions.popitem(last=False)
-        return session
-
-    def get_session(self, session_id: str) -> ConversationSession | None:
-        """Get a session by ID, returns None if not found or expired."""
-        session = self._sessions.get(session_id)
-        if session is None:
-            return None
-        if session.is_expired():
-            del self._sessions[session_id]
-            return None
-        session.last_accessed = time.time()
-        self._sessions.move_to_end(session_id)
-        return session
-
-    def get_or_create_session(self, session_id: str | None) -> ConversationSession:
-        """Get existing session or create new one."""
-        if session_id:
-            session = self.get_session(session_id)
-            if session:
-                return session
-        return self.create_session()
-
-    def _cleanup_expired(self) -> None:
-        """Remove expired sessions (called periodically)."""
-        expired = [sid for sid, s in self._sessions.items() if s.is_expired()]
-        for sid in expired:
-            del self._sessions[sid]
-
-
-# Global session store
-_session_store: SessionStore | None = None
-
-
-def get_session_store() -> SessionStore:
-    """Get or create session store singleton."""
-    global _session_store
-    if _session_store is None:
-        _session_store = SessionStore()
-    return _session_store
-
-
-def _compute_dynamic_threshold(query: str, results: list) -> float:
-    """Compute a dynamic score threshold based on query and result characteristics.
-
-    Short/vague queries get lower thresholds to avoid over-filtering.
-    Specific queries (with model numbers, technical terms) get higher thresholds.
-
-    Args:
-        query: The search query.
-        results: List of search results with scores.
-
-    Returns:
-        Dynamic threshold value (0.0-1.0 for RRF scores).
-    """
-    if not results:
-        return 0.0
-
-    # Base threshold varies by query length (short queries = lower threshold)
-    query_words = len(query.split())
-    if query_words <= 2:
-        base_threshold = 0.15  # Very short queries - be permissive
-    elif query_words <= 5:
-        base_threshold = 0.20  # Medium queries
-    else:
-        base_threshold = 0.25  # Longer, more specific queries
-
-    # Check for specific technical terms that indicate precise intent
-    technical_indicators = [
-        "rio", "rcp", "ci0", "vp4", "firmware", "ip", "port", "error", "protocol"
-    ]
-    has_technical = any(term in query.lower() for term in technical_indicators)
-    if has_technical:
-        base_threshold += 0.05
-
-    # Compute score distribution to set adaptive cutoff
-    scores = [r.score for r in results]
-    if len(scores) >= 3:
-        mean_score = sum(scores) / len(scores)
-        # Don't filter below mean if most results are relevant
-        threshold = min(base_threshold, mean_score * 0.6)
-    else:
-        threshold = base_threshold
-
-    return threshold
-
-
-def _filter_by_dynamic_threshold(
-    results: list,
-    chunks: list[dict],
-    query: str,
-) -> tuple[list, list[dict]]:
-    """Filter results using dynamic threshold based on query characteristics.
-
-    Args:
-        results: Search results list.
-        chunks: Corresponding chunks for synthesis.
-        query: Original search query.
-
-    Returns:
-        Filtered (results, chunks) tuple.
-    """
-    if not results:
-        return results, chunks
-
-    threshold = _compute_dynamic_threshold(query, results)
-
-    filtered_results = []
-    filtered_chunks = []
-    for result, chunk in zip(results, chunks):
-        if result.score >= threshold:
-            filtered_results.append(result)
-            filtered_chunks.append(chunk)
-
-    # Always return at least top 3 results even if below threshold
-    if len(filtered_results) < 3 and len(results) >= 3:
-        return results[:3], chunks[:3]
-
-    return filtered_results, filtered_chunks
-
-
-def _build_context(
-    chunks: list[dict],
-    max_chunks: int = 8,
-    graph_context: str | None = None,
-) -> str:
-    """Build context string from chunks for Claude synthesis.
-
-    Args:
-        chunks: Retrieved document chunks.
-        max_chunks: Maximum chunks to include.
-        graph_context: Optional graph enrichment context string.
-    """
-    parts = []
-
-    # Add graph context first if available
-    if graph_context:
-        parts.append(f"[Knowledge Graph Relationships]\n{graph_context}")
-
-    for i, chunk in enumerate(chunks[:max_chunks], 1):
-        text = chunk.get("text", "")[:2000]
-        source_type = chunk.get("source_type")
-        if source_type == "documentation":
-            parts.append(f"[{i} Doc: {chunk.get('url', '')}]\n{text}")
-        elif source_type == "custom_docs":
-            url = chunk.get("url") or "Custom Knowledge"
-            parts.append(f"[{i} Knowledge: {url}]\n{text}")
-        else:
-            parts.append(f"[{i} Case: {chunk.get('subject', 'Support')}]\n{text}")
-    return "\n---\n".join(parts)
-
-
-class SearchSource(str, Enum):
-    """Search source options."""
-
-    DOCS = "docs"
-    GMAIL = "gmail"
-    BOTH = "both"
-
-
-class SearchRequest(BaseModel):
-    """Search request model."""
-
-    query: str = Field(..., min_length=1, max_length=2000)
-    source: SearchSource = SearchSource.BOTH
-    limit: int = Field(10, ge=1, le=50)
-    session_id: str | None = Field(None, description="Session ID for follow-up conversations")
-
-
-class SourceLink(BaseModel):
-    """A source link for the answer."""
-
-    title: str
-    url: str | None = None
-    source_type: str  # "documentation" or "gmail_case"
-
-
-class SearchResult(BaseModel):
-    """Individual search result."""
-
-    score: float
-    source: str
-    title: str
-    url: str | None = None
-    subject: str | None = None
-    snippet: str
-    metadata: dict
-
-
-class SearchResponse(BaseModel):
-    """Search response model with AI-generated answer."""
-
-    query: str
-    source: str
-    answer: str  # Claude-generated comprehensive answer
-    source_links: list[SourceLink]  # Top 3 relevant sources
-    results: list[SearchResult]
-    total: int
-    session_id: str | None = None  # Session ID for follow-up conversations
-
-
-def _extract_source_links(
-    chunks: list[dict],
-    max_links: int = 3,
-    as_model: bool = False,
-) -> list[SourceLink] | list[dict]:
-    """Extract unique source links from chunks."""
-    seen: set[str] = set()
-    links: list = []
-
-    for chunk in chunks:
-        if len(links) >= max_links:
-            break
-
-        if chunk.get("source_type") == "documentation":
-            url = chunk.get("url")
-            if url and url not in seen:
-                seen.add(url)
-                link = {"title": chunk.get("title", "Documentation"), "url": url, "source_type": "documentation"}
-                links.append(SourceLink(**link) if as_model else link)
-        else:
-            subject = chunk.get("subject", "Support Case")
-            key = f"case:{subject}"
-            if key not in seen:
-                seen.add(key)
-                link = {"title": subject, "url": None, "source_type": "gmail_case"}
-                links.append(SourceLink(**link) if as_model else link)
-
-    return links
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -692,315 +342,6 @@ async def health():
     return {"status": "healthy", "version": "1.0.0"}
 
 
-async def synthesize_answer(
-    query: str,
-    chunks: list[dict],
-    conversation_history: list[dict] | None = None,
-    graph_context: str | None = None,
-) -> str:
-    """Use Claude Haiku to synthesize an answer from retrieved chunks.
-
-    Args:
-        query: The user's question.
-        chunks: Retrieved context chunks.
-        conversation_history: Optional list of previous messages for follow-up context.
-        graph_context: Optional graph enrichment context string.
-    """
-    if not chunks:
-        return "No relevant information found for your query."
-
-    settings = get_settings()
-    context = _build_context(chunks, graph_context=graph_context)
-
-    # Build messages with conversation history
-    messages = []
-    if conversation_history:
-        messages.extend(conversation_history)
-    messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
-
-    response = await get_anthropic().messages.create(
-        model=settings.sonnet_model,
-        max_tokens=1500,
-        system=get_prompt("synthesis.web_answer"),
-        messages=messages,
-    )
-    return response.content[0].text
-
-
-async def synthesize_answer_stream(
-    query: str,
-    chunks: list[dict],
-    conversation_history: list[dict] | None = None,
-    graph_context: str | None = None,
-):
-    """Stream answer synthesis using Claude Haiku.
-
-    Args:
-        query: The user's question.
-        chunks: Retrieved context chunks.
-        conversation_history: Optional list of previous messages for follow-up context.
-        graph_context: Optional graph enrichment context string.
-    """
-    if not chunks:
-        yield "No relevant information found for your query."
-        return
-
-    settings = get_settings()
-    context = _build_context(chunks, graph_context=graph_context)
-
-    # Build messages with conversation history
-    messages = []
-    if conversation_history:
-        messages.extend(conversation_history)
-    messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
-
-    async with get_anthropic().messages.stream(
-        model=settings.sonnet_model,
-        max_tokens=1500,
-        system=get_prompt("synthesis.web_answer"),
-        messages=messages,
-    ) as stream:
-        async for text in stream.text_stream:
-            yield text
-
-
-async def _generate_embeddings_parallel(
-    query: str,
-) -> tuple[list[float], "SparseVector"]:
-    """Generate dense and sparse embeddings in parallel.
-
-    Runs dense embedding (async API call) and sparse embedding (sync BM25)
-    concurrently to reduce query latency by ~100ms.
-
-    Args:
-        query: Search query text.
-
-    Returns:
-        Tuple of (dense_vector, sparse_vector).
-    """
-    with measure_embedding_generation(metadata={"query_length": len(query)}):
-        emb = get_embeddings()
-        sparse_emb = get_sparse_embeddings()
-
-        # Run dense (async) and sparse (sync wrapped) in parallel
-        dense_task = emb.embed_query(query)
-        sparse_task = asyncio.to_thread(sparse_emb.embed_query, query)
-
-        dense_vector, sparse_vector = await asyncio.gather(dense_task, sparse_task)
-    return dense_vector, sparse_vector
-
-
-async def _perform_search(
-    req: SearchRequest,
-) -> tuple[list[SearchResult], list[dict], str | None, bool]:
-    """Perform hybrid search and return results with chunks for synthesis.
-
-    Uses hybrid search (dense + sparse vectors) with RRF fusion for better
-    results on queries with specific model numbers or technical terms.
-    Optionally applies reranking with Voyage rerank-2.5 for improved relevance.
-
-    Returns:
-        Tuple of (search_results, chunks_for_synthesis, graph_context, reranked)
-    """
-    settings = get_settings()
-    metrics = get_metrics_collector()
-    metrics.record_query()
-    rerank_enabled = settings.rerank_enabled
-    reranker = get_reranker()
-
-    with measure_total_search(metadata={"source": req.source.value, "limit": req.limit}):
-        vs = get_vectorstore()
-
-        # Generate dense and sparse embeddings in parallel for better latency
-        dense_vector, sparse_vector = await _generate_embeddings_parallel(req.query)
-
-        # Over-fetch when reranking is enabled (3x the limit, min 15)
-        fetch_limit = max(req.limit * 3, 15) if rerank_enabled else req.limit
-
-        results: list[SearchResult] = []
-        chunks_for_synthesis: list[dict] = []
-
-        if req.source == SearchSource.DOCS:
-            # Search only documentation with hybrid RRF
-            with measure_vector_search(metadata={"collection": "docs", "limit": fetch_limit}):
-                docs = await vs.search_docs_hybrid(dense_vector, sparse_vector, limit=fetch_limit)
-            for doc in docs:
-                results.append(
-                    SearchResult(
-                        score=doc.score,
-                        source="documentation",
-                        title=doc.payload.get("title", "Untitled"),
-                        url=doc.payload.get("url"),
-                        snippet=_truncate(doc.payload.get("text", ""), 300),
-                        metadata=doc.payload,
-                    )
-                )
-                chunks_for_synthesis.append({
-                    "text": doc.payload.get("text", ""),
-                    "source_type": "documentation",
-                    "url": doc.payload.get("url"),
-                    "title": doc.payload.get("title", "Untitled"),
-                })
-
-        elif req.source == SearchSource.GMAIL:
-            # Search only Gmail cases with hybrid RRF
-            with measure_vector_search(metadata={"collection": "gmail", "limit": fetch_limit}):
-                cases = await vs.search_cases_hybrid(dense_vector, sparse_vector, limit=fetch_limit)
-            for case in cases:
-                results.append(
-                    SearchResult(
-                        score=case.score,
-                        source="gmail_case",
-                        title=case.payload.get("subject", "No Subject"),
-                        subject=case.payload.get("subject"),
-                        snippet=_truncate(case.payload.get("text", ""), 300),
-                        metadata=case.payload,
-                    )
-                )
-                chunks_for_synthesis.append({
-                    "text": case.payload.get("text", ""),
-                    "source_type": "gmail_case",
-                    "subject": case.payload.get("subject", "Support Case"),
-                })
-
-        else:
-            # Hybrid RRF search across all collections (docs, cases, custom_docs)
-            with measure_vector_search(metadata={"collection": "all", "limit": fetch_limit}):
-                hybrid = await vs.hybrid_search_rrf(dense_vector, sparse_vector, limit=fetch_limit)
-            for item in hybrid:
-                source_type = item.payload.get("_source", "unknown")
-                if source_type == "documentation":
-                    results.append(
-                        SearchResult(
-                            score=item.score,
-                            source="documentation",
-                            title=item.payload.get("title", "Untitled"),
-                            url=item.payload.get("url"),
-                            snippet=_truncate(item.payload.get("text", ""), 300),
-                            metadata=item.payload,
-                        )
-                    )
-                    chunks_for_synthesis.append({
-                        "text": item.payload.get("text", ""),
-                        "source_type": "documentation",
-                        "url": item.payload.get("url"),
-                        "title": item.payload.get("title", "Untitled"),
-                    })
-                elif source_type == "custom_docs":
-                    results.append(
-                        SearchResult(
-                            score=item.score,
-                            source="custom_docs",
-                            title=item.payload.get("title", "Custom Knowledge"),
-                            url=item.payload.get("url_reference"),
-                            snippet=_truncate(item.payload.get("text", ""), 300),
-                            metadata=item.payload,
-                        )
-                    )
-                    chunks_for_synthesis.append({
-                        "text": item.payload.get("text", ""),
-                        "source_type": "custom_docs",
-                        "url": item.payload.get("url_reference"),
-                        "title": item.payload.get("title", "Custom Knowledge"),
-                    })
-                else:
-                    results.append(
-                        SearchResult(
-                            score=item.score,
-                            source="gmail_case",
-                            title=item.payload.get("subject", "No Subject"),
-                            subject=item.payload.get("subject"),
-                            snippet=_truncate(item.payload.get("text", ""), 300),
-                            metadata=item.payload,
-                        )
-                    )
-                    chunks_for_synthesis.append({
-                        "text": item.payload.get("text", ""),
-                        "source_type": "gmail_case",
-                        "subject": item.payload.get("subject", "Support Case"),
-                    })
-
-        # Apply dynamic threshold filtering based on query characteristics
-        results, chunks_for_synthesis = _filter_by_dynamic_threshold(
-            results, chunks_for_synthesis, req.query
-        )
-
-        # Apply reranking if enabled and we have results
-        was_reranked = False
-        if rerank_enabled and results and chunks_for_synthesis:
-            try:
-                # Extract texts for reranking
-                texts_to_rerank = [c.get("text", "") for c in chunks_for_synthesis]
-
-                # Rerank using Voyage AI
-                rerank_response = reranker.rerank(
-                    query=req.query,
-                    documents=texts_to_rerank,
-                    top_k=req.limit,
-                )
-
-                # Reorder results and chunks based on rerank scores
-                reranked_results: list[SearchResult] = []
-                reranked_chunks: list[dict] = []
-                for rr in rerank_response.results:
-                    idx = rr.index
-                    if idx < len(results):
-                        # Update score to reranker score
-                        orig = results[idx]
-                        reranked_results.append(SearchResult(
-                            score=rr.relevance_score,
-                            source=orig.source,
-                            title=orig.title,
-                            url=orig.url,
-                            subject=orig.subject,
-                            snippet=orig.snippet,
-                            metadata=orig.metadata,
-                        ))
-                        reranked_chunks.append(chunks_for_synthesis[idx])
-
-                results = reranked_results
-                chunks_for_synthesis = reranked_chunks
-                was_reranked = True
-                logger.debug(
-                    "reranking_applied",
-                    query_len=len(req.query),
-                    original_count=len(texts_to_rerank),
-                    reranked_count=len(results),
-                )
-            except Exception as e:
-                logger.warning("reranking_failed", error=str(e))
-                # Fall back to original results, trim to limit
-                results = results[:req.limit]
-                chunks_for_synthesis = chunks_for_synthesis[:req.limit]
-        else:
-            # No reranking, just trim to limit
-            results = results[:req.limit]
-            chunks_for_synthesis = chunks_for_synthesis[:req.limit]
-
-        # Get graph enrichment if available
-        graph_context = None
-        try:
-            enrichment = await get_graph_enrichment()
-            if enrichment and results:
-                # Extract chunk IDs for graph traversal
-                chunk_ids = []
-                for result in results[:5]:  # Top 5 chunks
-                    if hasattr(result, "metadata") and result.metadata:
-                        chunk_id = result.metadata.get("id") or result.metadata.get("chunk_id")
-                        if chunk_id:
-                            chunk_ids.append(str(chunk_id))
-
-                if chunk_ids:
-                    enrichment_ctx = await enrichment.enrich_from_chunks(chunk_ids)
-                    graph_context = enrichment_ctx.to_context_string()
-                    if graph_context:
-                        logger.debug("graph_enrichment_added", context_len=len(graph_context))
-        except Exception as e:
-            logger.debug("graph_enrichment_skipped", error=str(e))
-
-        return results, chunks_for_synthesis, graph_context, was_reranked
-
-
 @app.post("/api/search/stream")
 @limiter.limit("30/minute")
 async def search_stream(request: Request, req: SearchRequest):
@@ -1021,10 +362,10 @@ async def search_stream(request: Request, req: SearchRequest):
     conversation_history = session.get_context_messages()
 
     # Use helper to perform search
-    _, chunks_for_synthesis, graph_context, was_reranked = await _perform_search(req)
+    _, chunks_for_synthesis, graph_context, was_reranked = await perform_search(req)
 
     # Extract top 3 unique source links
-    source_links = _extract_source_links(chunks_for_synthesis)
+    source_links = extract_source_links(chunks_for_synthesis)
 
     # Capture start time for analytics
     search_start_time = start_time
@@ -1100,7 +441,7 @@ async def search(request: Request, req: SearchRequest):
     conversation_history = session.get_context_messages()
 
     # Use helper to perform search
-    results, chunks_for_synthesis, graph_context, was_reranked = await _perform_search(req)
+    results, chunks_for_synthesis, graph_context, was_reranked = await perform_search(req)
 
     # Generate synthesized answer using Claude with conversation history and graph context
     answer = await synthesize_answer(
@@ -1111,7 +452,7 @@ async def search(request: Request, req: SearchRequest):
     session.add_exchange(req.query, answer)
 
     # Extract top 3 unique source links
-    source_links = _extract_source_links(chunks_for_synthesis, as_model=True)
+    source_links = extract_source_links(chunks_for_synthesis, as_model=True)
 
     # Log search to analytics with full data (non-blocking)
     response_time_ms = int((time.time() - start_time) * 1000)
@@ -1139,258 +480,9 @@ async def search(request: Request, req: SearchRequest):
         session_id=session.session_id,
     )
 
-
-def _truncate(text: str, max_length: int) -> str:
-    """Truncate text to max length with ellipsis."""
-    if len(text) <= max_length:
-        return text
-    return text[: max_length - 3] + "..."
-
-
 # =============================================================================
 # Camera Compatibility Routes
 # =============================================================================
-
-
-# Session cookie settings
-ADMIN_SESSION_COOKIE = "admin_session"
-ADMIN_SESSION_MAX_AGE = 24 * 60 * 60  # 24 hours
-
-# Brute force protection settings
-LOGIN_LOCKOUT_THRESHOLD = 5  # Failed attempts before lockout
-LOGIN_LOCKOUT_DURATION = 300  # 5 minutes lockout
-
-
-class LoginAttemptTracker:
-    """Track failed login attempts per IP for brute force protection."""
-
-    def __init__(self) -> None:
-        self._attempts: dict[str, list[float]] = {}  # IP -> list of attempt timestamps
-        self._lockouts: dict[str, float] = {}  # IP -> lockout expiry timestamp
-
-    def is_locked_out(self, ip: str) -> bool:
-        """Check if IP is currently locked out."""
-        if ip in self._lockouts:
-            if time.time() < self._lockouts[ip]:
-                return True
-            # Lockout expired, remove it
-            del self._lockouts[ip]
-            if ip in self._attempts:
-                del self._attempts[ip]
-        return False
-
-    def get_lockout_remaining(self, ip: str) -> int:
-        """Get seconds remaining in lockout, or 0 if not locked out."""
-        if ip in self._lockouts:
-            remaining = int(self._lockouts[ip] - time.time())
-            return max(0, remaining)
-        return 0
-
-    def record_failed_attempt(self, ip: str) -> bool:
-        """Record a failed login attempt. Returns True if now locked out."""
-        now = time.time()
-
-        # Clean old attempts (older than lockout duration)
-        if ip in self._attempts:
-            self._attempts[ip] = [t for t in self._attempts[ip] if now - t < LOGIN_LOCKOUT_DURATION]
-        else:
-            self._attempts[ip] = []
-
-        self._attempts[ip].append(now)
-
-        # Check if should be locked out
-        if len(self._attempts[ip]) >= LOGIN_LOCKOUT_THRESHOLD:
-            self._lockouts[ip] = now + LOGIN_LOCKOUT_DURATION
-            return True
-        return False
-
-    def clear_attempts(self, ip: str) -> None:
-        """Clear attempts on successful login."""
-        if ip in self._attempts:
-            del self._attempts[ip]
-        if ip in self._lockouts:
-            del self._lockouts[ip]
-
-
-# Global login attempt tracker
-_login_tracker: LoginAttemptTracker | None = None
-
-
-def get_login_tracker() -> LoginAttemptTracker:
-    """Get or create login attempt tracker singleton."""
-    global _login_tracker
-    if _login_tracker is None:
-        _login_tracker = LoginAttemptTracker()
-    return _login_tracker
-
-
-def get_session_serializer() -> URLSafeTimedSerializer:
-    """Get session serializer using admin password as secret key."""
-    settings = get_settings()
-    if not settings.admin_password:
-        raise HTTPException(status_code=503, detail="Admin access not configured")
-    return URLSafeTimedSerializer(settings.admin_password.get_secret_value())
-
-
-# =============================================================================
-# CSRF Protection
-# =============================================================================
-
-CSRF_TOKEN_MAX_AGE = 3600  # 1 hour validity
-CSRF_HEADER_NAME = "X-CSRF-Token"
-
-
-def generate_csrf_token(session_id: str | None = None) -> str:
-    """Generate a signed CSRF token.
-
-    Args:
-        session_id: Optional session ID to tie token to session.
-
-    Returns:
-        Signed CSRF token string.
-    """
-    serializer = get_session_serializer()
-    # Include timestamp and optional session binding
-    payload = {
-        "csrf": secrets.token_hex(16),
-        "ts": int(time.time()),
-    }
-    if session_id:
-        payload["sid"] = session_id
-    return serializer.dumps(payload)
-
-
-def validate_csrf_token(
-    token: str,
-    session_id: str | None = None,
-) -> bool:
-    """Validate a CSRF token.
-
-    Args:
-        token: The CSRF token to validate.
-        session_id: Optional session ID to verify token binding.
-
-    Returns:
-        True if valid, False otherwise.
-    """
-    try:
-        serializer = get_session_serializer()
-        payload = serializer.loads(token, max_age=CSRF_TOKEN_MAX_AGE)
-
-        # Verify session binding if provided
-        if session_id and payload.get("sid") != session_id:
-            logger.warning("CSRF token session mismatch")
-            return False
-
-        return True
-    except SignatureExpired:
-        logger.warning("CSRF token expired")
-        return False
-    except BadSignature:
-        logger.warning("CSRF token invalid signature")
-        return False
-    except Exception as e:
-        logger.warning("CSRF validation error", error=str(e))
-        return False
-
-
-def verify_csrf(
-    request: Request,
-    x_csrf_token: Annotated[str | None, Header(alias=CSRF_HEADER_NAME)] = None,
-    admin_session: Annotated[str | None, Cookie()] = None,
-) -> bool:
-    """Dependency to verify CSRF token on state-changing requests.
-
-    Checks for CSRF token in X-CSRF-Token header.
-    Must be used on POST, PUT, DELETE endpoints that modify state.
-
-    Args:
-        request: The FastAPI request object.
-        x_csrf_token: CSRF token from header.
-        admin_session: Admin session cookie for session binding.
-
-    Returns:
-        True if CSRF is valid.
-
-    Raises:
-        HTTPException: If CSRF validation fails.
-    """
-    # Skip CSRF for safe methods (GET, HEAD, OPTIONS)
-    if request.method in ("GET", "HEAD", "OPTIONS"):
-        return True
-
-    # Skip CSRF for API endpoints that use valid X-Admin-Password header authentication
-    # (these are typically programmatic API calls, not browser requests)
-    # SECURITY: Must verify password is correct before skipping CSRF to prevent bypass
-    x_admin_password = request.headers.get("X-Admin-Password")
-    if x_admin_password is not None:
-        settings = get_settings()
-        if settings.admin_password and secrets.compare_digest(
-            x_admin_password.encode("utf-8"),
-            settings.admin_password.get_secret_value().encode("utf-8"),
-        ):
-            return True
-        # Invalid password - don't skip CSRF, continue to normal validation
-
-    if not x_csrf_token:
-        raise HTTPException(
-            status_code=403,
-            detail="CSRF token missing. Include X-CSRF-Token header.",
-        )
-
-    # Extract session ID for binding verification (optional)
-    session_id = None
-    if admin_session:
-        try:
-            serializer = get_session_serializer()
-            data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
-            session_id = data.get("session_id")
-        except Exception:
-            pass  # Session validation failure is handled elsewhere
-
-    if not validate_csrf_token(x_csrf_token, session_id):
-        raise HTTPException(
-            status_code=403,
-            detail="CSRF token invalid or expired. Please refresh the page.",
-        )
-
-    return True
-
-
-def verify_admin(
-    x_admin_password: Annotated[str | None, Header()] = None,
-    admin_session: Annotated[str | None, Cookie()] = None,
-) -> bool:
-    """Verify admin access via header password OR session cookie.
-
-    Two authentication methods are supported:
-    1. X-Admin-Password header - for API calls (legacy support)
-    2. admin_session cookie - for browser sessions (signed with itsdangerous)
-    """
-    settings = get_settings()
-    if not settings.admin_password:
-        raise HTTPException(status_code=503, detail="Admin access not configured")
-
-    # Method 1: Check session cookie first (preferred for browser)
-    if admin_session:
-        try:
-            serializer = get_session_serializer()
-            data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
-            if data.get("authenticated"):
-                return True
-        except SignatureExpired:
-            logger.debug("Admin session expired")
-        except BadSignature:
-            logger.debug("Invalid admin session signature")
-
-    # Method 2: Check header password (API calls / legacy)
-    if x_admin_password is not None and secrets.compare_digest(
-        x_admin_password.encode('utf-8'),
-        settings.admin_password.get_secret_value().encode('utf-8')
-    ):
-        return True
-
-    raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 @app.get("/cameras", response_class=HTMLResponse)
@@ -1655,19 +747,6 @@ async def admin_docs_page(request: Request, page: str):
 async def admin_login_page(request: Request):
     """Admin login page."""
     return templates.TemplateResponse("admin_login.html", {"request": request})
-
-
-class LoginRequest(BaseModel):
-    """Login request model."""
-
-    password: str
-
-
-class LoginResponse(BaseModel):
-    """Login response model."""
-
-    success: bool
-    message: str
 
 
 @app.post("/api/admin/login", tags=["Authentication"])
@@ -2444,19 +1523,6 @@ async def admin_support_cases(request: Request):
 # =============================================================================
 
 
-class TerminologyStatusUpdate(BaseModel):
-    """Request body for status update."""
-
-    status: str = Field(..., pattern="^(pending|approved|rejected|applied)$")
-
-
-class TerminologyBatchStatusUpdate(BaseModel):
-    """Request body for batch status update."""
-
-    ids: list[str]
-    status: str = Field(..., pattern="^(pending|approved|rejected|applied)$")
-
-
 @app.get("/api/admin/terminology-fixes", tags=["Terminology Fixes"])
 async def api_list_terminology_fixes(
     limit: int = 50,
@@ -2812,16 +1878,6 @@ async def api_graph_relationships(
         return {"available": False, "relationships": [], "error": str(e)}
 
 
-class RelationshipDeleteRequest(BaseModel):
-    """Request body for deleting a relationship."""
-
-    source_type: str
-    source_name: str
-    rel_type: str
-    target_type: str
-    target_name: str
-
-
 @app.delete("/api/admin/graph/relationships", tags=["Graph"])
 async def api_delete_relationship(
     request: RelationshipDeleteRequest,
@@ -2848,17 +1904,6 @@ async def api_delete_relationship(
     except Exception as e:
         logger.warning("graph_relationship_delete_failed", error=str(e))
         return {"success": False, "error": str(e)}
-
-
-class RelationshipUpdateRequest(BaseModel):
-    """Request body for updating a relationship type."""
-
-    source_type: str
-    source_name: str
-    old_rel_type: str
-    new_rel_type: str
-    target_type: str
-    target_name: str
 
 
 @app.patch("/api/admin/graph/relationships", tags=["Graph"])
@@ -2893,70 +1938,6 @@ async def api_update_relationship(
 # =============================================================================
 # Chunk Editor Routes (Admin)
 # =============================================================================
-
-
-class ChunkCollection(str, Enum):
-    """Available chunk collections."""
-
-    DOCS = "docusaurus_docs"
-    CASES = "gmail_cases"
-    CUSTOM = "custom_docs"
-
-
-class ChunkListItem(BaseModel):
-    """Chunk item for listing."""
-
-    id: str
-    collection: str
-    text_preview: str = Field(description="First 200 chars of text")
-    title: str | None = None
-    subject: str | None = None
-    url: str | None = None
-    chunk_index: int | None = None
-    source: str | None = None
-
-
-class ChunkListResponse(BaseModel):
-    """Paginated chunk list response."""
-
-    chunks: list[ChunkListItem]
-    next_offset: str | None = None
-    total: int | None = None
-
-
-class ChunkDetail(BaseModel):
-    """Full chunk details for viewing/editing."""
-
-    id: str
-    collection: str
-    text: str
-    # Common metadata
-    source: str | None = None
-    chunk_index: int | None = None
-    # Documentation-specific
-    url: str | None = None
-    title: str | None = None
-    lastmod: str | None = None
-    parent_id: str | None = None
-    # Gmail case-specific
-    subject: str | None = None
-    thread_id: str | None = None
-    parent_case_id: str | None = None
-    problem_summary: str | None = None
-    solution_summary: str | None = None
-    category: str | None = None
-    product: str | None = None
-    keywords: list[str] | None = None
-    # Raw metadata for anything else
-    metadata: dict
-
-
-class ChunkUpdate(BaseModel):
-    """Chunk update request."""
-
-    text: str | None = Field(None, description="New text content (triggers re-embedding)")
-    title: str | None = Field(None, description="New title (docs)")
-    subject: str | None = Field(None, description="New subject (cases)")
 
 
 @app.get("/admin/chunks", response_class=HTMLResponse)
@@ -3186,15 +2167,6 @@ async def api_chunk_delete(
 async def admin_knowledge(request: Request):
     """Admin custom knowledge management page."""
     return templates.TemplateResponse("admin_knowledge.html", {"request": request})
-
-
-class KnowledgeListResponse(BaseModel):
-    """Paginated response for custom documents list."""
-
-    items: list[CustomDocumentListItem]
-    total: int
-    limit: int
-    offset: int
 
 
 @app.get(
@@ -3589,25 +2561,6 @@ async def api_run_draft_pipeline(
 # =============================================================================
 
 
-class DebugSearchResponse(BaseModel):
-    """Debug search response with full chunk details."""
-
-    query: str
-    source: str
-    # Timing
-    retrieval_time_ms: int
-    synthesis_time_ms: int
-    total_time_ms: int
-    # Chunks retrieved
-    chunks: list[dict]
-    # Prompt sent to LLM
-    llm_prompt: str
-    system_prompt: str
-    # LLM response
-    llm_response: str
-    model: str
-
-
 @app.get("/admin/search-debug", response_class=HTMLResponse)
 async def admin_search_debug(request: Request):
     """Admin search debug page - shows chunks and LLM response."""
@@ -3624,7 +2577,7 @@ async def api_search_debug(
 
     # Perform search and measure retrieval time
     retrieval_start = time.time()
-    results, chunks_for_synthesis, graph_context, _ = await _perform_search(req)
+    results, chunks_for_synthesis, graph_context, _ = await perform_search(req)
     retrieval_time_ms = int((time.time() - retrieval_start) * 1000)
 
     # Build context (same as synthesis)
@@ -3829,16 +2782,6 @@ async def api_prompt_versions(
     return [v.to_dict() for v in versions]
 
 
-class PromptUpdateRequest(BaseModel):
-    """Request body for updating a prompt."""
-
-    name: str | None = None
-    description: str | None = None
-    model: str | None = None
-    content: str | None = None
-    change_note: str | None = None
-
-
 @app.put("/api/admin/prompts/{prompt_id}", tags=["Prompts"])
 @limiter.limit("30/minute")
 async def api_prompt_update(
@@ -3870,16 +2813,6 @@ async def api_prompt_update(
     if not prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")
     return prompt.to_dict()
-
-
-class PromptCreateFromDefaultRequest(BaseModel):
-    """Request body for creating a prompt from defaults."""
-
-    key: str
-    name: str | None = None
-    description: str | None = None
-    model: str | None = None
-    content: str | None = None
 
 
 @app.post("/api/admin/prompts/from-default", tags=["Prompts"])
@@ -3933,12 +2866,6 @@ async def api_prompt_create_from_default(
         created_by="admin",
     )
     return prompt.to_dict()
-
-
-class PromptRollbackRequest(BaseModel):
-    """Request body for rollback."""
-
-    version: int
 
 
 @app.post("/api/admin/prompts/{prompt_id}/rollback", tags=["Prompts"])
@@ -3995,13 +2922,6 @@ async def api_prompts_cache_stats(
 
     pm = get_prompt_manager()
     return pm.get_cache_stats()
-
-
-class PromptTestRequest(BaseModel):
-    """Request body for testing a prompt."""
-
-    content: str
-    variables: dict[str, str] = Field(default_factory=dict)
 
 
 @app.post("/api/admin/prompts/test", tags=["Prompts"])
