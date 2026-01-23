@@ -103,20 +103,22 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Public pages use strict nonce-only policy.
         is_admin_page = request.url.path.startswith("/admin")
         if is_admin_page:
-            # Admin pages: Allow inline event handlers via 'unsafe-hashes'
-            # This is a temporary measure while migrating to data-action pattern
-            script_src = f"script-src 'self' 'nonce-{csp_nonce}' 'unsafe-hashes' 'unsafe-inline' https://cdn.jsdelivr.net"
+            # Admin pages: Allow inline event handlers via 'unsafe-inline'
+            # NOTE: When a nonce is present, browsers ignore 'unsafe-inline' per CSP Level 2+.
+            # So we omit the nonce for admin pages to allow onclick handlers to work.
+            # This is a temporary measure while templates are migrated to data-action pattern.
+            script_src = "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://esm.sh"
         else:
-            # Public pages: Strict nonce-only policy
-            script_src = f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net"
+            # Public pages: Strict nonce-only policy (esm.sh for Excalidraw modules)
+            script_src = f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net https://esm.sh"
 
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             f"{script_src}; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://esm.sh; "
             "img-src 'self' data: https:; "
-            "font-src 'self' https://cdn.jsdelivr.net; "
-            "connect-src 'self'; "
+            "font-src 'self' https://cdn.jsdelivr.net https://esm.sh; "
+            "connect-src 'self' https://esm.sh https://cdn.jsdelivr.net;"
             "frame-ancestors 'none'"
         )
         # Prevent caching of API responses (may contain sensitive data)

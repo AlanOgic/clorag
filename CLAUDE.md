@@ -7,7 +7,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 - **Gmail support threads** (curated and anonymized)
 - **Custom knowledge documents** (admin-managed)
 
-Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Mermaid diagrams for integration scenarios.
+Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
 **Version**: 0.6.3 | **Python**: 3.10-3.13
 
@@ -162,7 +162,7 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 
 ### Security
 - Session-based admin auth with brute force protection (5 attempts → 5min lockout per IP)
-- XSS: DOMPurify with SVG allowlist for Mermaid
+- XSS: DOMPurify with SVG allowlist for Excalidraw diagrams
 - OAuth tokens: Fernet encryption with PBKDF2 (480K iterations)
 - Secure cookies in production (configurable via `SECURE_COOKIES`)
 - **CSP Policy**: Differentiated per page type:

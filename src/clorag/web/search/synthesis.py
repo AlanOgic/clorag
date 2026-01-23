@@ -21,7 +21,10 @@ def get_anthropic() -> anthropic.AsyncAnthropic:
     """Get or create Anthropic client singleton."""
     global _anthropic_client
     if _anthropic_client is None:
-        _anthropic_client = anthropic.AsyncAnthropic()
+        settings = get_settings()
+        _anthropic_client = anthropic.AsyncAnthropic(
+            api_key=settings.anthropic_api_key.get_secret_value()
+        )
     return _anthropic_client
 
 

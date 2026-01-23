@@ -117,7 +117,7 @@
                         <li><a href="#reranking" class="docs-nav__link">Reranking</a></li>
                         <li><a href="#graphrag" class="docs-nav__link">GraphRAG</a></li>
                         <li><a href="#optimizations" class="docs-nav__link">Optimizations</a></li>
-                        <li><a href="#mermaid" class="docs-nav__link">Mermaid Diagrams</a></li>
+                        <li><a href="#mermaid" class="docs-nav__link">Excalidraw Diagrams</a></li>
                     </ul>
                 </div>
             </nav>
@@ -450,15 +450,15 @@ NEO4J_URI=bolt://localhost:7687</code></pre>
                     <li><strong>API response</strong>: Includes total count for pagination UI</li>
                 </ul>
 
-                <h2 id="mermaid">Mermaid Diagram Generation</h2>
-                <p>Claude autonomously generates Mermaid.js diagrams when explaining integration scenarios:</p>
+                <h2 id="mermaid">Diagram Generation (Excalidraw Style)</h2>
+                <p>Claude autonomously generates Mermaid diagrams when explaining integration scenarios, which are rendered in <strong>Excalidraw's hand-drawn style</strong>:</p>
                 <ul>
                     <li><strong>Camera connections</strong> - How to connect cameras to RIO/RCP/CI0/VP4</li>
                     <li><strong>Network topology</strong> - IP setup and network architecture</li>
                     <li><strong>Signal flow</strong> - Video, control, and tally routing</li>
                     <li><strong>Multi-device setups</strong> - Complex integration scenarios</li>
                 </ul>
-                <p>Diagrams are rendered client-side using Mermaid.js v11 ESM modules with Cyanview color theming (navy blue nodes, cyan connections).</p>
+                <p>Diagrams use <code>@excalidraw/mermaid-to-excalidraw</code> to convert Mermaid syntax into Excalidraw's distinctive hand-drawn aesthetic, making technical diagrams more approachable and visually appealing.</p>
 
                 <div class="info-box info-box--info">
                     <div class="info-box__title">Key Code Paths</div>

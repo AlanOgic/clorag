@@ -10,22 +10,21 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- DOMPurify for XSS protection -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.2/dist/purify.min.js"></script>
-    <!-- Mermaid diagram rendering (v11) -->
+    <!-- Excalidraw diagram rendering (hand-drawn style) -->
     <script type="module" nonce="{{ request.state.csp_nonce }}">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-        // Mermaid config - styling is handled by applyMermaidStyles() JavaScript function
-        mermaid.initialize({
-            startOnLoad: false,
-            theme: 'default',
-            flowchart: {
-                useMaxWidth: true,
-                htmlLabels: true,
-                curve: 'basis',
-                nodeSpacing: 50,
-                rankSpacing: 50
-            }
-        });
-        window.mermaid = mermaid;
+        // Import mermaid-to-excalidraw and excalidraw utilities using esm.sh bundled imports
+        // The ?bundle flag handles all internal dependencies including react/jsx-runtime
+        const { parseMermaidToExcalidraw } = await import('https://esm.sh/@excalidraw/mermaid-to-excalidraw@2.0.0?bundle');
+        const { convertToExcalidrawElements, exportToSvg } = await import('https://esm.sh/@excalidraw/excalidraw@0.18.0?bundle');
+
+        // Expose Excalidraw utilities for diagram rendering
+        window.excalidrawUtils = {
+            parseMermaidToExcalidraw,
+            convertToExcalidrawElements,
+            exportToSvg
+        };
+
+        console.log('Excalidraw utilities loaded successfully');
     </script>
     <style>
         :root {
@@ -396,7 +395,7 @@
             color: inherit;
         }
 
-        /* Mermaid diagram containers */
+        /* Diagram containers (Excalidraw hand-drawn style) */
         .answer-content .mermaid-container {
             position: relative;
             background: #f8f9fa;
@@ -546,11 +545,10 @@
             gap: 0.5rem;
         }
 
-        /* Mermaid styling is handled by applyMermaidStyles() in JavaScript */
-        /* Only keep edge label styling as CSS fallback */
-        .answer-content .mermaid-container svg .edgeLabel {
-            background-color: #ffffff;
-            color: #1c1e21;
+        /* Excalidraw diagrams use hand-drawn style - minimal CSS overrides needed */
+        .answer-content .mermaid-container.excalidraw-container svg {
+            /* Excalidraw handles all styling internally */
+            font-family: 'Virgil', 'Segoe UI Emoji', sans-serif;
         }
 
         .results-header {
@@ -1248,9 +1246,11 @@
         // Storage for export functionality - stores raw markdown and sources per exchange
         const answerStore = {};
 
-        // Render Mermaid diagrams in a container after streaming completes
+        // Render diagrams in a container after streaming completes (Excalidraw hand-drawn style)
         async function renderMermaidDiagrams(container) {
-            if (!window.mermaid || !container) return;
+            if (!window.excalidrawUtils || !container) return;
+
+            const { parseMermaidToExcalidraw, convertToExcalidrawElements, exportToSvg } = window.excalidrawUtils;
 
             // Find all mermaid code blocks (marked.js renders as <pre><code class="language-mermaid">)
             const mermaidBlocks = container.querySelectorAll('pre code.language-mermaid');
@@ -1261,8 +1261,9 @@
 
                 // Create container div for the diagram
                 const diagramDiv = document.createElement('div');
-                diagramDiv.className = 'mermaid-container';
-                const diagramId = `mermaid-diagram-${++mermaidCounter}`;
+                diagramDiv.className = 'mermaid-container excalidraw-container';
+                const diagramId = `excalidraw-diagram-${++mermaidCounter}`;
+                diagramDiv.id = diagramId;
 
                 // Store original mermaid code for copy functionality
                 diagramDiv.dataset.mermaidCode = mermaidCode;
@@ -1279,124 +1280,36 @@
                     `;
                     copyBtn.onclick = () => copyMermaidCode(copyBtn, mermaidCode);
 
-                    // Render the diagram
-                    const { svg } = await window.mermaid.render(diagramId, mermaidCode);
+                    // Parse Mermaid to Excalidraw elements
+                    const { elements, files } = await parseMermaidToExcalidraw(mermaidCode, {
+                        fontSize: 16
+                    });
 
-                    // Apply custom styling based on node types
-                    const styledSvg = applyMermaidStyles(svg);
+                    // Convert skeleton elements to fully qualified Excalidraw elements
+                    const excalidrawElements = convertToExcalidrawElements(elements);
+
+                    // Export to SVG for display (hand-drawn style)
+                    const svg = await exportToSvg({
+                        elements: excalidrawElements,
+                        appState: {
+                            exportBackground: true,
+                            viewBackgroundColor: '#f8f9fa',
+                            exportWithDarkMode: false
+                        },
+                        files: files || {},
+                        exportPadding: 20
+                    });
 
                     diagramDiv.appendChild(copyBtn);
-                    diagramDiv.insertAdjacentHTML('beforeend', styledSvg);
+                    diagramDiv.appendChild(svg);
                     pre.replaceWith(diagramDiv);
                 } catch (error) {
-                    console.error('Mermaid rendering error:', error);
+                    console.error('Excalidraw rendering error:', error);
                     // Keep code block visible on error, add error styling
                     pre.style.borderLeft = '3px solid #dc3545';
+                    pre.title = `Diagram rendering failed: ${error.message}`;
                 }
             }
-        }
-
-        // Apply custom styles to Mermaid SVG based on node content
-        function applyMermaidStyles(svgString) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(svgString, 'image/svg+xml');
-            const svg = doc.querySelector('svg');
-
-            if (!svg) return svgString;
-
-            // Camera keywords for detection
-            const cameraKeywords = ['camera', 'sony', 'canon', 'panasonic', 'blackmagic', 'red', 'arri',
-                                    'fx6', 'fx3', 'fx9', 'a7', 'c70', 'c300', 'c500', 'eva1', 'gh6', 'bmpcc',
-                                    'ptz', 'brc', 'aw-ue', 'cr-n'];
-            const cyanviewKeywords = ['rcp', 'rio', 'ci0', 'vp4', 'cyanview'];
-
-            // Process all nodes - apply default navy styling first, then override for specific types
-            const nodes = svg.querySelectorAll('.node');
-            nodes.forEach(node => {
-                const label = node.querySelector('.nodeLabel');
-                const labelText = label ? label.textContent.toLowerCase() : '';
-
-                // Find the shape element (rect, polygon, circle, ellipse)
-                const shape = node.querySelector('rect, polygon, circle, ellipse');
-
-                // Check if it's a camera or Cyanview node
-                const isCamera = cameraKeywords.some(kw => labelText.includes(kw));
-                const isCyanview = cyanviewKeywords.some(kw => labelText.includes(kw));
-
-                // Helper to style all text elements within a node
-                const styleNodeText = (node, color) => {
-                    // SVG text elements
-                    node.querySelectorAll('text, tspan, .nodeLabel').forEach(el => {
-                        el.setAttribute('fill', color);
-                        el.style.fill = color;
-                        el.style.color = color;
-                    });
-                    // HTML elements in foreignObject
-                    node.querySelectorAll('span, div, p, foreignObject *').forEach(el => {
-                        el.style.color = color;
-                        el.style.fill = color;
-                    });
-                };
-
-                if (isCamera && !isCyanview) {
-                    // Style as camera: light orange, black text, rounded
-                    if (shape) {
-                        shape.setAttribute('fill', '#FFE0B2');
-                        shape.setAttribute('stroke', '#E65100');
-                        shape.setAttribute('stroke-width', '2');
-                        if (shape.tagName === 'rect') {
-                            shape.setAttribute('rx', '10');
-                            shape.setAttribute('ry', '10');
-                        }
-                    }
-                    styleNodeText(node, '#1a1a1a');
-                } else {
-                    // Default style (Cyanview devices): light cyan background, black text
-                    if (shape) {
-                        shape.setAttribute('fill', '#E0F4FF');
-                        shape.setAttribute('stroke', '#0077b6');
-                        shape.setAttribute('stroke-width', '2');
-                    }
-                    styleNodeText(node, '#1a1a1a');
-                }
-            });
-
-            // Process all edges for link styling
-            const edges = svg.querySelectorAll('.edgePath path');
-            const edgeLabels = svg.querySelectorAll('.edgeLabel');
-
-            // Connection type keywords
-            const networkKeywords = ['ethernet', 'ip', 'network', 'lan', 'rj45', 'tcp', 'udp', 'poe'];
-            const serialKeywords = ['serial', 'rs-485', 'rs-232', 'rs485', 'rs232', 'lanc', 'visca'];
-            // Control signal path: RCP to camera control commands (not video stream)
-            const controlSignalKeywords = ['control', 'signal', 'command', 'ctrl', 'rcp'];
-
-            edgeLabels.forEach((edgeLabel, index) => {
-                const labelText = edgeLabel.textContent.toLowerCase();
-                const edge = edges[index];
-                if (!edge) return;
-
-                const isNetwork = networkKeywords.some(kw => labelText.includes(kw));
-                const isSerial = serialKeywords.some(kw => labelText.includes(kw));
-                const isControlSignal = controlSignalKeywords.some(kw => labelText.includes(kw));
-
-                if (isNetwork) {
-                    // Network wires: blue solid
-                    edge.setAttribute('stroke', '#0077b6');
-                    edge.setAttribute('stroke-width', '2');
-                } else if (isSerial) {
-                    // Serial wires: orange solid
-                    edge.setAttribute('stroke', '#F57C00');
-                    edge.setAttribute('stroke-width', '2');
-                } else if (isControlSignal) {
-                    // Control signal path (RCP to camera): orange dotted
-                    edge.setAttribute('stroke', '#F57C00');
-                    edge.setAttribute('stroke-width', '2');
-                    edge.setAttribute('stroke-dasharray', '5, 5');
-                }
-            });
-
-            return new XMLSerializer().serializeToString(svg);
         }
 
         // Copy mermaid code to clipboard
