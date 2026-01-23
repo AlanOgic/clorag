@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Performance Metrics - Admin - Cyanview</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .metric-card__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .metric-card__title {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            font-size: 0.95rem;
+        }
+
+        .metric-card__status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .metric-card__status--ok {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .metric-card__status--warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .metric-card__status--error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .metric-card__value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-card__label {
+            font-size: 0.85rem;
+            color: #606770;
+        }
+
+        .metric-card__details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .metric-detail {
+            text-align: center;
+        }
+
+        .metric-detail__value {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            font-size: 1.1rem;
+        }
+
+        .metric-detail__label {
+            font-size: 0.75rem;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        /* Cache Cards */
+        .cache-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .cache-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .cache-card__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .cache-card__title {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .cache-card__hit-rate {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .cache-card__hit-rate--good {
+            color: #2e7d32;
+        }
+
+        .cache-card__hit-rate--medium {
+            color: #f57c00;
+        }
+
+        .cache-card__hit-rate--low {
+            color: #c62828;
+        }
+
+        .cache-progress {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .cache-progress__fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .cache-progress__fill--hits {
+            background: #4caf50;
+        }
+
+        .cache-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #606770;
+        }
+
+        .cache-stats__item {
+            text-align: center;
+        }
+
+        .cache-stats__value {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        /* Recent Measurements Table */
+        .recent-section {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 2rem;
+        }
+
+        .recent-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .recent-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .metric-select {
+            padding: 0.5rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        .count-select {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: white;
+            width: 80px;
+        }
+
+        .measurement-row {
+            display: grid;
+            grid-template-columns: 1fr 100px 150px;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #f0f0f0;
+            align-items: center;
+        }
+
+        .measurement-row:last-child {
+            border-bottom: none;
+        }
+
+        .measurement-row__duration {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .measurement-row__duration--slow {
+            color: #f57c00;
+        }
+
+        .measurement-row__duration--very-slow {
+            color: #c62828;
+        }
+
+        .measurement-row__bar {
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .measurement-row__bar-fill {
+            height: 100%;
+            background: var(--cyan-blue);
+            border-radius: 3px;
+        }
+
+        .measurement-row__time {
+            font-size: 0.85rem;
+            color: #999;
+            text-align: right;
+        }
+
+        /* Alerts Section */
+        .alerts-section {
+            margin-bottom: 2rem;
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .alert--warning {
+            background: #fff3e0;
+            border-left: 4px solid #f57c00;
+        }
+
+        .alert--info {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+        }
+
+        .alert--success {
+            background: #e8f5e9;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .alert__icon {
+            font-size: 1.25rem;
+        }
+
+        .alert__message {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+
+        /* Recommendations */
+        .recommendations {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .recommendations__title {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .recommendations__list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .recommendations__item {
+            padding: 0.5rem 0;
+            font-size: 0.9rem;
+            color: #606770;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .recommendations__item::before {
+            content: ">";
+            color: var(--cyan-blue);
+            font-weight: 600;
+        }
+
+        /* Auto-refresh toggle */
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .auto-refresh__toggle {
+            position: relative;
+            width: 40px;
+            height: 20px;
+        }
+
+        .auto-refresh__toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .auto-refresh__slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #ccc;
+            border-radius: 20px;
+            transition: 0.3s;
+        }
+
+        .auto-refresh__slider::before {
+            content: "";
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .auto-refresh__toggle input:checked + .auto-refresh__slider {
+            background: var(--cyan-blue);
+        }
+
+        .auto-refresh__toggle input:checked + .auto-refresh__slider::before {
+            transform: translateX(20px);
+        }
+
+        /* Thresholds Legend */
+        .thresholds-legend {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+            color: #606770;
+            margin-bottom: 1rem;
+        }
+
+        .threshold-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .threshold-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .threshold-dot--ok {
+            background: #4caf50;
+        }
+
+        .threshold-dot--warning {
+            background: #f57c00;
+        }
+
+        .threshold-dot--error {
+            background: #c62828;
+        }
+
+        /* Auth loading overlay */
+        .auth-loading {
+            position: fixed;
+            inset: 0;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-loading.hidden {
+            display: none;
+        }
+
+        /* Summary row */
+        .summary-row {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .summary-stat {
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .summary-stat__value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--cyanview-navy);
+        }
+
+        .summary-stat__label {
+            font-size: 0.85rem;
+            color: #606770;
+        }
+
+        /* Refresh button */
+        .refresh-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .refresh-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .refresh-btn.spinning svg {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* No data state */
+        .no-data {
+            text-align: center;
+            padding: 2rem;
+            color: #999;
+            font-style: italic;
+        }
+    </style>
+    <script src="/static/js/admin.js"></script>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Dashboard</a>
+            <a href="/admin/analytics" class="navbar__link">Analytics</a>
+            <a href="/admin/docs" class="navbar__link">Docs</a>
+            <span class="navbar__divider"></span>
+            <a href="/" class="navbar__link">AI Search</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Auth loading overlay -->
+    <div id="authLoading" class="auth-loading">
+        <span>Checking authentication...</span>
+    </div>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero__title">Performance Metrics</h1>
+        <p class="hero__subtitle">Monitor RAG pipeline performance, cache efficiency, and system health</p>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main main--wide">
+        <!-- Controls -->
+        <div class="page-header">
+            <div class="auto-refresh">
+                <label class="auto-refresh__toggle">
+                    <input type="checkbox" id="autoRefreshToggle">
+                    <span class="auto-refresh__slider"></span>
+                </label>
+                <span>Auto-refresh (30s)</span>
+            </div>
+            <button class="refresh-btn" id="refreshBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                </svg>
+                Refresh
+            </button>
+        </div>
+
+        <!-- Alerts Section -->
+        <div class="alerts-section" id="alertsSection"></div>
+
+        <!-- Summary Row -->
+        <div class="summary-row" id="summaryRow">
+            <div class="summary-stat">
+                <div class="summary-stat__value" id="totalQueries">-</div>
+                <div class="summary-stat__label">Total Queries</div>
+            </div>
+            <div class="summary-stat">
+                <div class="summary-stat__value" id="errorRate">-</div>
+                <div class="summary-stat__label">Error Rate</div>
+            </div>
+            <div class="summary-stat">
+                <div class="summary-stat__value" id="avgLatency">-</div>
+                <div class="summary-stat__label">Avg Total Latency</div>
+            </div>
+        </div>
+
+        <!-- Thresholds Legend -->
+        <div class="thresholds-legend">
+            <div class="threshold-item">
+                <span class="threshold-dot threshold-dot--ok"></span>
+                <span>Within target</span>
+            </div>
+            <div class="threshold-item">
+                <span class="threshold-dot threshold-dot--warning"></span>
+                <span>Above target, below warning</span>
+            </div>
+            <div class="threshold-item">
+                <span class="threshold-dot threshold-dot--error"></span>
+                <span>Above warning threshold</span>
+            </div>
+        </div>
+
+        <!-- Performance Metrics Grid -->
+        <h2 class="section__title" style="margin-bottom: 1rem;">Pipeline Latency (p95)</h2>
+        <div class="metrics-grid" id="metricsGrid">
+            <!-- Dynamically populated -->
+        </div>
+
+        <!-- Cache Statistics -->
+        <h2 class="section__title" style="margin-bottom: 1rem;">Cache Performance</h2>
+        <div class="cache-grid" id="cacheGrid">
+            <!-- Dynamically populated -->
+        </div>
+
+        <!-- Recommendations -->
+        <div class="recommendations" id="recommendationsSection" style="display: none;">
+            <div class="recommendations__title">Recommendations</div>
+            <ul class="recommendations__list" id="recommendationsList"></ul>
+        </div>
+
+        <!-- Recent Measurements -->
+        <div class="recent-section">
+            <div class="recent-header">
+                <h2 class="section__title" style="margin: 0;">Recent Measurements</h2>
+                <div class="recent-controls">
+                    <select class="metric-select" id="metricSelect">
+                        <option value="embedding_generation">Embedding Generation</option>
+                        <option value="vector_search">Vector Search</option>
+                        <option value="total_search" selected>Total Search</option>
+                        <option value="llm_synthesis">LLM Synthesis</option>
+                        <option value="graph_enrichment">Graph Enrichment</option>
+                    </select>
+                    <select class="count-select" id="countSelect">
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+            <div id="recentMeasurements">
+                <div class="no-data">Select a metric and click refresh to load measurements</div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading hidden" id="loading">
+            <div class="spinner"></div>
+            <p>Loading metrics...</p>
+        </div>
+    </main>
+
+    <script nonce="{{ request.state.csp_nonce }}">
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+        const metricSelect = document.getElementById('metricSelect');
+        const countSelect = document.getElementById('countSelect');
+
+        let autoRefreshInterval = null;
+        let currentThresholds = {};
+
+        // Check session on page load
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
+
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+                loadAllMetrics();
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                window.location.href = '/admin/login';
+            }
+        }
+        checkAuth();
+
+        // Logout handler
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/login';
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
+
+        // Refresh handler
+        refreshBtn.addEventListener('click', () => {
+            refreshBtn.classList.add('spinning');
+            loadAllMetrics().finally(() => {
+                setTimeout(() => refreshBtn.classList.remove('spinning'), 500);
+            });
+        });
+
+        // Auto-refresh toggle
+        autoRefreshToggle.addEventListener('change', () => {
+            if (autoRefreshToggle.checked) {
+                autoRefreshInterval = setInterval(loadAllMetrics, 30000);
+            } else {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        });
+
+        // Metric select change
+        metricSelect.addEventListener('change', loadRecentMeasurements);
+        countSelect.addEventListener('change', loadRecentMeasurements);
+
+        async function loadAllMetrics() {
+            try {
+                const [metricsRes, cacheRes] = await Promise.all([
+                    fetch('/api/admin/metrics'),
+                    fetch('/api/admin/cache-stats')
+                ]);
+
+                if (metricsRes.status === 401 || cacheRes.status === 401) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+
+                const metricsData = await metricsRes.json();
+                const cacheData = await cacheRes.json();
+
+                currentThresholds = metricsData.thresholds || {};
+                renderAlerts(metricsData.alerts || []);
+                renderSummary(metricsData);
+                renderMetricsGrid(metricsData.metrics || {}, metricsData.thresholds || {});
+                renderCacheGrid(cacheData);
+                renderRecommendations(cacheData.recommendations || []);
+
+                await loadRecentMeasurements();
+            } catch (error) {
+                console.error('Failed to load metrics:', error);
+            }
+        }
+
+        function renderAlerts(alerts) {
+            const container = document.getElementById('alertsSection');
+            if (!alerts.length) {
+                container.innerHTML = `
+                    <div class="alert alert--success">
+                        <span class="alert__icon">&#10003;</span>
+                        <span class="alert__message">All metrics are within acceptable thresholds</span>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = alerts.map(alert => {
+                const icon = alert.level === 'warning' ? '&#9888;' : '&#8505;';
+                return `
+                    <div class="alert alert--${alert.level}">
+                        <span class="alert__icon">${icon}</span>
+                        <span class="alert__message">${escapeHtml(alert.message)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSummary(data) {
+            document.getElementById('totalQueries').textContent = data.total_queries || 0;
+            document.getElementById('errorRate').textContent =
+                (data.error_rate_percent || 0).toFixed(1) + '%';
+
+            const totalSearch = data.metrics?.total_search;
+            if (totalSearch) {
+                document.getElementById('avgLatency').textContent =
+                    Math.round(totalSearch.avg_ms) + 'ms';
+            }
+        }
+
+        function renderMetricsGrid(metrics, thresholds) {
+            const container = document.getElementById('metricsGrid');
+            const metricConfig = {
+                'embedding_generation': { label: 'Embedding Generation', icon: '&#128196;' },
+                'vector_search': { label: 'Vector Search', icon: '&#128269;' },
+                'total_search': { label: 'Total Search Pipeline', icon: '&#9889;' },
+                'llm_synthesis': { label: 'LLM Synthesis (TTFB)', icon: '&#129302;' },
+                'graph_enrichment': { label: 'Graph Enrichment', icon: '&#128200;' }
+            };
+
+            let html = '';
+            for (const [key, config] of Object.entries(metricConfig)) {
+                const stats = metrics[key];
+                const threshold = thresholds[key] || { target_ms: 100, warning_ms: 500 };
+
+                if (!stats) {
+                    html += `
+                        <div class="metric-card">
+                            <div class="metric-card__header">
+                                <span class="metric-card__title">${config.label}</span>
+                            </div>
+                            <div class="no-data">No data yet</div>
+                        </div>
+                    `;
+                    continue;
+                }
+
+                const p95 = stats.p95_ms || 0;
+                const status = getStatus(p95, threshold);
+                const statusClass = status === 'ok' ? 'ok' : (status === 'warning' ? 'warning' : 'error');
+
+                html += `
+                    <div class="metric-card">
+                        <div class="metric-card__header">
+                            <span class="metric-card__title">${config.label}</span>
+                            <span class="metric-card__status metric-card__status--${statusClass}">
+                                ${status === 'ok' ? 'OK' : (status === 'warning' ? 'WARN' : 'ALERT')}
+                            </span>
+                        </div>
+                        <div class="metric-card__value">${Math.round(p95)}ms</div>
+                        <div class="metric-card__label">p95 latency (target: ${threshold.target_ms}ms)</div>
+                        <div class="metric-card__details">
+                            <div class="metric-detail">
+                                <div class="metric-detail__value">${Math.round(stats.avg_ms || 0)}ms</div>
+                                <div class="metric-detail__label">Average</div>
+                            </div>
+                            <div class="metric-detail">
+                                <div class="metric-detail__value">${Math.round(stats.min_ms || 0)}ms</div>
+                                <div class="metric-detail__label">Min</div>
+                            </div>
+                            <div class="metric-detail">
+                                <div class="metric-detail__value">${Math.round(stats.max_ms || 0)}ms</div>
+                                <div class="metric-detail__label">Max</div>
+                            </div>
+                            <div class="metric-detail">
+                                <div class="metric-detail__value">${stats.count || 0}</div>
+                                <div class="metric-detail__label">Samples</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html || '<div class="no-data">No metrics collected yet</div>';
+        }
+
+        function getStatus(value, threshold) {
+            if (value > threshold.warning_ms) return 'error';
+            if (value > threshold.target_ms) return 'warning';
+            return 'ok';
+        }
+
+        function renderCacheGrid(data) {
+            const container = document.getElementById('cacheGrid');
+            const caches = [
+                { key: 'dense_cache', label: 'Dense Embeddings (Voyage)', maxSize: 200 },
+                { key: 'sparse_cache', label: 'Sparse Embeddings (BM25)', maxSize: 200 },
+                { key: 'rerank_cache', label: 'Rerank Results', maxSize: 100 }
+            ];
+
+            let html = '';
+            for (const cache of caches) {
+                const stats = data[cache.key];
+                if (!stats) continue;
+
+                const hitRate = stats.hit_rate_percent || 0;
+                const hitRateClass = hitRate >= 50 ? 'good' : (hitRate >= 30 ? 'medium' : 'low');
+                const fillWidth = (stats.size / (stats.max_size || cache.maxSize)) * 100;
+
+                html += `
+                    <div class="cache-card">
+                        <div class="cache-card__header">
+                            <span class="cache-card__title">${cache.label}</span>
+                            <span class="cache-card__hit-rate cache-card__hit-rate--${hitRateClass}">
+                                ${hitRate.toFixed(1)}%
+                            </span>
+                        </div>
+                        <div class="cache-progress">
+                            <div class="cache-progress__fill cache-progress__fill--hits"
+                                 style="width: ${Math.min(fillWidth, 100)}%"></div>
+                        </div>
+                        <div class="cache-stats">
+                            <div class="cache-stats__item">
+                                <div class="cache-stats__value">${stats.size || 0}</div>
+                                <div>Size</div>
+                            </div>
+                            <div class="cache-stats__item">
+                                <div class="cache-stats__value">${stats.max_size || cache.maxSize}</div>
+                                <div>Max</div>
+                            </div>
+                            <div class="cache-stats__item">
+                                <div class="cache-stats__value">${stats.hits || 0}</div>
+                                <div>Hits</div>
+                            </div>
+                            <div class="cache-stats__item">
+                                <div class="cache-stats__value">${stats.misses || 0}</div>
+                                <div>Misses</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html || '<div class="no-data">No cache data available</div>';
+        }
+
+        function renderRecommendations(recommendations) {
+            const section = document.getElementById('recommendationsSection');
+            const list = document.getElementById('recommendationsList');
+
+            if (!recommendations.length ||
+                (recommendations.length === 1 && recommendations[0].includes('healthy'))) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            list.innerHTML = recommendations
+                .filter(r => !r.includes('healthy'))
+                .map(r => `<li class="recommendations__item">${escapeHtml(r)}</li>`)
+                .join('');
+        }
+
+        async function loadRecentMeasurements() {
+            const metric = metricSelect.value;
+            const count = countSelect.value;
+            const container = document.getElementById('recentMeasurements');
+
+            try {
+                const res = await fetch(`/api/admin/metrics/recent/${metric}?count=${count}`);
+
+                if (res.status === 404) {
+                    container.innerHTML = '<div class="no-data">No measurements for this metric yet</div>';
+                    return;
+                }
+
+                if (!res.ok) throw new Error('Failed to load');
+
+                const data = await res.json();
+                renderRecentMeasurements(data.measurements || [], metric);
+            } catch (error) {
+                container.innerHTML = '<div class="no-data">Failed to load measurements</div>';
+            }
+        }
+
+        function renderRecentMeasurements(measurements, metricName) {
+            const container = document.getElementById('recentMeasurements');
+            const threshold = currentThresholds[metricName] || { target_ms: 100, warning_ms: 500 };
+            const maxDuration = Math.max(...measurements.map(m => m.duration_ms), threshold.warning_ms);
+
+            if (!measurements.length) {
+                container.innerHTML = '<div class="no-data">No measurements recorded yet</div>';
+                return;
+            }
+
+            const html = measurements.map(m => {
+                const duration = m.duration_ms;
+                const barWidth = (duration / maxDuration) * 100;
+                const durationClass = duration > threshold.warning_ms ? 'very-slow' :
+                                     (duration > threshold.target_ms ? 'slow' : '');
+                const timestamp = new Date(m.timestamp * 1000);
+                const timeStr = timestamp.toLocaleTimeString();
+
+                return `
+                    <div class="measurement-row">
+                        <div class="measurement-row__bar">
+                            <div class="measurement-row__bar-fill" style="width: ${barWidth}%"></div>
+                        </div>
+                        <div class="measurement-row__duration ${durationClass ? 'measurement-row__duration--' + durationClass : ''}">
+                            ${duration.toFixed(1)}ms
+                        </div>
+                        <div class="measurement-row__time">${timeStr}</div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

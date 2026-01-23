@@ -79,19 +79,62 @@
             display: none;
         }
 
-        /* Page-specific: RAG intro box */
+        /* Page-specific: RAG intro box (collapsible) */
         .intro-box {
             background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
             border: 1px solid #bbdefb;
             border-radius: 12px;
-            padding: 1.5rem 2rem;
             margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .intro-box__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .intro-box__header:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .intro-box__toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--cyan-dark);
+            font-size: 0.85rem;
+        }
+
+        .intro-box__toggle svg {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.2s;
+        }
+
+        .intro-box__toggle.rotated svg {
+            transform: rotate(180deg);
+        }
+
+        .intro-box__content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            padding: 0 1.5rem;
+        }
+
+        .intro-box__content.expanded {
+            max-height: 500px;
+            padding: 0 1.5rem 1.5rem;
         }
 
         .intro-box__title {
             font-size: 1.1rem;
             color: var(--cyanview-navy);
-            margin-bottom: 0.75rem;
+            margin: 0;
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -99,6 +142,10 @@
 
         .intro-box__title::before {
             content: "🔍";
+        }
+
+        .intro-box__text:first-child {
+            margin-top: 0;
         }
 
         .intro-box__text {
@@ -147,6 +194,8 @@
         </a>
         <div class="navbar__links">
             <a href="/admin" class="navbar__link navbar__link--active">Dashboard</a>
+            <a href="/admin/analytics" class="navbar__link">Analytics</a>
+            <a href="/admin/metrics" class="navbar__link">Metrics</a>
             <a href="/admin/docs" class="navbar__link">Docs</a>
             <a href="/admin/prompts" class="navbar__link">Prompts</a>
             <span class="navbar__divider"></span>
@@ -169,21 +218,31 @@
 
     <!-- Main Content -->
     <main class="main">
-        <!-- RAG System Overview -->
+        <!-- RAG System Overview (collapsible, closed by default) -->
         <div class="intro-box">
-            <h2 class="intro-box__title">How CLORAG Works</h2>
-            <p class="intro-box__text">
-                CLORAG is a <strong>Retrieval-Augmented Generation</strong> system that answers Cyanview support questions by combining:
-            </p>
-            <ul class="intro-box__list">
-                <li><strong>Three knowledge sources</strong>: Docusaurus documentation, curated Gmail support threads, and custom admin documents</li>
-                <li><strong>Hybrid search</strong>: Semantic understanding (Voyage AI embeddings) + keyword matching (BM25), merged via Reciprocal Rank Fusion</li>
-                <li><strong>Reranking</strong>: Voyage rerank-2.5 cross-encoder re-scores top results for better relevance</li>
-                <li><strong>Answer synthesis</strong>: Claude Sonnet generates coherent answers with sources and hand-drawn Excalidraw diagrams for integration scenarios</li>
-            </ul>
-            <p class="intro-box__flow">
-                <code>Query → Embed → Search 3 collections → Merge &amp; Rerank → Claude generates answer</code>
-            </p>
+            <div class="intro-box__header" data-action="toggle-section" data-target="introBox">
+                <h2 class="intro-box__title">How CLORAG Works</h2>
+                <span class="intro-box__toggle" id="introBoxIcon">
+                    <span id="introBoxLabel">Show</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </span>
+            </div>
+            <div class="intro-box__content" id="introBoxContent">
+                <p class="intro-box__text">
+                    CLORAG is a <strong>Retrieval-Augmented Generation</strong> system that answers Cyanview support questions by combining:
+                </p>
+                <ul class="intro-box__list">
+                    <li><strong>Three knowledge sources</strong>: Docusaurus documentation, curated Gmail support threads, and custom admin documents</li>
+                    <li><strong>Hybrid search</strong>: Semantic understanding (Voyage AI embeddings) + keyword matching (BM25), merged via Reciprocal Rank Fusion</li>
+                    <li><strong>Reranking</strong>: Voyage rerank-2.5 cross-encoder re-scores top results for better relevance</li>
+                    <li><strong>Answer synthesis</strong>: Claude Sonnet generates coherent answers with sources and hand-drawn Excalidraw diagrams for integration scenarios</li>
+                </ul>
+                <p class="intro-box__flow">
+                    <code>Query → Embed → Search 3 collections → Merge &amp; Rerank → Claude generates answer</code>
+                </p>
+            </div>
         </div>
         <!-- Admin Cards -->
         <div class="admin-grid">
@@ -206,6 +265,16 @@
                 </div>
                 <h2 class="admin-card__title">Search Analytics</h2>
                 <p class="admin-card__description">View search statistics, popular queries, response times, and daily search trends.</p>
+            </a>
+
+            <a href="/admin/metrics" class="admin-card">
+                <div class="admin-card__icon" style="background: #e8f5e9;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                </div>
+                <h2 class="admin-card__title">Performance Metrics</h2>
+                <p class="admin-card__description">Monitor RAG pipeline latency, cache hit rates, and system health with real-time metrics.</p>
             </a>
 
             <a href="/admin/drafts" class="admin-card">

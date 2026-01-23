@@ -44,23 +44,29 @@ async def api_popular_queries(
 async def api_cache_stats(
     _: bool = Depends(verify_admin),
 ) -> dict[str, Any]:
-    """Get embedding cache statistics for performance monitoring.
+    """Get embedding and rerank cache statistics for performance monitoring.
 
-    Returns hit/miss rates for both dense (Voyage AI) and sparse (BM25)
-    query embedding caches. Higher hit rates indicate better cache efficiency.
+    Returns hit/miss rates for dense (Voyage AI), sparse (BM25), and rerank
+    caches. Higher hit rates indicate better cache efficiency.
     """
     from clorag.core.embeddings import get_query_cache
+    from clorag.core.reranker import get_rerank_cache
 
     sparse_emb = get_sparse_embeddings()
     dense_cache = get_query_cache()
+    rerank_cache = get_rerank_cache()
 
     dense_stats = dense_cache.stats()
     sparse_stats = sparse_emb.cache_stats()
+    rerank_stats = rerank_cache.stats()
 
     return {
         "dense_cache": dense_stats,
         "sparse_cache": sparse_stats,
-        "recommendations": _generate_cache_recommendations(dense_stats, sparse_stats),
+        "rerank_cache": rerank_stats,
+        "recommendations": _generate_cache_recommendations(
+            dense_stats, sparse_stats, rerank_stats
+        ),
     }
 
 
@@ -170,8 +176,9 @@ async def api_get_conversations(
 
 
 def _generate_cache_recommendations(
-    dense_stats: dict[str, int],
-    sparse_stats: dict[str, int],
+    dense_stats: dict[str, int | float],
+    sparse_stats: dict[str, int | float],
+    rerank_stats: dict[str, int | float] | None = None,
 ) -> list[str]:
     """Generate actionable recommendations based on cache performance."""
     recommendations = []
@@ -189,6 +196,12 @@ def _generate_cache_recommendations(
             "Sparse cache hit rate is low (<30%). Users may be asking diverse queries."
         )
 
+    # Check rerank cache hit rate
+    if rerank_stats and rerank_stats.get("hit_rate_percent", 0) < 20:
+        recommendations.append(
+            "Rerank cache hit rate is low (<20%). This is normal for diverse queries."
+        )
+
     # Check if caches are full
     if dense_stats.get("size", 0) >= 190:  # Near 200 limit
         recommendations.append(
@@ -198,6 +211,11 @@ def _generate_cache_recommendations(
     if sparse_stats.get("size", 0) >= 190:
         recommendations.append(
             "Sparse cache is near capacity. Consider increasing SPARSE_CACHE_MAX_SIZE."
+        )
+
+    if rerank_stats and rerank_stats.get("size", 0) >= 95:  # Near 100 limit
+        recommendations.append(
+            "Rerank cache is near capacity. Consider increasing RERANK_CACHE_MAX_SIZE."
         )
 
     if not recommendations:

@@ -619,12 +619,7 @@
             if (!confirm(`Rollback to version ${currentVersionNumber}? This will create a new version with that content.`)) return;
 
             try {
-                const response = await fetch(`/api/admin/prompts/${currentPromptId}/rollback`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ version: currentVersionNumber }),
-                });
+                const response = await AdminUtils.postJson(`/api/admin/prompts/${currentPromptId}/rollback`, { version: currentVersionNumber });
 
                 if (response.ok) {
                     showAlert('Rolled back successfully', 'success');
@@ -660,20 +655,10 @@
 
                 if (promptId) {
                     // Update existing
-                    response = await fetch(`/api/admin/prompts/${promptId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify(data),
-                    });
+                    response = await AdminUtils.putJson(`/api/admin/prompts/${promptId}`, data);
                 } else {
                     // Create from default
-                    response = await fetch('/api/admin/prompts/from-default', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ key: promptKey, ...data }),
-                    });
+                    response = await AdminUtils.postJson('/api/admin/prompts/from-default', { key: promptKey, ...data });
                 }
 
                 if (response.ok) {
@@ -721,10 +706,7 @@
             if (!confirm('Initialize database with default prompts? Existing prompts will not be overwritten.')) return;
 
             try {
-                const response = await fetch('/api/admin/prompts/initialize', {
-                    method: 'POST',
-                    credentials: 'include',
-                });
+                const response = await AdminUtils.postJson('/api/admin/prompts/initialize', {});
 
                 if (response.ok) {
                     const result = await response.json();
@@ -742,10 +724,7 @@
         // Reload all caches
         async function reloadAllCaches() {
             try {
-                const response = await fetch('/api/admin/prompts/reload', {
-                    method: 'POST',
-                    credentials: 'include',
-                });
+                const response = await AdminUtils.postJson('/api/admin/prompts/reload', {});
 
                 if (response.ok) {
                     showAlert('All prompt caches reloaded', 'success');

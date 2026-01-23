@@ -852,7 +852,7 @@
 </head>
 <body>
     <!-- Camera Detail Modal -->
-    <div id="cameraModal" class="modal-overlay hidden" onclick="if(event.target === this) closeModal()">
+    <div id="cameraModal" class="modal-overlay hidden" data-action="close-modal-overlay">
         <div class="modal">
             <div class="modal-header">
                 <div>
@@ -860,7 +860,7 @@
                     <div class="modal-subtitle" id="modalManufacturer"></div>
                     <div class="modal-code" id="modalCodeModel"></div>
                 </div>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" data-action="close-modal">&times;</button>
             </div>
             <div class="modal-body" id="modalBody">
                 <!-- Content populated by JavaScript -->
@@ -874,17 +874,17 @@
             <!-- Selected cameras appear here -->
         </div>
         <div class="compare-bar__actions">
-            <button class="compare-bar__btn compare-bar__btn--secondary" onclick="clearComparison()">Clear</button>
-            <button class="compare-bar__btn compare-bar__btn--primary" onclick="showComparison()">Compare</button>
+            <button class="compare-bar__btn compare-bar__btn--secondary" data-action="clear-comparison">Clear</button>
+            <button class="compare-bar__btn compare-bar__btn--primary" data-action="show-comparison">Compare</button>
         </div>
     </div>
 
     <!-- Comparison Modal -->
-    <div id="compareModal" class="compare-modal" onclick="if(event.target === this) closeCompareModal()">
+    <div id="compareModal" class="compare-modal" data-action="close-compare-modal-overlay">
         <div class="compare-modal__content">
             <div class="compare-modal__header">
                 <h2 class="compare-modal__title">Camera Comparison</h2>
-                <button class="compare-modal__close" onclick="closeCompareModal()">&times;</button>
+                <button class="compare-modal__close" data-action="close-compare-modal">&times;</button>
             </div>
             <div id="compareModalBody">
                 <!-- Comparison table populated by JavaScript -->
@@ -927,32 +927,32 @@
     <main class="main">
         <!-- Filter Bar -->
         <div class="filter-bar">
-            <input type="text" class="filter-bar__search" id="searchInput" placeholder="Search cameras..." oninput="filterTable()">
-            <select class="filter-bar__select" id="manufacturerFilter" onchange="applyFilters()">
+            <input type="text" class="filter-bar__search" id="searchInput" placeholder="Search cameras..." data-action="filter-table">
+            <select class="filter-bar__select" id="manufacturerFilter" data-action="apply-filters">
                 <option value="">All Manufacturers</option>
                 {% for mfr in manufacturers %}
                 <option value="{{ mfr }}" {% if selected_manufacturer == mfr %}selected{% endif %}>{{ mfr }}</option>
                 {% endfor %}
             </select>
-            <select class="filter-bar__select" id="deviceTypeFilter" onchange="applyFilters()">
+            <select class="filter-bar__select" id="deviceTypeFilter" data-action="apply-filters">
                 <option value="">All Types</option>
                 {% for dtype in device_types %}
                 <option value="{{ dtype }}" {% if selected_device_type == dtype %}selected{% endif %}>{{ dtype | replace('_', ' ') | title }}</option>
                 {% endfor %}
             </select>
-            <select class="filter-bar__select" id="portFilter" onchange="applyFilters()">
+            <select class="filter-bar__select" id="portFilter" data-action="apply-filters">
                 <option value="">All Ports</option>
                 {% for port in ports %}
                 <option value="{{ port }}" {% if selected_port == port %}selected{% endif %}>{{ port }}</option>
                 {% endfor %}
             </select>
-            <select class="filter-bar__select" id="protocolFilter" onchange="applyFilters()">
+            <select class="filter-bar__select" id="protocolFilter" data-action="apply-filters">
                 <option value="">All Protocols</option>
                 {% for protocol in protocols %}
                 <option value="{{ protocol }}" {% if selected_protocol == protocol %}selected{% endif %}>{{ protocol }}</option>
                 {% endfor %}
             </select>
-            <button class="export-btn" onclick="exportCSV()">
+            <button class="export-btn" data-action="export-csv">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
                 </svg>
@@ -966,11 +966,11 @@
             <table class="cameras-table" id="camerasTable">
                 <thead>
                     <tr>
-                        <th style="width: 40px;"><input type="checkbox" class="compare-checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)" title="Select all for comparison"></th>
-                        <th data-sort="type" onclick="sortTable('type')"></th>
-                        <th data-sort="name" onclick="sortTable('name')">Device</th>
-                        <th data-sort="ports" onclick="sortTable('ports')">Ports</th>
-                        <th data-sort="protocols" onclick="sortTable('protocols')">Protocols</th>
+                        <th style="width: 40px;"><input type="checkbox" class="compare-checkbox" id="selectAllCheckbox" data-action="toggle-select-all" title="Select all for comparison"></th>
+                        <th data-sort="type" data-action="sort-table"></th>
+                        <th data-sort="name" data-action="sort-table">Device</th>
+                        <th data-sort="ports" data-action="sort-table">Ports</th>
+                        <th data-sort="protocols" data-action="sort-table">Protocols</th>
                         <th>Controls</th>
                         <th>Notes</th>
                         <th>Docs</th>
@@ -984,9 +984,10 @@
                         data-ports="{{ camera.ports | join(',') | lower }}"
                         data-protocols="{{ camera.protocols | join(',') | lower }}"
                         data-camera-id="{{ camera.id }}"
-                        onclick="if(event.target.type !== 'checkbox') openCameraModal({{ camera.id }})">
-                        <td onclick="event.stopPropagation()">
-                            <input type="checkbox" class="compare-checkbox" data-camera-id="{{ camera.id }}" onclick="toggleCompareCamera({{ camera.id }}, '{{ camera.name | e }}')">
+                        data-camera-name="{{ camera.name | e }}"
+                        data-action="open-camera-modal">
+                        <td class="checkbox-cell">
+                            <input type="checkbox" class="compare-checkbox" data-camera-id="{{ camera.id }}" data-action="toggle-compare">
                         </td>
                         <td>
                             {% if camera.device_type %}
@@ -1099,7 +1100,7 @@
 
                 <!-- Previous button -->
                 {% if page > 1 %}
-                <a href="javascript:void(0)" onclick="goToPage({{ page - 1 }})" class="pagination__btn" title="Previous page">‹</a>
+                <a href="javascript:void(0)" data-action="go-to-page" data-page="{{ page - 1 }}" class="pagination__btn" title="Previous page">‹</a>
                 {% else %}
                 <span class="pagination__btn pagination__btn--disabled">‹</span>
                 {% endif %}
@@ -1109,7 +1110,7 @@
                 {% set end_page = [total_pages, page + 2] | min %}
 
                 {% if start_page > 1 %}
-                <a href="javascript:void(0)" onclick="goToPage(1)" class="pagination__btn">1</a>
+                <a href="javascript:void(0)" data-action="go-to-page" data-page="1" class="pagination__btn">1</a>
                 {% if start_page > 2 %}
                 <span class="pagination__ellipsis">…</span>
                 {% endif %}
@@ -1119,7 +1120,7 @@
                 {% if p == page %}
                 <span class="pagination__btn pagination__btn--active">{{ p }}</span>
                 {% else %}
-                <a href="javascript:void(0)" onclick="goToPage({{ p }})" class="pagination__btn">{{ p }}</a>
+                <a href="javascript:void(0)" data-action="go-to-page" data-page="{{ p }}" class="pagination__btn">{{ p }}</a>
                 {% endif %}
                 {% endfor %}
 
@@ -1127,12 +1128,12 @@
                 {% if end_page < total_pages - 1 %}
                 <span class="pagination__ellipsis">…</span>
                 {% endif %}
-                <a href="javascript:void(0)" onclick="goToPage({{ total_pages }})" class="pagination__btn">{{ total_pages }}</a>
+                <a href="javascript:void(0)" data-action="go-to-page" data-page="{{ total_pages }}" class="pagination__btn">{{ total_pages }}</a>
                 {% endif %}
 
                 <!-- Next button -->
                 {% if page < total_pages %}
-                <a href="javascript:void(0)" onclick="goToPage({{ page + 1 }})" class="pagination__btn" title="Next page">›</a>
+                <a href="javascript:void(0)" data-action="go-to-page" data-page="{{ page + 1 }}" class="pagination__btn" title="Next page">›</a>
                 {% else %}
                 <span class="pagination__btn pagination__btn--disabled">›</span>
                 {% endif %}
@@ -1140,7 +1141,7 @@
                 <!-- Page size selector -->
                 <div class="pagination__size">
                     <label for="pageSizeSelect">Per page:</label>
-                    <select id="pageSizeSelect" onchange="changePageSize(this.value)">
+                    <select id="pageSizeSelect" data-action="change-page-size">
                         <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
                         <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
                         <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
@@ -1190,6 +1191,86 @@
         };
 
         const cameraModal = document.getElementById('cameraModal');
+
+        // ==========================================
+        // Event Delegation for CSP Compliance
+        // ==========================================
+        document.addEventListener('click', function(e) {
+            const target = e.target;
+            const action = target.dataset.action || target.closest('[data-action]')?.dataset.action;
+            if (!action) return;
+
+            const actionEl = target.closest('[data-action]') || target;
+
+            switch (action) {
+                case 'close-modal':
+                    closeModal();
+                    break;
+                case 'close-modal-overlay':
+                    // Only close if clicking directly on the overlay, not inside the modal
+                    if (target === actionEl) closeModal();
+                    break;
+                case 'close-compare-modal':
+                    closeCompareModal();
+                    break;
+                case 'close-compare-modal-overlay':
+                    if (target === actionEl) closeCompareModal();
+                    break;
+                case 'clear-comparison':
+                    clearComparison();
+                    break;
+                case 'show-comparison':
+                    showComparison();
+                    break;
+                case 'export-csv':
+                    exportCSV();
+                    break;
+                case 'toggle-select-all':
+                    toggleSelectAll(target);
+                    break;
+                case 'sort-table':
+                    const column = actionEl.dataset.sort;
+                    if (column) sortTable(column);
+                    break;
+                case 'open-camera-modal':
+                    // Don't open modal if clicking on checkbox
+                    if (target.type === 'checkbox') return;
+                    const cameraId = parseInt(actionEl.dataset.cameraId);
+                    if (cameraId) openCameraModal(cameraId);
+                    break;
+                case 'toggle-compare':
+                    e.stopPropagation();
+                    const compCameraId = parseInt(target.dataset.cameraId);
+                    const compRow = target.closest('tr');
+                    const compCameraName = compRow?.dataset.cameraName || '';
+                    if (compCameraId) toggleCompareCamera(compCameraId, compCameraName);
+                    break;
+                case 'remove-from-comparison':
+                    const removeId = parseInt(actionEl.dataset.cameraId);
+                    if (removeId) removeFromComparison(removeId);
+                    break;
+                case 'go-to-page':
+                    const pageNum = parseInt(actionEl.dataset.page);
+                    if (pageNum) goToPage(pageNum);
+                    break;
+            }
+        });
+
+        // Handle input/change events for filters and pagination
+        document.addEventListener('input', function(e) {
+            if (e.target.dataset.action === 'filter-table') {
+                filterTable();
+            }
+        });
+
+        document.addEventListener('change', function(e) {
+            const action = e.target.dataset.action;
+            if (action === 'apply-filters') {
+                applyFilters();
+            } else if (action === 'change-page-size') {
+                changePageSize(e.target.value);
+            }
+        });
 
         // Security: Escape HTML to prevent XSS
         function escapeHtml(text) {
@@ -1595,8 +1676,7 @@
             rows.forEach(row => tbody.appendChild(row));
         }
 
-        // Apply client-side filters on input change
-        document.getElementById('searchInput').addEventListener('input', filterTable);
+        // Note: Search input filtering handled by event delegation above
 
         function exportCSV() {
             const rows = document.querySelectorAll('#camerasTable tbody tr');
@@ -1675,15 +1755,22 @@
 
             compareBar.classList.add('visible');
 
-            // Update cameras list
+            // Update cameras list using DOM APIs (CSP-safe)
             camerasContainer.innerHTML = '';
             selectedCameras.forEach((name, id) => {
                 const chip = document.createElement('span');
                 chip.className = 'compare-bar__camera';
-                chip.innerHTML = `
-                    ${name}
-                    <button class="compare-bar__camera-remove" onclick="removeFromComparison(${id})">&times;</button>
-                `;
+
+                const nameText = document.createTextNode(name);
+                chip.appendChild(nameText);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'compare-bar__camera-remove';
+                removeBtn.dataset.action = 'remove-from-comparison';
+                removeBtn.dataset.cameraId = id;
+                removeBtn.textContent = '×';
+                chip.appendChild(removeBtn);
+
                 camerasContainer.appendChild(chip);
             });
         }

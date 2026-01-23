@@ -258,6 +258,13 @@ async def admin_prompts(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("admin_prompts.html", {"request": request})
 
 
+@router.get("/admin/metrics", response_class=HTMLResponse)
+async def admin_metrics(request: Request) -> HTMLResponse:
+    """Admin performance metrics dashboard page."""
+    templates = get_templates()
+    return templates.TemplateResponse("admin_metrics.html", {"request": request})
+
+
 # =============================================================================
 # Admin OpenAPI Documentation
 # =============================================================================
