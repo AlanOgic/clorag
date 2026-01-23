@@ -129,28 +129,28 @@
                 <p>The following diagram shows the end-to-end retrieval pipeline from user query to AI response:</p>
 
                 <pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
-│                              USER QUERY                                      │
-│                    "How do I configure RIO IP address?"                      │
+│                              USER QUERY                                     │
+│                    "How do I configure RIO IP address?"                     │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         1. QUERY EMBEDDING                                   │
-│  ┌─────────────────────────┐    ┌─────────────────────────────────┐        │
-│  │  Voyage AI (voyage-3)   │    │  FastEmbed BM25                 │        │
-│  │  → 1024-dim dense vec   │    │  → sparse vector (term weights) │        │
-│  └─────────────────────────┘    └─────────────────────────────────┘        │
+│                         1. QUERY EMBEDDING                                  │
+│  ┌─────────────────────────┐    ┌─────────────────────────────────┐         │
+│  │  Voyage AI (voyage-3)   │    │  FastEmbed BM25                 │         │
+│  │  → 1024-dim dense vec   │    │  → sparse vector (term weights) │         │
+│  └─────────────────────────┘    └─────────────────────────────────┘         │
 │           (cached LRU 200)              (cached LRU 200)                    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    2. PARALLEL SEARCH (3 collections)                        │
-│                                                                              │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
-│  │  docusaurus_docs │  │   gmail_cases    │  │   custom_docs    │          │
-│  │  (documentation) │  │ (support cases)  │  │ (admin-managed)  │          │
-│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘          │
+│                    2. PARALLEL SEARCH (3 collections)                       │
+│                                                                             │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐           │
+│  │  docusaurus_docs │  │   gmail_cases    │  │   custom_docs    │           │
+│  │  (documentation) │  │ (support cases)  │  │ (admin-managed)  │           │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘           │
 │           │                     │                     │                     │
 │           └─────────────────────┼─────────────────────┘                     │
 │                                 ▼                                           │
@@ -159,21 +159,21 @@
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      3. HYBRID SEARCH (per collection)                       │
-│                                                                              │
+│                      3. HYBRID SEARCH (per collection)                      │
+│                                                                             │
 │   Dense Search ──────────┐                                                  │
 │   (semantic similarity)  │                                                  │
 │                          ├──► RRF Fusion ──► Ranked Results                 │
 │   Sparse Search ─────────┘    (k=60)                                        │
 │   (keyword matching)                                                        │
-│                                                                              │
-│   RRF Score = Σ 1/(k + rank_dense) + 1/(k + rank_sparse)                   │
+│                                                                             │
+│   RRF Score = Σ 1/(k + rank_dense) + 1/(k + rank_sparse)                    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       4. DYNAMIC THRESHOLD FILTER                            │
-│                                                                              │
+│                       4. DYNAMIC THRESHOLD FILTER                           │
+│                                                                             │
 │   Short query (≤2 words):  threshold 0.15 (permissive)                      │
 │   Medium query (3-5 words): threshold 0.20                                  │
 │   Long query (>5 words):    threshold 0.25 (strict)                         │
@@ -184,50 +184,50 @@
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      5. RERANKING (Voyage AI rerank-2.5)                     │
-│                                                                              │
+│                      5. RERANKING (Voyage AI rerank-2.5)                    │
+│                                                                             │
 │   Cross-encoder model re-scores each candidate against the query            │
 │   +15-40% relevance improvement over RRF alone                              │
 │   Returns top-K results with reranker relevance scores (0-1)                │
 │   LRU cache (100 entries) for repeated query+doc combinations               │
-│                                                                              │
+│                                                                             │
 │   Can be disabled per-query or globally via RERANK_ENABLED=false            │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    6. GRAPHRAG ENRICHMENT (if Neo4j configured)             │
-│                                                                              │
+│                                                                             │
 │   For each chunk, query Neo4j for related entities:                         │
 │   • Camera → COMPATIBLE_WITH → Products                                     │
 │   • Product → USES_PROTOCOL → Protocols                                     │
 │   • Issue → RESOLVED_BY → Solutions                                         │
-│                                                                              │
+│                                                                             │
 │   Adds context: "Related: CI0 compatible with RIO, uses RCP protocol"       │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      7. CLAUDE SYNTHESIS                                     │
-│                                                                              │
+│                      7. CLAUDE SYNTHESIS                                    │
+│                                                                             │
 │   Claude Sonnet 4 receives:                                                 │
 │   • User query                                                              │
 │   • Retrieved chunks (with source URLs)                                     │
 │   • Graph context (entities & relationships)                                │
 │   • System prompt (Cyanview expert persona)                                 │
-│                                                                              │
+│                                                                             │
 │   Generates:                                                                │
 │   • Comprehensive answer                                                    │
 │   • Mermaid diagrams (for connections/topology)                             │
 │   • Source citations                                                        │
-│                                                                              │
+│                                                                             │
 │   Streamed back to user via SSE                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         8. ANALYTICS LOGGING                                 │
-│                                                                              │
+│                         8. ANALYTICS LOGGING                                │
+│                                                                             │
 │   Stored in SQLite (analytics.db):                                          │
 │   • Query text, timestamp                                                   │
 │   • Sources used, chunk IDs                                                 │
@@ -294,7 +294,7 @@
                 <h3>How It Works</h3>
                 <p>Unlike bi-encoders (used for initial retrieval) that encode query and documents separately, cross-encoders process <strong>query+document pairs jointly</strong>. This enables much more accurate relevance prediction at the cost of speed—which is why we use it only on the top candidates.</p>
 
-                <pre><code>┌─────────────────────────────────────────────────────────────────────┐
+                <pre><code>┌──────────────────────────────────────────────────────────────────────┐
 │                         TWO-STAGE RETRIEVAL                          │
 │                                                                      │
 │   Stage 1: Hybrid Search (fast, approximate)                         │
@@ -304,14 +304,14 @@
 │   └─────────────────────────────────────────────────────────────────┘│
 │                              │                                       │
 │                              ▼                                       │
-│   Stage 2: Reranking (slower, precise)                              │
+│   Stage 2: Reranking (slower, precise)                               │
 │   ┌─────────────────────────────────────────────────────────────────┐│
 │   │  For each candidate:                                            ││
 │   │    relevance = rerank(query, document)                          ││
 │   │  Sort by relevance score (0-1)                                  ││
 │   │  Return top-K (default: 5)                                      ││
 │   └─────────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────┘</code></pre>
+└──────────────────────────────────────────────────────────────────────┘</code></pre>
 
                 <h3>Performance Impact</h3>
                 <table>

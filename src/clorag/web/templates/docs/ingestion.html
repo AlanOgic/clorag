@@ -277,19 +277,19 @@ uv run ingest-curated --offset 600 --max-threads 300</code></pre>
           │
           ├──────────────────┬──────────────────┐
           ▼                  ▼                  │
-   ┌─────────────┐    ┌─────────────┐          │
-   │   VOYAGE    │    │  FASTEMBED  │          │
-   │voyage-ctx-3 │    │    BM25     │          │
-   │ input_type= │    │   sparse    │          │
-   │  document   │    │   vectors   │          │
-   └─────────────┘    └─────────────┘          │
+   ┌─────────────┐    ┌─────────────┐           │
+   │   VOYAGE    │    │  FASTEMBED  │           │
+   │voyage-ctx-3 │    │    BM25     │           │
+   │ input_type= │    │   sparse    │           │
+   │  document   │    │   vectors   │           │
+   └─────────────┘    └─────────────┘           │
           │                  │                  │
           ▼                  ▼                  │
-   ┌─────────────┐    ┌─────────────┐          │
-   │   DENSE     │    │   SPARSE    │          │
-   │  1024-dim   │    │  variable   │          │
-   │   vector    │    │   indices   │          │
-   └─────────────┘    └─────────────┘          │
+   ┌─────────────┐    ┌─────────────┐           │
+   │   DENSE     │    │   SPARSE    │           │
+   │  1024-dim   │    │  variable   │           │
+   │   vector    │    │   indices   │           │
+   └─────────────┘    └─────────────┘           │
           │                  │                  │
           └────────┬─────────┘                  │
                    ▼                            │
