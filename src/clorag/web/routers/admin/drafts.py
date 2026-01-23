@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from clorag.config import get_settings
-from clorag.web.auth import verify_admin
+from clorag.web.auth import verify_admin, verify_csrf
 
 router = APIRouter(tags=["Drafts"])
 
@@ -84,7 +84,8 @@ async def api_thread_detail(
 @router.post("/drafts/preview/{thread_id}")
 async def api_preview_draft(
     thread_id: str,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Preview draft for a specific thread without creating it."""
     from clorag.drafts import DraftCreationPipeline, DraftPreview
@@ -103,7 +104,8 @@ async def api_preview_draft(
 @router.post("/drafts/create/{thread_id}")
 async def api_create_draft(
     thread_id: str,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Create draft for a specific thread."""
     from clorag.drafts import DraftCreationPipeline, DraftResult
@@ -125,7 +127,8 @@ async def api_create_draft(
 @router.post("/drafts/run")
 async def api_run_draft_pipeline(
     max_drafts: int = 5,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Manually trigger the draft creation pipeline."""
     from clorag.drafts import DraftCreationPipeline

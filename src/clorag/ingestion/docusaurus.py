@@ -80,7 +80,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         sitemap_url = urljoin(self._base_url, "/sitemap.xml")
         logger.info("Fetching sitemap", url=sitemap_url)
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             try:
                 response = await client.get(sitemap_url, timeout=30.0)
                 response.raise_for_status()

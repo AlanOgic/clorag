@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-import time
-from collections import OrderedDict
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime
@@ -15,64 +13,15 @@ from pathlib import Path
 from typing import Any
 
 from clorag.config import get_settings
+from clorag.core.cache import LRUCache
 from clorag.models.camera import Camera, CameraCreate, CameraSource, CameraUpdate, DeviceType
 from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class TTLCache:
-    """Thread-safe LRU cache with TTL expiration."""
-
-    def __init__(self, maxsize: int = 100, ttl_seconds: float = 300.0) -> None:
-        """Initialize cache.
-
-        Args:
-            maxsize: Maximum number of items to store.
-            ttl_seconds: Time-to-live for cached items in seconds.
-        """
-        self._cache: OrderedDict[str, tuple[float, Any]] = OrderedDict()
-        self._maxsize = maxsize
-        self._ttl = ttl_seconds
-        self._lock = threading.Lock()
-
-    def get(self, key: str) -> Any | None:
-        """Get a value from cache if not expired."""
-        with self._lock:
-            if key not in self._cache:
-                return None
-            timestamp, value = self._cache[key]
-            if time.time() - timestamp > self._ttl:
-                del self._cache[key]
-                return None
-            # Move to end (LRU)
-            self._cache.move_to_end(key)
-            return value
-
-    def set(self, key: str, value: Any) -> None:
-        """Set a value in cache."""
-        with self._lock:
-            if key in self._cache:
-                del self._cache[key]
-            self._cache[key] = (time.time(), value)
-            # Evict oldest if over capacity
-            while len(self._cache) > self._maxsize:
-                self._cache.popitem(last=False)
-
-    def invalidate(self, pattern: str | None = None) -> None:
-        """Invalidate cache entries.
-
-        Args:
-            pattern: If provided, only invalidate keys containing this pattern.
-                    If None, invalidate all entries.
-        """
-        with self._lock:
-            if pattern is None:
-                self._cache.clear()
-            else:
-                keys_to_delete = [k for k in self._cache if pattern in k]
-                for key in keys_to_delete:
-                    del self._cache[key]
+# TTLCache is now an alias to LRUCache with TTL for backwards compatibility
+TTLCache = LRUCache
 
 
 class ConnectionPool:
@@ -88,6 +37,7 @@ class ConnectionPool:
         self._db_path = db_path
         self._pool_size = pool_size
         self._connections: list[sqlite3.Connection] = []
+        self._in_use = 0  # Track connections currently checked out
         self._lock = threading.Lock()
         self._condition = threading.Condition(self._lock)
 
@@ -107,18 +57,21 @@ class ConnectionPool:
         """Get a connection from the pool."""
         conn: sqlite3.Connection | None = None
         with self._condition:
-            while not self._connections and len(self._connections) >= self._pool_size:
+            # Wait if pool is empty AND we've hit max connections
+            while not self._connections and self._in_use >= self._pool_size:
                 self._condition.wait(timeout=5.0)
 
             if self._connections:
                 conn = self._connections.pop()
             else:
                 conn = self._create_connection()
+            self._in_use += 1
 
         try:
             yield conn
         finally:
             with self._condition:
+                self._in_use -= 1
                 if len(self._connections) < self._pool_size:
                     self._connections.append(conn)
                 else:
@@ -131,6 +84,7 @@ class ConnectionPool:
             for conn in self._connections:
                 conn.close()
             self._connections.clear()
+            self._in_use = 0
 
 # Whitelist of allowed columns for UPDATE operations (SQL injection protection)
 ALLOWED_UPDATE_COLUMNS = frozenset(
@@ -170,7 +124,7 @@ class CameraDatabase:
 
         # Initialize connection pool and cache
         self._pool = ConnectionPool(self._db_path, pool_size=5)
-        self._cache = TTLCache(maxsize=200, ttl_seconds=300.0)  # 5 minute TTL
+        self._cache: LRUCache[Any] = LRUCache(max_size=200, ttl_seconds=300.0)  # 5 min TTL
 
         self._ensure_schema()
 

@@ -8,7 +8,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from clorag.web.auth import verify_admin
+from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.schemas import RelationshipDeleteRequest, RelationshipUpdateRequest
 from clorag.web.search import get_graph_enrichment
 
@@ -185,7 +185,8 @@ async def api_graph_relationships(
 @router.delete("/graph/relationships")
 async def api_delete_relationship(
     request: RelationshipDeleteRequest,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Delete a relationship between two nodes."""
     enrichment = await get_graph_enrichment()
@@ -214,7 +215,8 @@ async def api_delete_relationship(
 @router.patch("/graph/relationships")
 async def api_update_relationship(
     request: RelationshipUpdateRequest,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Update the type of a relationship between two nodes."""
     enrichment = await get_graph_enrichment()

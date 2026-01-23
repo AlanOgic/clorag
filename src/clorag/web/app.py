@@ -95,11 +95,24 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
         # Content Security Policy with nonce for inline scripts
         # SECURITY: Uses per-request nonce for script execution (CSP Level 2+).
-        # All 28 templates have been updated to use nonce="{{ request.state.csp_nonce }}".
+        # All templates use nonce="{{ request.state.csp_nonce }}" for inline scripts.
         # 'unsafe-inline' for style-src is needed for inline styles and libraries like Mermaid.
+        #
+        # NOTE: Admin pages use 'unsafe-hashes' to allow inline event handlers (onclick, etc.)
+        # while templates are being migrated to use data-action attributes with event delegation.
+        # Public pages use strict nonce-only policy.
+        is_admin_page = request.url.path.startswith("/admin")
+        if is_admin_page:
+            # Admin pages: Allow inline event handlers via 'unsafe-hashes'
+            # This is a temporary measure while migrating to data-action pattern
+            script_src = f"script-src 'self' 'nonce-{csp_nonce}' 'unsafe-hashes' 'unsafe-inline' https://cdn.jsdelivr.net"
+        else:
+            # Public pages: Strict nonce-only policy
+            script_src = f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net"
+
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net; "
+            f"{script_src}; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "img-src 'self' data: https:; "
             "font-src 'self' https://cdn.jsdelivr.net; "
@@ -132,12 +145,21 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
 
     # Ensure all Qdrant collections exist (including custom_docs)
+    # This is a critical check - the app cannot function without Qdrant
     try:
         vs = get_vectorstore()
         await vs.ensure_collections(hybrid=True)
         logger.info("Qdrant collections ensured")
     except Exception as e:
-        logger.warning("Failed to ensure Qdrant collections", error=str(e))
+        logger.critical(
+            "Failed to connect to Qdrant - application cannot start",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
+        raise RuntimeError(
+            f"Qdrant initialization failed: {e}. "
+            "Check QDRANT_URL and ensure Qdrant server is running."
+        ) from e
 
     # Pre-load BM25 sparse embedding model to eliminate cold start latency (~2-3s)
     try:

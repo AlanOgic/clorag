@@ -285,7 +285,7 @@
                     pagination.style.display = 'none';
                 }
             } catch (error) {
-                document.getElementById('chunksBody').innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${error.message}</td></tr>`;
+                document.getElementById('chunksBody').innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${escapeHtml(error.message)}</td></tr>`;
             }
         }
 
@@ -312,7 +312,7 @@
                 renderChunks(data.chunks, false);
                 document.getElementById('pagination').style.display = 'none';
             } catch (error) {
-                document.getElementById('chunksBody').innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${error.message}</td></tr>`;
+                document.getElementById('chunksBody').innerHTML = `<tr><td colspan="5" class="empty-state">Error: ${escapeHtml(error.message)}</td></tr>`;
             }
         }
 

@@ -20,7 +20,7 @@ logger = structlog.get_logger()
 # Session constants
 MAX_SESSIONS = 1000  # Maximum concurrent sessions
 ADMIN_SESSION_COOKIE = "admin_session"
-ADMIN_SESSION_MAX_AGE = 24 * 60 * 60  # 24 hours
+ADMIN_SESSION_MAX_AGE = 4 * 60 * 60  # 4 hours (reduced from 24 for security)
 
 
 class SessionStore:

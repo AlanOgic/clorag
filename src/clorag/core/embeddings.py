@@ -1,9 +1,6 @@
 """Voyage AI embeddings client."""
 
-import hashlib
-from collections import OrderedDict
 from dataclasses import dataclass
-from threading import Lock
 from typing import Literal
 
 import structlog
@@ -11,6 +8,7 @@ import voyageai
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from clorag.config import get_settings
+from clorag.core.cache import LRUCache, make_cache_key
 
 logger = structlog.get_logger(__name__)
 
@@ -19,54 +17,24 @@ QUERY_CACHE_MAX_SIZE = 200  # Cache up to 200 unique queries
 
 
 class QueryEmbeddingCache:
-    """Thread-safe LRU cache for query embeddings to reduce API calls."""
+    """Wrapper around LRUCache for query embeddings with typed interface."""
 
     def __init__(self, max_size: int = QUERY_CACHE_MAX_SIZE) -> None:
-        self._cache: OrderedDict[str, list[float]] = OrderedDict()
-        self._max_size = max_size
-        self._lock = Lock()
-        self._hits = 0
-        self._misses = 0
-
-    def _make_key(self, query: str, model: str, dimensions: int) -> str:
-        """Create cache key from query parameters."""
-        key_str = f"{query}:{model}:{dimensions}"
-        return hashlib.sha256(key_str.encode()).hexdigest()[:32]
+        self._cache: LRUCache[list[float]] = LRUCache(max_size=max_size)
 
     def get(self, query: str, model: str, dimensions: int) -> list[float] | None:
         """Get cached embedding or None if not found."""
-        key = self._make_key(query, model, dimensions)
-        with self._lock:
-            if key in self._cache:
-                # Move to end (most recently used)
-                self._cache.move_to_end(key)
-                self._hits += 1
-                return self._cache[key]
-            self._misses += 1
-            return None
+        key = make_cache_key(query, model, dimensions)
+        return self._cache.get(key)
 
     def set(self, query: str, model: str, dimensions: int, embedding: list[float]) -> None:
-        """Cache an embedding, evicting oldest if at capacity."""
-        key = self._make_key(query, model, dimensions)
-        with self._lock:
-            if key in self._cache:
-                self._cache.move_to_end(key)
-            else:
-                if len(self._cache) >= self._max_size:
-                    self._cache.popitem(last=False)  # Remove oldest
-                self._cache[key] = embedding
+        """Cache an embedding."""
+        key = make_cache_key(query, model, dimensions)
+        self._cache.set(key, embedding)
 
-    def stats(self) -> dict[str, int]:
+    def stats(self) -> dict[str, int | float]:
         """Get cache statistics."""
-        with self._lock:
-            total = self._hits + self._misses
-            hit_rate = (self._hits / total * 100) if total > 0 else 0
-            return {
-                "size": len(self._cache),
-                "hits": self._hits,
-                "misses": self._misses,
-                "hit_rate_percent": round(hit_rate, 1),
-            }
+        return self._cache.stats()
 
 
 # Global query cache instance

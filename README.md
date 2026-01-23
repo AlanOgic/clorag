@@ -679,6 +679,7 @@ uv run populate-graph
 | **Brute Force Protection** | 5 failed attempts → 5min lockout/IP |
 | **Rate Limiting** | 10/min login, configurable admin |
 | **XSS Protection** | DOMPurify with SVG allowlist |
+| **Content Security Policy** | Strict nonce-based CSP for public pages |
 | **Open Redirect Prevention** | Validated login redirects |
 | **HTTPS Cookies** | Secure, HttpOnly, SameSite=Strict |
 | **Timing-Safe Comparison** | Prevents timing attacks |
@@ -709,6 +710,7 @@ clorag/
 │   │   ├── support_case_db.py     # Support cases SQLite
 │   │   ├── prompt_db.py           # Prompts SQLite
 │   │   ├── terminology_db.py      # RIO terminology fixes SQLite
+│   │   ├── cache.py               # Generic LRU cache with TTL
 │   │   └── metrics.py             # Performance instrumentation
 │   │
 │   ├── agent/                     # Claude Agent SDK

@@ -496,7 +496,7 @@
             <div class="section">
                 <div class="section-header">
                     <span class="section-header__title">Searches per Day (Last 7 Days)</span>
-                    <button class="refresh-btn" onclick="loadAnalytics()">
+                    <button class="refresh-btn" id="refreshBtn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
                         </svg>
@@ -514,7 +514,7 @@
 
             <!-- Popular Queries -->
             <div class="section section--collapsible">
-                <div class="section__header" onclick="toggleSection('popularQueries')">
+                <div class="section__header" id="popularQueriesHeader" data-section="popularQueries">
                     <h3 class="section__title">Popular Queries (Last 30 Days)</h3>
                     <span class="section__toggle">
                         <span id="popularQueriesLabel">Show</span>
@@ -539,7 +539,7 @@
 
             <!-- Recent Conversations -->
             <div class="section section--collapsible">
-                <div class="section__header" onclick="toggleSection('recentConversations')">
+                <div class="section__header" id="recentConversationsHeader" data-section="recentConversations">
                     <h3 class="section__title">Recent Conversations</h3>
                     <span class="section__toggle">
                         <span id="recentConversationsLabel">Show</span>
@@ -584,7 +584,7 @@
         <div class="modal">
             <div class="modal__header">
                 <span class="modal__title">Search Details</span>
-                <button class="modal__close" onclick="closeModal()">&times;</button>
+                <button class="modal__close" data-action="close-modal" data-modal="searchModal">&times;</button>
             </div>
             <div class="modal__body" id="modalBody">
                 <div class="loading">
@@ -629,6 +629,25 @@
             } catch (e) {
                 console.error('Logout failed:', e);
             }
+        });
+
+        // Refresh button handler
+        document.getElementById('refreshBtn').addEventListener('click', loadAnalytics);
+
+        // Section toggle handlers (using data-action attributes)
+        document.getElementById('popularQueriesHeader').addEventListener('click', () => {
+            AdminActions.toggleSection('popularQueries');
+        });
+        document.getElementById('recentConversationsHeader').addEventListener('click', () => {
+            AdminActions.toggleSection('recentConversations');
+        });
+
+        // Register page-specific action handlers
+        AdminActions.register('open-search-detail', (el) => {
+            openSearchDetail(parseInt(el.dataset.id, 10));
+        });
+        AdminActions.register('toggle-conversation', (el) => {
+            toggleConversation(parseInt(el.dataset.idx, 10));
         });
 
         async function loadAnalytics() {
@@ -707,7 +726,7 @@
                 const sessionShort = conv.session_id ? conv.session_id.substring(0, 8) : 'Unknown';
 
                 const queriesHtml = conv.queries.map((q, i) => `
-                    <div class="conversation-query clickable-row" onclick="openSearchDetail(${q.id})" title="Click to view details">
+                    <div class="conversation-query clickable-row" data-action="open-search-detail" data-id="${q.id}" title="Click to view details">
                         <span class="conversation-query__number">${i + 1}</span>
                         <span class="conversation-query__text">${escapeHtml(q.query)}</span>
                         <div class="conversation-query__meta">
@@ -718,7 +737,7 @@
 
                 return `
                     <div class="conversation-card">
-                        <div class="conversation-card__header" onclick="toggleConversation(${idx})">
+                        <div class="conversation-card__header" data-action="toggle-conversation" data-idx="${idx}">
                             <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0;">
                                 <span class="conversation-card__count">${conv.query_count} ${conv.query_count === 1 ? 'query' : 'queries'}</span>
                                 <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(truncatedQuery)}</span>
@@ -742,17 +761,8 @@
         function toggleConversation(idx) {
             const body = document.getElementById('convBody' + idx);
             const icon = document.getElementById('expandIcon' + idx);
-            body.classList.toggle('expanded');
-            icon.classList.toggle('rotated');
-        }
-
-        function toggleSection(sectionId) {
-            const content = document.getElementById(sectionId + 'Content');
-            const icon = document.getElementById(sectionId + 'Icon');
-            const label = document.getElementById(sectionId + 'Label');
-            const isExpanded = content.classList.toggle('expanded');
-            icon.classList.toggle('rotated');
-            label.textContent = isExpanded ? 'Hide' : 'Show';
+            if (body) body.classList.toggle('expanded');
+            if (icon) icon.classList.toggle('rotated');
         }
 
         function renderDailyChart(dailyData) {
@@ -834,7 +844,7 @@
                     ? '<span class="tag tag--reranked">Yes</span>'
                     : '<span class="tag tag--no-rerank">No</span>';
                 return `
-                    <tr class="clickable-row" onclick="openSearchDetail(${s.id})" title="Click to view stored details">
+                    <tr class="clickable-row" data-action="open-search-detail" data-id="${s.id}" title="Click to view stored details">
                         <td>${escapeHtml(s.query.substring(0, 60))}${s.query.length > 60 ? '...' : ''}</td>
                         <td><span class="tag ${tagClass}">${s.source}</span></td>
                         <td>${rerankTag}</td>
@@ -895,27 +905,14 @@
                 const data = await response.json();
                 renderSearchDetail(data);
             } catch (error) {
-                modalBody.innerHTML = `<p class="error">${error.message}</p>`;
+                modalBody.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
             }
         }
 
         function closeModal() {
             searchModal.classList.add('hidden');
         }
-
-        // Close modal on overlay click
-        searchModal.addEventListener('click', (e) => {
-            if (e.target === searchModal) {
-                closeModal();
-            }
-        });
-
-        // Close modal on Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !searchModal.classList.contains('hidden')) {
-                closeModal();
-            }
-        });
+        // Modal overlay click and Escape key are handled globally by AdminActions
 
         function renderSearchDetail(data) {
             const tagClass = data.source === 'docs' ? 'tag--docs' :

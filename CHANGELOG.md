@@ -2,6 +2,64 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.6.3] - 2026-01-23
+
+### Added
+
+- **CSP-Compliant Event Delegation System**
+  - New `AdminActions` object in `admin.js` for global event delegation
+  - Supports `data-action` attributes instead of inline `onclick` handlers
+  - Built-in handlers: `toggle-section`, `close-modal`, `open-modal`, `add-row`, `remove-row`, `confirm-delete`, `call`
+  - Custom handler registration via `AdminActions.register('action-name', handler)`
+  - Automatic modal close on overlay click and Escape key
+
+- **Generic LRU Cache Module**
+  - New `src/clorag/core/cache.py` with thread-safe `LRUCache[T]` class
+  - Optional TTL-based expiration for cached items
+  - Hit/miss statistics tracking with `stats()` method
+  - `make_cache_key(*args)` helper for hash-based key generation
+  - Designed for embeddings, reranking, and database query caching
+
+- **Modular Web Architecture**
+  - Refactored monolithic `app.py` (2700+ lines) into clean modular structure
+  - New `web/auth/` module: `admin.py`, `csrf.py`, `sessions.py`
+  - New `web/search/` module: `pipeline.py`, `synthesis.py`, `utils.py`
+  - New `web/routers/` with 11 admin routers + 3 public routers
+  - New `web/schemas.py` for Pydantic request/response models
+  - New `web/dependencies.py` for FastAPI dependency injection
+  - `app.py` now ~200 lines: middleware, lifespan, app initialization
+
+### Changed
+
+- **Differentiated CSP Policy**
+  - Admin pages: Allow inline handlers via `unsafe-inline` (behind authentication)
+  - Public pages: Strict nonce-only policy for maximum security
+  - Provides migration path while templates are updated to data-action pattern
+
+- **Template Migration to Event Delegation**
+  - `index.html` fully migrated to data-action pattern (strict CSP)
+  - `admin_analytics.html` partially migrated with AdminActions handlers
+  - Dynamic HTML now uses `data-action`, `data-exchange`, `data-format` attributes
+
+### Security
+
+- Nonce-based CSP maintained for public-facing pages
+- Admin pages use relaxed CSP (behind authentication) until template migration complete
+- Modal overlay click and Escape key handlers now global (reduce code duplication)
+
+### Files
+
+- `src/clorag/core/cache.py` - New generic LRU cache module
+- `src/clorag/web/app.py` - CSP differentiation, reduced to ~200 lines
+- `src/clorag/web/static/js/admin.js` - AdminActions event delegation system
+- `src/clorag/web/templates/index.html` - Migrated to data-action pattern
+- `src/clorag/web/templates/admin_analytics.html` - Partial migration
+- `src/clorag/web/auth/` - New authentication module (3 files)
+- `src/clorag/web/search/` - New search pipeline module (3 files)
+- `src/clorag/web/routers/` - New router modules (14 files)
+- `src/clorag/web/schemas.py` - Request/response Pydantic models
+- `src/clorag/web/dependencies.py` - FastAPI dependency injection
+
 ## [0.6.2] - 2026-01-22
 
 ### Added

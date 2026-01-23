@@ -604,7 +604,7 @@
                 }
 
             } catch (error) {
-                tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Error: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Error: ${escapeHtml(error.message)}</td></tr>`;
             }
         }
 
@@ -721,7 +721,7 @@
                 });
 
             } catch (error) {
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Error: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Error: ${escapeHtml(error.message)}</td></tr>`;
             }
         }
 

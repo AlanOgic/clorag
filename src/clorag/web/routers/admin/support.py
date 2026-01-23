@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from clorag.core.support_case_db import get_support_case_database
-from clorag.web.auth import verify_admin
+from clorag.web.auth import verify_admin, verify_csrf
 
 router = APIRouter(tags=["Support Cases"])
 
@@ -88,7 +88,8 @@ async def api_get_support_case_raw_thread(
 @router.delete("/support-cases/{case_id}")
 async def api_delete_support_case(
     case_id: str,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Delete a support case."""
     db = get_support_case_database()

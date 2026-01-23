@@ -6,8 +6,10 @@ from typing import Any
 from urllib.parse import urlparse
 from uuid import uuid4
 
+import structlog
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.models import (
     Distance,
     Modifier,
@@ -18,6 +20,8 @@ from qdrant_client.http.models import (
 )
 
 from clorag.config import get_settings
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -527,9 +531,30 @@ class VectorStore:
                 sparse_vector=sparse_vector,
                 limit=limit,
             )
-        except Exception:
-            # Collection might not exist yet - return empty results
-            return []
+        except UnexpectedResponse as e:
+            # Collection not found is expected if no custom docs uploaded yet
+            if "not found" in str(e).lower() or "doesn't exist" in str(e).lower():
+                logger.debug(
+                    "Custom docs collection not found",
+                    collection=self._custom_docs_collection,
+                )
+                return []
+            # Other Qdrant errors should be logged and re-raised
+            logger.error(
+                "Qdrant error in custom docs search",
+                error=str(e),
+                collection=self._custom_docs_collection,
+            )
+            raise
+        except Exception as e:
+            # Unexpected errors should be logged and re-raised
+            logger.error(
+                "Unexpected error in custom docs search",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            raise
 
     async def hybrid_search_rrf(
         self,
@@ -806,14 +831,23 @@ class VectorStore:
             if not batch:
                 break
 
-            # If we need vectors, fetch them individually
-            if with_vectors:
-                for chunk in batch:
-                    full_chunk = await self.get_chunk(
-                        collection, chunk["id"], with_vectors=True
-                    )
-                    if full_chunk:
-                        chunks.append(full_chunk)
+            # If we need vectors, fetch them in a single batch request (not N+1)
+            if with_vectors and batch:
+                chunk_ids = [chunk["id"] for chunk in batch]
+                results = await self._client.retrieve(
+                    collection_name=collection,
+                    ids=chunk_ids,
+                    with_payload=True,
+                    with_vectors=True,
+                )
+                for point in results:
+                    chunk_dict: dict[str, Any] = {
+                        "id": str(point.id),
+                        "payload": point.payload or {},
+                    }
+                    if point.vector:
+                        chunk_dict["vectors"] = point.vector
+                    chunks.append(chunk_dict)
             else:
                 chunks.extend(batch)
 

@@ -1,5 +1,6 @@
 """Multi-source retriever combining documentation and Gmail cases with hybrid RRF search."""
 
+import asyncio
 from dataclasses import dataclass
 from enum import Enum
 
@@ -191,7 +192,7 @@ class MultiSourceRetriever:
         # Apply reranking if enabled and we have results
         was_reranked = False
         if should_rerank and filtered_results:
-            filtered_results = self._apply_reranking(query, filtered_results, limit)
+            filtered_results = await self._apply_reranking(query, filtered_results, limit)
             was_reranked = True
 
         # Limit results to requested amount
@@ -205,7 +206,7 @@ class MultiSourceRetriever:
             reranked=was_reranked,
         )
 
-    def _apply_reranking(
+    async def _apply_reranking(
         self,
         query: str,
         results: list[SearchResult],
@@ -227,8 +228,9 @@ class MultiSourceRetriever:
         # Extract document texts for reranking
         documents = [r.text for r in results]
 
-        # Call reranker (synchronous, but fast for small document sets)
-        rerank_response = self._reranker.rerank(
+        # Run reranker in thread pool to avoid blocking the event loop
+        rerank_response = await asyncio.to_thread(
+            self._reranker.rerank,
             query=query,
             documents=documents,
             top_k=top_k,
@@ -361,15 +363,11 @@ class MultiSourceRetriever:
         Returns:
             Dict with 'dense', 'sparse', and 'rerank' cache stats.
         """
-        from typing import cast
-
         from clorag.core.embeddings import get_query_cache
 
-        # Note: existing cache stats return dict[str, int] but contain floats
-        # for hit_rate_percent. Using cast to satisfy type checker.
         return {
-            "dense": cast(dict[str, int | float], get_query_cache().stats()),
-            "sparse": cast(dict[str, int | float], self._sparse_embeddings.cache_stats()),
+            "dense": get_query_cache().stats(),
+            "sparse": self._sparse_embeddings.cache_stats(),
             "rerank": self._reranker.cache_stats(),
         }
 

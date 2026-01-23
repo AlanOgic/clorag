@@ -285,7 +285,7 @@
                 document.getElementById('fixesTable').style.display = allFixes.length === 0 ? 'none' : 'table';
 
             } catch (error) {
-                document.getElementById('fixesBody').innerHTML = `<tr><td colspan="7" class="empty-state">Error: ${error.message}</td></tr>`;
+                document.getElementById('fixesBody').innerHTML = `<tr><td colspan="7" class="empty-state">Error: ${escapeHtml(error.message)}</td></tr>`;
             }
         }
 

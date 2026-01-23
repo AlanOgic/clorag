@@ -7,7 +7,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
-from clorag.web.auth import verify_admin
+from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.dependencies import limiter
 from clorag.web.schemas import (
     PromptCreateFromDefaultRequest,
@@ -80,7 +80,8 @@ async def api_prompt_update(
     request: Request,
     prompt_id: str,
     updates: Annotated[PromptUpdateRequest, Body()],
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Update a prompt (creates a new version if content changed)."""
     from clorag.services.prompt_manager import get_prompt_manager
@@ -112,7 +113,8 @@ async def api_prompt_update(
 async def api_prompt_create_from_default(
     request: Request,
     data: Annotated[PromptCreateFromDefaultRequest, Body()],
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Create a database prompt from a default, optionally with modifications."""
     from clorag.core.prompt_db import get_prompt_database
@@ -168,7 +170,8 @@ async def api_prompt_rollback(
     request: Request,
     prompt_id: str,
     data: Annotated[PromptRollbackRequest, Body()],
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Rollback a prompt to a previous version."""
     from clorag.services.prompt_manager import get_prompt_manager
@@ -185,7 +188,8 @@ async def api_prompt_rollback(
 async def api_prompts_initialize(
     request: Request,
     force: bool = False,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Initialize database with default prompts."""
     from clorag.services.prompt_manager import get_prompt_manager
@@ -197,7 +201,8 @@ async def api_prompts_initialize(
 
 @router.post("/prompts/reload")
 async def api_prompts_reload(
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, str]:
     """Reload all prompt caches (hot reload)."""
     from clorag.services.prompt_manager import get_prompt_manager
@@ -223,7 +228,8 @@ async def api_prompts_cache_stats(
 async def api_prompt_test(
     request: Request,
     data: Annotated[PromptTestRequest, Body()],
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Test a prompt with variable substitution (no LLM call)."""
     from clorag.services.prompt_manager import get_prompt_manager

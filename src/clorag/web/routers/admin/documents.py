@@ -16,7 +16,7 @@ from clorag.models.custom_document import (
     CustomDocumentUpdate,
     DocumentCategory,
 )
-from clorag.web.auth import verify_admin
+from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.dependencies import get_custom_docs_service, limiter
 from clorag.web.schemas import KnowledgeListResponse
 
@@ -25,6 +25,10 @@ logger = structlog.get_logger()
 
 # Maximum file upload size (10MB)
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+# PDF safety limits
+MAX_PDF_PAGES = 500  # Maximum pages to process
+MAX_PDF_PAGE_TEXT = 100_000  # Maximum text per page (100KB)
 
 
 async def read_upload_with_limit(
@@ -107,7 +111,8 @@ async def api_knowledge_get(
 async def api_knowledge_create(
     request: Request,
     doc: Annotated[CustomDocumentCreate, Body()],
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> CustomDocument:
     """Create a new custom document."""
     service = get_custom_docs_service()
@@ -120,7 +125,8 @@ async def api_knowledge_update(
     request: Request,
     doc_id: str,
     updates: Annotated[CustomDocumentUpdate, Body()],
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> CustomDocument:
     """Update a custom document."""
     service = get_custom_docs_service()
@@ -135,7 +141,8 @@ async def api_knowledge_update(
 async def api_knowledge_delete(
     request: Request,
     doc_id: str,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, str]:
     """Delete a custom document."""
     service = get_custom_docs_service()
@@ -154,7 +161,8 @@ async def api_knowledge_upload(
     tags: Annotated[str, Form()] = "",
     url_reference: Annotated[str, Form()] = "",
     notes: Annotated[str, Form()] = "",
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> CustomDocument:
     """Upload a file (txt, md, pdf) as a custom document.
 
@@ -171,6 +179,25 @@ async def api_knowledge_upload(
         raise HTTPException(
             status_code=400,
             detail="Unsupported file type. Allowed: .txt, .md, .pdf",
+        )
+
+    # Validate MIME type (defense in depth)
+    allowed_mimes = {
+        "text/plain",
+        "text/markdown",
+        "text/x-markdown",
+        "application/pdf",
+        "application/octet-stream",  # Some browsers send this for .md files
+    }
+    if file.content_type and file.content_type not in allowed_mimes:
+        logger.warning(
+            "Suspicious file upload: MIME type mismatch",
+            filename=filename,
+            content_type=file.content_type,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid content type: {file.content_type}",
         )
 
     # Read file content with streaming size limit
@@ -191,16 +218,40 @@ async def api_knowledge_upload(
                     detail="Could not decode file. Please ensure it's a valid text file.",
                 )
     elif filename.endswith(".pdf"):
-        # PDF files - extract text using pypdf
+        # PDF files - extract text using pypdf with safety limits
         try:
             from pypdf import PdfReader
+            from pypdf.errors import PdfReadError
 
             pdf_file = io.BytesIO(content_bytes)
-            reader = PdfReader(pdf_file)
+            try:
+                reader = PdfReader(pdf_file)
+            except PdfReadError as e:
+                logger.warning("Invalid PDF file", error=str(e))
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid or corrupted PDF file.",
+                )
+
+            # Enforce page limit to prevent DoS
+            if len(reader.pages) > MAX_PDF_PAGES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"PDF too large. Maximum {MAX_PDF_PAGES} pages allowed.",
+                )
+
             text_parts = []
-            for page in reader.pages:
+            for i, page in enumerate(reader.pages):
                 page_text = page.extract_text()
                 if page_text:
+                    # Enforce per-page size limit
+                    if len(page_text) > MAX_PDF_PAGE_TEXT:
+                        logger.warning(
+                            "PDF page text too large, truncating",
+                            page=i + 1,
+                            size=len(page_text),
+                        )
+                        page_text = page_text[:MAX_PDF_PAGE_TEXT]
                     text_parts.append(page_text)
             content = "\n\n".join(text_parts)
         except ImportError:
@@ -208,6 +259,8 @@ async def api_knowledge_upload(
                 status_code=500,
                 detail="PDF support not available. Install pypdf package.",
             )
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning("PDF extraction failed", error=str(e))
             raise HTTPException(

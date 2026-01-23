@@ -6,7 +6,7 @@ Provides listing, viewing, updating, and deleting of chunks in Qdrant collection
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from clorag.web.auth import verify_admin
+from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.dependencies import limiter
 from clorag.web.schemas import (
     ChunkCollection,
@@ -138,7 +138,8 @@ async def api_chunk_update(
     collection: str,
     chunk_id: str,
     updates: ChunkUpdate,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> ChunkDetail:
     """Update a chunk. Re-embeds automatically if text changes."""
     # Validate collection
@@ -185,7 +186,7 @@ async def api_chunk_update(
         raise HTTPException(status_code=500, detail="Failed to update chunk")
 
     # Return updated chunk
-    return await api_chunk_get(collection, chunk_id, _)
+    return await api_chunk_get(collection, chunk_id, _admin)
 
 
 @router.delete("/chunks/{collection}/{chunk_id}")
@@ -194,7 +195,8 @@ async def api_chunk_delete(
     request: Request,
     collection: str,
     chunk_id: str,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, str]:
     """Delete a single chunk."""
     # Validate collection

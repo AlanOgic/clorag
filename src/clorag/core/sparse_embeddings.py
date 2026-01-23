@@ -1,12 +1,9 @@
 """BM25 sparse embeddings using FastEmbed for hybrid search."""
 
-import hashlib
-from collections import OrderedDict
-from threading import Lock
-
 from fastembed import SparseTextEmbedding
 from qdrant_client.http.models import SparseVector
 
+from clorag.core.cache import LRUCache, make_cache_key
 from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,53 +13,24 @@ SPARSE_CACHE_MAX_SIZE = 200
 
 
 class SparseQueryCache:
-    """Thread-safe LRU cache for sparse query embeddings."""
+    """Wrapper around LRUCache for sparse embeddings with typed interface."""
 
     def __init__(self, max_size: int = SPARSE_CACHE_MAX_SIZE) -> None:
-        self._cache: OrderedDict[str, SparseVector] = OrderedDict()
-        self._max_size = max_size
-        self._lock = Lock()
-        self._hits = 0
-        self._misses = 0
-
-    def _make_key(self, query: str, model: str) -> str:
-        """Create cache key from query parameters."""
-        key_str = f"{query}:{model}"
-        return hashlib.sha256(key_str.encode()).hexdigest()[:32]
+        self._cache: LRUCache[SparseVector] = LRUCache(max_size=max_size)
 
     def get(self, query: str, model: str) -> SparseVector | None:
         """Get cached sparse vector or None if not found."""
-        key = self._make_key(query, model)
-        with self._lock:
-            if key in self._cache:
-                self._cache.move_to_end(key)
-                self._hits += 1
-                return self._cache[key]
-            self._misses += 1
-            return None
+        key = make_cache_key(query, model)
+        return self._cache.get(key)
 
     def set(self, query: str, model: str, vector: SparseVector) -> None:
-        """Cache a sparse vector, evicting oldest if at capacity."""
-        key = self._make_key(query, model)
-        with self._lock:
-            if key in self._cache:
-                self._cache.move_to_end(key)
-            else:
-                if len(self._cache) >= self._max_size:
-                    self._cache.popitem(last=False)
-                self._cache[key] = vector
+        """Cache a sparse vector."""
+        key = make_cache_key(query, model)
+        self._cache.set(key, vector)
 
-    def stats(self) -> dict[str, int]:
+    def stats(self) -> dict[str, int | float]:
         """Get cache statistics."""
-        with self._lock:
-            total = self._hits + self._misses
-            hit_rate = (self._hits / total * 100) if total > 0 else 0
-            return {
-                "size": len(self._cache),
-                "hits": self._hits,
-                "misses": self._misses,
-                "hit_rate_percent": round(hit_rate, 1),
-            }
+        return self._cache.stats()
 
 
 class SparseEmbeddingsClient:
@@ -133,7 +101,7 @@ class SparseEmbeddingsClient:
 
         return vector
 
-    def cache_stats(self) -> dict[str, int]:
+    def cache_stats(self) -> dict[str, int | float]:
         """Get cache statistics."""
         return self._cache.stats()
 

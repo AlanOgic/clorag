@@ -18,10 +18,13 @@ from clorag.models.camera import (
     CameraUpdate,
     DeviceType,
 )
-from clorag.web.auth import verify_admin
+from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.dependencies import limiter
 
 router = APIRouter(tags=["Cameras"])
+
+# Maximum CSV file upload size (5MB - CSV files are typically small)
+MAX_CSV_UPLOAD_BYTES = 5 * 1024 * 1024
 
 
 @router.post("/cameras", response_model=Camera)
@@ -29,7 +32,8 @@ router = APIRouter(tags=["Cameras"])
 async def api_camera_create(
     request: Request,
     camera: Annotated[CameraCreate, Body()],
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> Camera:
     """Create a new camera entry."""
     db = get_camera_database()
@@ -42,7 +46,8 @@ async def api_camera_update(
     camera_id: int,
     request: Request,
     updates: Annotated[CameraUpdate, Body()],
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> Camera:
     """Update an existing camera."""
     db = get_camera_database()
@@ -57,7 +62,8 @@ async def api_camera_update(
 async def api_camera_delete(
     camera_id: int,
     request: Request,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, str | int]:
     """Delete a camera entry."""
     db = get_camera_database()
@@ -96,7 +102,8 @@ async def api_cameras_review_count(
 async def api_camera_approve(
     camera_id: int,
     request: Request,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> Camera:
     """Approve a camera (clear needs_review flag)."""
     db = get_camera_database()
@@ -111,7 +118,8 @@ async def api_camera_approve(
 async def api_cameras_import_csv(
     request: Request,
     file: UploadFile,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, int | list[str]]:
     """Import cameras from CSV file.
 
@@ -124,7 +132,23 @@ async def api_cameras_import_csv(
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
 
-    content = await file.read()
+    # Validate MIME type (defense in depth)
+    allowed_mimes = {"text/csv", "text/plain", "application/octet-stream"}
+    if file.content_type and file.content_type not in allowed_mimes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid content type for CSV: {file.content_type}",
+        )
+
+    # Read with size limit to prevent DoS
+    content = await file.read(MAX_CSV_UPLOAD_BYTES + 1)
+    if len(content) > MAX_CSV_UPLOAD_BYTES:
+        max_mb = MAX_CSV_UPLOAD_BYTES // (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"CSV file too large. Maximum size is {max_mb}MB.",
+        )
+
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:

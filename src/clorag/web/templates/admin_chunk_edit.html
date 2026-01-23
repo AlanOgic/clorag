@@ -247,7 +247,7 @@
                 document.getElementById('loadingState').classList.add('hidden');
                 document.getElementById('formContainer').classList.remove('hidden');
             } catch (error) {
-                document.getElementById('loadingState').innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+                document.getElementById('loadingState').innerHTML = `<div class="alert alert-error">Error: ${escapeHtml(error.message)}</div>`;
             }
         }
 

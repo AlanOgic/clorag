@@ -9,6 +9,8 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 
 Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Mermaid diagrams for integration scenarios.
 
+**Version**: 0.6.3 | **Python**: 3.10-3.13
+
 ## Commands
 
 ```bash
@@ -47,7 +49,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 ### Source Layout
 
-**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool), `prompt_db.py` (LLM prompts SQLite with version history), `terminology_db.py` (RIO terminology fixes SQLite storage)
+**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool), `prompt_db.py` (LLM prompts SQLite with version history), `terminology_db.py` (RIO terminology fixes SQLite storage), `cache.py` (generic thread-safe LRU cache with TTL)
 
 **Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler with Jina Reader + BeautifulSoup fallback), `chunker.py`, `base.py`
 
@@ -163,6 +165,10 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - XSS: DOMPurify with SVG allowlist for Mermaid
 - OAuth tokens: Fernet encryption with PBKDF2 (480K iterations)
 - Secure cookies in production (configurable via `SECURE_COOKIES`)
+- **CSP Policy**: Differentiated per page type:
+  - Public pages: Strict nonce-only (`script-src 'nonce-...'`)
+  - Admin pages: Allows inline handlers (`unsafe-inline`) while templates migrate to `data-action`
+- **Event Delegation**: `AdminActions` in `admin.js` handles `data-action` attributes globally
 
 ### GraphRAG
 Optional Neo4j knowledge graph with entities (Camera, Product, Protocol, Port, Issue, Solution, Firmware) and relationships (COMPATIBLE_WITH, USES_PROTOCOL, AFFECTS, RESOLVED_BY, etc.). Gracefully disabled if `NEO4J_PASSWORD` not set.
@@ -205,3 +211,53 @@ ssh root@cyanview.cloud "cd /opt/clorag && docker compose build && docker compos
 ```
 
 Production: https://cyanview.cloud/ (Docker maps 8085→8080)
+
+## Recent Updates (2026-01-23)
+
+### Major Refactoring: Modular Web Architecture
+
+The monolithic `app.py` (2700+ lines) has been refactored into a clean modular structure:
+
+**New Web Structure:**
+
+```text
+web/
+├── app.py              # Now ~200 lines: middleware, lifespan, app init
+├── schemas.py          # Pydantic request/response models
+├── dependencies.py     # FastAPI DI: limiter, templates, DB singletons
+├── auth/               # Authentication module
+│   ├── admin.py        # verify_admin, brute force protection, rate limits
+│   ├── csrf.py         # CSRF token generation and validation
+│   └── sessions.py     # Cookie-based session management
+├── search/             # Search pipeline module
+│   ├── pipeline.py     # Main search orchestration
+│   ├── synthesis.py    # Claude LLM synthesis with streaming
+│   └── utils.py        # Helpers: score thresholds, source formatting
+└── routers/            # API routes by domain
+    ├── cameras.py      # Public camera API (/api/cameras)
+    ├── pages.py        # Page routes (/, /cameras, /help, /admin/*)
+    ├── search.py       # Search API (/api/search, /api/search/stream)
+    └── admin/          # 11 admin routers under /api/admin
+        ├── analytics.py, auth.py, cameras.py, chunks.py
+        ├── debug.py, documents.py, drafts.py, graph.py
+        ├── prompts.py, support.py, terminology.py
+```
+
+### New Core Module: Generic Cache
+
+Added `core/cache.py` - thread-safe LRU cache with optional TTL:
+
+- `LRUCache[T]`: Generic cache with hit/miss stats
+- `make_cache_key(*args)`: Hash-based key generation
+- Used across embeddings, reranking, and database queries
+
+### Security Enhancements
+
+- **Nonce-based CSP**: All templates use `{{ csp_nonce }}` for inline scripts
+- **CORS/CSRF fixes**: Proper origin validation, double-submit cookie pattern
+- **OAuth encryption**: PBKDF2 iterations increased to 480K
+- **Timing-safe comparison**: Prevents timing attacks on auth
+
+### Answer Export Feature (v0.6.2)
+
+Users can export AI responses in multiple formats: Markdown, Plain Text, HTML, PDF

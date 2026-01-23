@@ -9,7 +9,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
 from clorag.core.terminology_db import get_terminology_fix_database
-from clorag.web.auth import verify_admin
+from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.schemas import TerminologyBatchStatusUpdate, TerminologyStatusUpdate
 from clorag.web.search import get_embeddings, get_sparse_embeddings, get_vectorstore
 
@@ -67,7 +67,8 @@ async def api_get_terminology_fix(
 async def api_update_terminology_fix_status(
     fix_id: str,
     body: TerminologyStatusUpdate,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Update the status of a terminology fix."""
     db = get_terminology_fix_database()
@@ -80,7 +81,8 @@ async def api_update_terminology_fix_status(
 @router.put("/terminology-fixes/batch-status")
 async def api_batch_update_terminology_fix_status(
     body: TerminologyBatchStatusUpdate,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Update status for multiple terminology fixes."""
     db = get_terminology_fix_database()
@@ -90,7 +92,8 @@ async def api_batch_update_terminology_fix_status(
 
 @router.post("/terminology-fixes/apply")
 async def api_apply_terminology_fixes(
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Apply all approved terminology fixes to the vector database.
 
@@ -140,7 +143,8 @@ async def api_apply_terminology_fixes(
 @router.post("/terminology-fixes/scan")
 async def api_scan_terminology_fixes(
     max_chunks: int | None = None,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Scan vector database for RIO terminology issues.
 
@@ -190,7 +194,8 @@ async def api_scan_terminology_fixes(
 @router.delete("/terminology-fixes/{fix_id}")
 async def api_delete_terminology_fix(
     fix_id: str,
-    _: bool = Depends(verify_admin),
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
     """Delete a terminology fix."""
     db = get_terminology_fix_database()

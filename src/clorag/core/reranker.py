@@ -1,15 +1,14 @@
 """Voyage AI reranker client for post-retrieval relevance refinement."""
 
 import hashlib
-from collections import OrderedDict
 from dataclasses import dataclass
-from threading import Lock
 
 import structlog
 import voyageai
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from clorag.config import get_settings
+from clorag.core.cache import LRUCache
 
 logger = structlog.get_logger(__name__)
 
@@ -36,23 +35,19 @@ class RerankResponse:
 
 
 class RerankCache:
-    """Thread-safe LRU cache for reranking results to reduce API calls.
-
-    Cache key is computed from query + sorted document hashes to handle
-    document order independence.
-    """
+    """Wrapper around LRUCache for rerank results with document-order-independent keys."""
 
     def __init__(self, max_size: int = RERANK_CACHE_MAX_SIZE) -> None:
-        self._cache: OrderedDict[str, list[RerankResult]] = OrderedDict()
-        self._max_size = max_size
-        self._lock = Lock()
-        self._hits = 0
-        self._misses = 0
+        self._cache: LRUCache[list[RerankResult]] = LRUCache(max_size=max_size)
 
-    def _make_key(self, query: str, documents: list[str], model: str, top_k: int | None) -> str:
-        """Create cache key from query and documents."""
+    def _make_key(
+        self, query: str, documents: list[str], model: str, top_k: int | None
+    ) -> str:
+        """Create cache key from query and documents (order-independent)."""
         # Hash each document and sort for order independence
-        doc_hashes = sorted(hashlib.sha256(d.encode()).hexdigest()[:16] for d in documents)
+        doc_hashes = sorted(
+            hashlib.sha256(d.encode()).hexdigest()[:16] for d in documents
+        )
         key_str = f"{query}:{model}:{top_k}:{','.join(doc_hashes)}"
         return hashlib.sha256(key_str.encode()).hexdigest()[:32]
 
@@ -61,13 +56,7 @@ class RerankCache:
     ) -> list[RerankResult] | None:
         """Get cached reranking results or None if not found."""
         key = self._make_key(query, documents, model, top_k)
-        with self._lock:
-            if key in self._cache:
-                self._cache.move_to_end(key)
-                self._hits += 1
-                return self._cache[key]
-            self._misses += 1
-            return None
+        return self._cache.get(key)
 
     def set(
         self,
@@ -77,27 +66,13 @@ class RerankCache:
         top_k: int | None,
         results: list[RerankResult],
     ) -> None:
-        """Cache reranking results, evicting oldest if at capacity."""
+        """Cache reranking results."""
         key = self._make_key(query, documents, model, top_k)
-        with self._lock:
-            if key in self._cache:
-                self._cache.move_to_end(key)
-            else:
-                if len(self._cache) >= self._max_size:
-                    self._cache.popitem(last=False)
-                self._cache[key] = results
+        self._cache.set(key, results)
 
     def stats(self) -> dict[str, int | float]:
         """Get cache statistics."""
-        with self._lock:
-            total = self._hits + self._misses
-            hit_rate = (self._hits / total * 100) if total > 0 else 0
-            return {
-                "size": len(self._cache),
-                "hits": self._hits,
-                "misses": self._misses,
-                "hit_rate_percent": round(hit_rate, 1),
-            }
+        return self._cache.stats()
 
 
 # Global rerank cache instance

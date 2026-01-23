@@ -1135,7 +1135,7 @@
     </section>
 
     <!-- Floating New Conversation Button -->
-    <button class="new-conversation-btn hidden" id="new-conversation-btn" onclick="startNewConversation()" title="Start a new conversation">
+    <button class="new-conversation-btn hidden" id="new-conversation-btn" title="Start a new conversation">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
@@ -1729,6 +1729,9 @@ ${bodyContent}
             resultsToggle.textContent = isCollapsed ? 'Hide retrieved chunks' : 'Show retrieved chunks';
         });
 
+        // New conversation button
+        document.getElementById('new-conversation-btn').addEventListener('click', startNewConversation);
+
         // Get selected source
         function getSelectedSource() {
             return document.querySelector('input[name="source"]:checked').value;
@@ -1765,20 +1768,20 @@ ${bodyContent}
                         <span class="answer-title">AI Answer</span>
                         <div class="answer-header-actions">
                             <div class="export-dropdown" id="export-dropdown-${exchangeId}">
-                                <button class="export-btn" title="Export answer" onclick="toggleExportMenu(${exchangeId})">
+                                <button class="export-btn" title="Export answer" data-action="toggle-export" data-exchange="${exchangeId}">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
                                     <span>Export</span>
                                 </button>
                                 <div class="export-menu">
-                                    <button onclick="exportAnswer('text', ${exchangeId})">
+                                    <button data-action="export-answer" data-format="text" data-exchange="${exchangeId}">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
                                         Text (.txt)
                                     </button>
-                                    <button onclick="exportAnswer('markdown', ${exchangeId})">
+                                    <button data-action="export-answer" data-format="markdown" data-exchange="${exchangeId}">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                         </svg>
@@ -1786,13 +1789,13 @@ ${bodyContent}
                                     </button>
                                     <div class="export-menu-divider"></div>
                                     <div class="export-menu-label">HTML with diagrams</div>
-                                    <button onclick="exportAnswer('html-svg', ${exchangeId})">
+                                    <button data-action="export-answer" data-format="html-svg" data-exchange="${exchangeId}">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                         </svg>
                                         SVG (vector)
                                     </button>
-                                    <button onclick="exportAnswer('html-png', ${exchangeId})">
+                                    <button data-action="export-answer" data-format="html-png" data-exchange="${exchangeId}">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                         </svg>
@@ -1805,7 +1808,7 @@ ${bodyContent}
                     <div class="answer-content" id="answer-content-${exchangeId}"></div>
                 </div>
                 <div class="followup-input-container" id="followup-container-${exchangeId}" style="display: none;">
-                    <form class="followup-form" onsubmit="handleFollowup(event, ${exchangeId})">
+                    <form class="followup-form" data-action="followup-form" data-exchange="${exchangeId}">
                         <input type="text"
                                class="followup-input"
                                id="followup-input-${exchangeId}"
@@ -1999,6 +2002,36 @@ ${bodyContent}
             const query = searchInput.value.trim();
             if (query) {
                 performSearch(query);
+            }
+        });
+
+        // Event delegation for dynamically created elements (CSP-compliant)
+        document.addEventListener('click', (e) => {
+            const target = e.target.closest('[data-action]');
+            if (!target) return;
+
+            const action = target.dataset.action;
+            const exchangeId = parseInt(target.dataset.exchange, 10);
+
+            switch (action) {
+                case 'toggle-export':
+                    e.preventDefault();
+                    toggleExportMenu(exchangeId);
+                    break;
+                case 'export-answer':
+                    e.preventDefault();
+                    exportAnswer(target.dataset.format, exchangeId);
+                    break;
+            }
+        });
+
+        // Event delegation for form submissions
+        document.addEventListener('submit', (e) => {
+            const form = e.target.closest('[data-action="followup-form"]');
+            if (form) {
+                e.preventDefault();
+                const exchangeId = parseInt(form.dataset.exchange, 10);
+                handleFollowup(e, exchangeId);
             }
         });
 
