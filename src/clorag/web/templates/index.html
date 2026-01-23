@@ -6,6 +6,8 @@
     <meta name="robots" content="noindex, nofollow">
     <title>Cyanview AI Search</title>
     <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <!-- Phenomena font for animated letters -->
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=phenomena@700,400&display=swap">
     <!-- Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- DOMPurify for XSS protection -->
@@ -100,31 +102,35 @@
             color: var(--cyan-blue);
         }
 
-        /* Hero Section */
+        /* Hero Section with animated background */
         .hero {
+            position: relative;
             background: var(--hero-bg);
-            padding: 4rem 2rem;
+            padding: 0;
             text-align: center;
             color: white;
+            height: 320px;
+            overflow: hidden;
         }
 
-        .hero__title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
+        #heroCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
         }
 
-        .hero__subtitle {
-            font-size: 1.2rem;
-            opacity: 0.9;
-            max-width: 600px;
-            margin: 0 auto 2rem;
-        }
-
-        /* Search Container */
+        /* Search Container - positioned in lower part */
         .search-container {
+            position: absolute;
+            bottom: 4.5rem;
+            left: 50%;
+            transform: translateX(-50%);
             max-width: 700px;
-            margin: 0 auto;
+            width: calc(100% - 2rem);
+            z-index: 1;
         }
 
         .search-box {
@@ -971,8 +977,8 @@
 
         /* Responsive */
         @media (max-width: 600px) {
-            .hero__title {
-                font-size: 1.8rem;
+            .hero {
+                height: 280px;
             }
 
             .search-box {
@@ -1005,13 +1011,9 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
+    <!-- Hero Section with animated background -->
     <section class="hero">
-        <h1 class="hero__title">Cyanview AI Search</h1>
-        <p class="hero__subtitle">
-            Ask questions about Cyanview products and get AI-powered answers.
-        </p>
-
+        <canvas id="heroCanvas"></canvas>
         <div class="search-container">
             <form class="search-box" id="search-form">
                 <input
@@ -1025,7 +1027,6 @@
                     Ask
                 </button>
             </form>
-
         </div>
     </section>
 
@@ -1886,7 +1887,20 @@ ${bodyContent}
         // Focus search input on load
         setRandomPlaceholder();
         searchInput.focus();
-
+    </script>
+    <!-- Geometric background animation -->
+    <script src="/static/js/geometric-bg.js"></script>
+    <script nonce="{{ request.state.csp_nonce }}">
+        // Initialize geometric background for hero section
+        new GeometricBackground('heroCanvas', {
+            shapeCount: 15,
+            letterMultiplier: 2,
+            formationYPosition: 0.35,  // Moved down, closer to search bar
+            formationInterval: 60000,   // Every minute
+            formationFirstDelay: 8000   // First one after 8 seconds
+        });
+    </script>
+    <script nonce="{{ request.state.csp_nonce }}">
         // Copy answer to clipboard
         async function copyAnswer() {
             const answerEl = document.getElementById('answer-content');
