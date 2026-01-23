@@ -167,44 +167,6 @@
             cursor: not-allowed;
         }
 
-        /* Source Selector Toggle */
-        .source-selector {
-            display: inline-flex;
-            justify-content: center;
-            margin-top: 1.5rem;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 8px;
-            padding: 4px;
-        }
-
-        .source-option {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            padding: 0.5rem 1.25rem;
-            background: transparent;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-            font-size: 0.9rem;
-            white-space: nowrap;
-        }
-
-        .source-option:hover:not(.selected) {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .source-option input {
-            display: none;
-        }
-
-        .source-option.selected {
-            background: white;
-            color: var(--cyanview-navy);
-            font-weight: 500;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
         /* Info Section */
         .info-section {
             max-width: 900px;
@@ -1013,16 +975,6 @@
                 font-size: 1.8rem;
             }
 
-            .source-selector {
-                flex-direction: row;
-                width: auto;
-            }
-
-            .source-option {
-                padding: 0.4rem 0.75rem;
-                font-size: 0.8rem;
-            }
-
             .search-box {
                 flex-direction: column;
             }
@@ -1074,22 +1026,6 @@
                 </button>
             </form>
 
-            <div style="text-align: center;">
-                <div class="source-selector">
-                    <label class="source-option selected" data-value="both">
-                        <input type="radio" name="source" value="both" checked>
-                        <span>All</span>
-                    </label>
-                    <label class="source-option" data-value="docs">
-                        <input type="radio" name="source" value="docs">
-                        <span>Documentation</span>
-                    </label>
-                    <label class="source-option" data-value="gmail">
-                        <input type="radio" name="source" value="gmail">
-                        <span>Support Cases</span>
-                    </label>
-                </div>
-            </div>
         </div>
     </section>
 
@@ -1178,13 +1114,6 @@
                     <li><a href="#" class="example-query">"How to update CI0 firmware"</a></li>
                 </ul>
 
-                <h3>Source Filters</h3>
-                <ul>
-                    <li><strong>All:</strong> Best results - combines official docs with real-world solutions</li>
-                    <li><strong>Documentation:</strong> Official manuals, specs, and product guides</li>
-                    <li><strong>Support Cases:</strong> Field-tested solutions from actual deployments</li>
-                </ul>
-
                 <h3>Pro Tips</h3>
                 <ul>
                     <li>Include camera model and Cyanview product (RCP, RIO, CI0, VP4, Live Composer)</li>
@@ -1216,7 +1145,6 @@
         const resultsToggle = document.getElementById('results-toggle');
         const loadingEl = document.getElementById('loading');
         const emptyState = document.getElementById('empty-state');
-        const sourceOptions = document.querySelectorAll('.source-option');
         const conversationContainer = document.getElementById('conversation-container');
         const newConversationBtn = document.getElementById('new-conversation-btn');
         const infoSection = document.getElementById('info-section');
@@ -1625,14 +1553,6 @@ ${bodyContent}
             });
         });
 
-        // Source selector styling
-        sourceOptions.forEach(option => {
-            option.addEventListener('click', () => {
-                sourceOptions.forEach(o => o.classList.remove('selected'));
-                option.classList.add('selected');
-            });
-        });
-
         // Toggle raw results
         resultsToggle.addEventListener('click', () => {
             const isCollapsed = resultsList.classList.contains('collapsed');
@@ -1643,9 +1563,9 @@ ${bodyContent}
         // New conversation button
         document.getElementById('new-conversation-btn').addEventListener('click', startNewConversation);
 
-        // Get selected source
+        // Get selected source (always use all sources)
         function getSelectedSource() {
-            return document.querySelector('input[name="source"]:checked').value;
+            return 'both';
         }
 
         // Start a new conversation (reset session)
