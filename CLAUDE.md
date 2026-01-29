@@ -17,6 +17,7 @@ Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion
 uv sync                                    # Install dependencies
 uv run rag-web                             # Web server (port 8080)
 uv run clorag "query"                      # CLI agent
+uv run clorag-mcp                          # MCP server for Claude Desktop
 
 # Ingestion
 uv run ingest-docs                         # Docusaurus documentation
@@ -57,9 +58,11 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Agent** (`agent/`): `tools.py` (Claude Agent SDK MCP tools), `prompts.py`
 
+**MCP** (`mcp/`): Standalone MCP server for Claude Desktop. `server.py` (FastMCP server with lifespan), `tools/` (search, cameras, documents, support, odoo tools). 16+ tools exposing full RAG capabilities via stdio transport. Odoo tools (11 additional) enabled via `ODOO_MCP_ENABLED=true`.
+
 **Graph** (`graph/`): `schema.py` (Camera, Product, Protocol, Issue, Solution entities), `enrichment.py`
 
-**Services** (`services/`): `custom_docs.py` (CustomDocumentService CRUD), `prompt_manager.py` (LLM prompt management with caching), `default_prompts.py` (hardcoded prompt registry)
+**Services** (`services/`): `custom_docs.py` (CustomDocumentService CRUD), `prompt_manager.py` (LLM prompt management with caching), `default_prompts.py` (hardcoded prompt registry), `odoo_mcp_client.py` (async HTTP client for Odoo MCP integration)
 
 **Drafts** (`drafts/`): `gmail_service.py`, `draft_generator.py`, `draft_pipeline.py`
 
@@ -102,6 +105,11 @@ Environment variables (see `.env.example`):
 - `CHUNK_SIZE_DEFAULT` (default: `400`) - Default chunk size (tokens)
 - `CHUNK_OVERLAP` (default: `50`) - Chunk overlap (~12.5%)
 - `CHUNK_ADAPTIVE_THRESHOLD` (default: `200`) - Single-chunk threshold (tokens)
+- `ODOO_MCP_ENABLED` (default: `false`) - Enable Odoo MCP integration
+- `ODOO_MCP_URL` (default: `http://localhost:8081`) - Odoo MCP server URL
+- `ODOO_MCP_API_KEY` - Bearer token for Odoo MCP authentication
+- `ODOO_MCP_TIMEOUT` (default: `30`) - Request timeout in seconds
+- `ODOO_MCP_CACHE_TTL` (default: `300`) - Cache TTL for read operations
 
 Settings via `clorag.config.get_settings()` (cached singleton).
 
@@ -176,6 +184,55 @@ Optional Neo4j knowledge graph with entities (Camera, Product, Protocol, Port, I
 **Local dev**: SSH tunnel to production Neo4j:
 ```bash
 ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
+```
+
+### Odoo MCP Integration
+Optional integration with Odoo ERP via Odoo MCP Server for CRM, sales, and support workflows.
+
+**Architecture**:
+```
+CLORAG Server → OdooMCPClient (httpx) → Odoo MCP Server (FastMCP) → Odoo 19+ (JSON-2 API)
+     ↓                    ↓                      ↓
+ Port 8080          JSON-RPC 2.0           Port 8081
+```
+
+**Capabilities**:
+- **Customer Operations**: `lookup_customer` (by email/serial), `create_customer`, `get_customer_contacts`
+- **Sales Operations**: `search_products`, `get_purchase_history`, `create_quotation`, `get_quotation`
+- **Support Operations**: `check_warranty`, `get_repair_history`, `create_repair`
+
+**MCP Tools** (11 tools, enabled when `ODOO_MCP_ENABLED=true`):
+- Customer: lookup_customer, create_customer, get_customer_contacts
+- Sales: search_products, get_purchase_history, create_quotation, get_quotation
+- Support: check_warranty, get_repair_history, create_repair
+
+**Data Models** (in `services/odoo_mcp_client.py`):
+- `OdooCustomer`: Partner with company, country, VAT
+- `OdooProduct`: Product with SKU, price, category
+- `OdooQuotation`: Sale order with lines
+- `OdooRepair`: Repair order with serial tracking
+
+**Workflow Examples**:
+1. **Support**: Email → lookup customer by email → get purchases → search KB → create repair if needed
+2. **Pre-Sales**: Analyze requirements → search products → create/lookup customer → create quotation
+
+**Docker deployment**:
+```bash
+# Start with Odoo MCP service
+docker compose --profile odoo up -d
+
+# Without Odoo (default)
+docker compose up -d
+```
+
+**Configuration**: Set in `.env`:
+```bash
+ODOO_MCP_ENABLED=true
+ODOO_MCP_API_KEY=your-secret-token
+ODOO_URL=https://your-company.odoo.com
+ODOO_DB=your-database
+ODOO_USERNAME=api-user@company.com
+ODOO_API_KEY=your-odoo-api-key
 ```
 
 ### Custom Documents

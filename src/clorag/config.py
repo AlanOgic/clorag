@@ -197,6 +197,28 @@ class Settings(BaseSettings):
         description="TTL in seconds for prompt cache (default: 5 minutes)",
     )
 
+    # Odoo MCP Integration
+    odoo_mcp_enabled: bool = Field(
+        default=False,
+        description="Enable Odoo MCP integration for CRM/ERP operations",
+    )
+    odoo_mcp_url: str = Field(
+        default="http://localhost:8081",
+        description="Odoo MCP server URL (FastMCP streamable-http endpoint)",
+    )
+    odoo_mcp_api_key: SecretStr | None = Field(
+        default=None,
+        description="API key for authenticating with Odoo MCP server",
+    )
+    odoo_mcp_timeout: int = Field(
+        default=30,
+        description="Timeout in seconds for Odoo MCP requests",
+    )
+    odoo_mcp_cache_ttl: int = Field(
+        default=300,
+        description="TTL in seconds for Odoo MCP read operation cache (default: 5 minutes)",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

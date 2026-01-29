@@ -82,6 +82,7 @@ import-docs = "clorag.scripts.import_documents:main"
 rebuild-fts = "clorag.scripts.rebuild_fts:main"
 fix-rio-terminology = "clorag.scripts.fix_rio_terminology:main"
 init-prompts = "clorag.scripts.init_prompts:main"
+clorag-mcp = "clorag.mcp.server:main"
 
 [build-system]
 requires = ["hatchling"]
