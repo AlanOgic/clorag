@@ -58,7 +58,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Agent** (`agent/`): `tools.py` (Claude Agent SDK MCP tools), `prompts.py`
 
-**MCP** (`mcp/`): Standalone MCP server for Claude Desktop. `server.py` (FastMCP server with lifespan), `tools/` (search, cameras, documents, support, odoo tools). 16+ tools exposing full RAG capabilities via stdio transport. Odoo tools (11 additional) enabled via `ODOO_MCP_ENABLED=true`.
+**MCP** (`mcp/`): Standalone MCP server for Claude Desktop. `server.py` (FastMCP server with lifespan), `tools/` (search, cameras, documents, support, odoo tools). 16+ tools exposing full RAG capabilities via stdio transport. Odoo tools (14 additional) enabled via `ODOO_MCP_ENABLED=true`.
 
 **Graph** (`graph/`): `schema.py` (Camera, Product, Protocol, Issue, Solution entities), `enrichment.py`
 
@@ -200,17 +200,20 @@ CLORAG Server → OdooMCPClient (httpx) → Odoo MCP Server (FastMCP) → Odoo 1
 - **Customer Operations**: `lookup_customer` (by email/serial), `create_customer`, `get_customer_contacts`
 - **Sales Operations**: `search_products`, `get_purchase_history`, `create_quotation`, `get_quotation`
 - **Support Operations**: `check_warranty`, `get_repair_history`, `create_repair`
+- **Serial Number Operations**: `search_serials`, `get_serial_info`, `get_product_serials`
 
-**MCP Tools** (11 tools, enabled when `ODOO_MCP_ENABLED=true`):
+**MCP Tools** (14 tools, enabled when `ODOO_MCP_ENABLED=true`):
 - Customer: lookup_customer, create_customer, get_customer_contacts
 - Sales: search_products, get_purchase_history, create_quotation, get_quotation
 - Support: check_warranty, get_repair_history, create_repair
+- Serials: search_serials, get_serial_info, get_product_serials
 
 **Data Models** (in `services/odoo_mcp_client.py`):
 - `OdooCustomer`: Partner with company, country, VAT
 - `OdooProduct`: Product with SKU, price, category
 - `OdooQuotation`: Sale order with lines
 - `OdooRepair`: Repair order with serial tracking
+- `OdooSerial`: Serial number (stock.lot) with delivery info
 
 **Workflow Examples**:
 1. **Support**: Email → lookup customer by email → get purchases → search KB → create repair if needed

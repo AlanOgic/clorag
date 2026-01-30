@@ -47,6 +47,7 @@ An intelligent support agent combining **Docusaurus documentation**, **Gmail sup
 - [Deployment](#deployment)
 - [Security](#security)
 - [Project Structure](#project-structure)
+- [Odoo MCP Integration](#odoo-mcp-integration)
 - [License](#license)
 
 ---
@@ -782,6 +783,112 @@ clorag/
 ├── data/                          # SQLite databases
 ├── pyproject.toml                 # Project configuration
 └── docker-compose.yml             # Deployment config
+```
+
+---
+
+## Odoo MCP Integration
+
+CLORAG integrates with Odoo ERP via the Odoo MCP Server for CRM, sales, and support workflows.
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           CLORAG + ODOO MCP                                   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   User Query                                                                 │
+│       │                                                                      │
+│       ▼                                                                      │
+│   ┌────────────────────────────────────────────────────┐                    │
+│   │                   CLORAG Server                     │                    │
+│   │                   (Port 8080)                       │                    │
+│   │                                                     │                    │
+│   │  ┌─────────────┐    ┌──────────────┐              │                    │
+│   │  │ RAG Search  │    │  OdooMCP     │              │                    │
+│   │  │ (Knowledge) │    │  Client      │              │                    │
+│   │  └──────┬──────┘    └──────┬───────┘              │                    │
+│   │         │                  │                       │                    │
+│   └─────────┼──────────────────┼───────────────────────┘                    │
+│             │                  │                                            │
+│             │                  │ JSON-RPC 2.0 / HTTP                        │
+│             │                  ▼                                            │
+│             │        ┌─────────────────────────────────┐                    │
+│   ┌─────────┴───┐    │      Odoo MCP Server           │                    │
+│   │   Qdrant    │    │      (Port 8081)               │                    │
+│   │  Vectors    │    │                                │                    │
+│   └─────────────┘    │  FastMCP 3.0 + Bearer Auth    │                    │
+│                      │  3 tools: execute_method,      │                    │
+│                      │  batch_execute, execute_workflow│                   │
+│                      └───────────────┬─────────────────┘                    │
+│                                      │                                      │
+│                                      │ Odoo v2 JSON-2 API                  │
+│                                      ▼                                      │
+│                      ┌─────────────────────────────────┐                    │
+│                      │         Odoo 19+                │                    │
+│                      │   (cyalan01.odoo.com)           │                    │
+│                      │                                 │                    │
+│                      │  res.partner, product.product,  │                    │
+│                      │  sale.order, stock.lot,         │                    │
+│                      │  repair.order...                │                    │
+│                      └─────────────────────────────────┘                    │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Available Tools (14 total)
+
+| Category | Tools | Description |
+|----------|-------|-------------|
+| **Customer** | `lookup_customer`, `create_customer`, `get_customer_contacts` | CRM partner management |
+| **Sales** | `search_products`, `get_purchase_history`, `create_quotation`, `get_quotation` | Sales pipeline |
+| **Support** | `check_warranty`, `get_repair_history`, `create_repair` | Repair/RMA management |
+| **Serials** | `search_serials`, `get_serial_info`, `get_product_serials` | Serial number tracking |
+
+### Configuration
+
+```env
+# Enable Odoo MCP integration
+ODOO_MCP_ENABLED=true
+
+# Odoo MCP Server connection
+ODOO_MCP_URL=http://odoo-mcp:8080      # Docker internal
+ODOO_MCP_API_KEY=your-secret-token      # Bearer token auth
+ODOO_MCP_TIMEOUT=30                     # Request timeout (seconds)
+ODOO_MCP_CACHE_TTL=300                  # Cache TTL (seconds)
+
+# Odoo Server credentials (for Odoo MCP Server)
+ODOO_URL=https://your-company.odoo.com
+ODOO_DB=your-database
+ODOO_USERNAME=api-user@company.com
+ODOO_API_KEY=your-odoo-api-key
+```
+
+### Docker Deployment
+
+```bash
+# Start with Odoo MCP service
+docker compose --profile odoo up -d
+
+# Without Odoo (default)
+docker compose up -d
+```
+
+### Workflow Examples
+
+**Support Workflow:**
+```
+Email received → lookup_customer(email) → get_purchase_history()
+→ search_serials(customer_id) → check_warranty(serial)
+→ hybrid_search(problem) → create_repair() if needed
+```
+
+**Pre-Sales Workflow:**
+```
+Analyze requirements → search_products(query)
+→ lookup_customer(email) OR create_customer()
+→ create_quotation(customer_id, products)
 ```
 
 ---

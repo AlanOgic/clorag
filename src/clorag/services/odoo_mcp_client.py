@@ -290,6 +290,43 @@ class OdooRepair:
 
 
 @dataclass
+class OdooSerial:
+    """Odoo serial number (stock.lot) data model."""
+
+    id: int
+    name: str  # Serial number
+    product_id: int | None = None
+    product_name: str | None = None
+    company_id: int | None = None
+    company_name: str | None = None
+    create_date: datetime | None = None
+    # Delivery info (populated when tracing)
+    customer_id: int | None = None
+    customer_name: str | None = None
+    delivery_date: datetime | None = None
+    delivery_ref: str | None = None
+
+    @classmethod
+    def from_odoo(cls, data: dict[str, Any]) -> OdooSerial:
+        """Create from Odoo record data."""
+        product = data.get("product_id")
+        company = data.get("company_id")
+        create_date_raw = data.get("create_date")
+
+        return cls(
+            id=data.get("id", 0),
+            name=data.get("name", ""),
+            product_id=product[0] if isinstance(product, list) else product,
+            product_name=product[1] if isinstance(product, list) else None,
+            company_id=company[0] if isinstance(company, list) else company,
+            company_name=company[1] if isinstance(company, list) else None,
+            create_date=(
+                datetime.fromisoformat(create_date_raw) if create_date_raw else None
+            ),
+        )
+
+
+@dataclass
 class WarrantyStatus:
     """Warranty status for a serial number."""
 
@@ -1116,6 +1153,318 @@ class OdooMCPClient:
         )
 
         return OdooRepair.from_odoo(result[0])
+
+    # =========================================================================
+    # Serial Number Operations
+    # =========================================================================
+
+    SERIAL_FIELDS = [
+        "id", "name", "product_id", "company_id", "create_date"
+    ]
+
+    async def search_serials(
+        self,
+        query: str | None = None,
+        product_id: int | None = None,
+        customer_id: int | None = None,
+        limit: int = 20,
+    ) -> list[OdooSerial]:
+        """Search for serial numbers in Odoo.
+
+        Args:
+            query: Partial serial number search (uses ilike).
+            product_id: Filter by product ID.
+            customer_id: Filter by customer (via delivery history).
+            limit: Maximum results (1-100, default 20).
+
+        Returns:
+            List of matching serial numbers with delivery info.
+        """
+        limit = max(1, min(100, limit))
+
+        # If searching by customer, we need to find lots via delivery
+        if customer_id:
+            return await self._search_serials_by_customer(customer_id, query, limit)
+
+        # Build domain for direct lot search
+        domain: list[Any] = []
+        if query:
+            domain.append(["name", "ilike", query])
+        if product_id:
+            domain.append(["product_id", "=", product_id])
+
+        result = await self.execute_method(
+            model="stock.lot",
+            method="search_read",
+            kwargs={
+                "domain": domain,
+                "fields": self.SERIAL_FIELDS,
+                "limit": limit,
+                "order": "create_date desc",
+            },
+            use_cache=True,
+        )
+
+        serials = []
+        if result and isinstance(result, list):
+            for lot_data in result:
+                serial = OdooSerial.from_odoo(lot_data)
+                # Enrich with delivery info
+                await self._enrich_serial_delivery_info(serial)
+                serials.append(serial)
+
+        return serials
+
+    async def _search_serials_by_customer(
+        self,
+        customer_id: int,
+        query: str | None = None,
+        limit: int = 20,
+    ) -> list[OdooSerial]:
+        """Search serials by customer delivery history.
+
+        Args:
+            customer_id: Customer partner ID.
+            query: Optional serial number filter.
+            limit: Maximum results.
+
+        Returns:
+            List of serials delivered to this customer.
+        """
+        # Find deliveries to this customer
+        picking_result = await self.execute_method(
+            model="stock.picking",
+            method="search_read",
+            kwargs={
+                "domain": [
+                    ["partner_id", "=", customer_id],
+                    ["state", "=", "done"],
+                    ["picking_type_code", "=", "outgoing"],
+                ],
+                "fields": ["id", "name", "date_done"],
+                "limit": 50,
+                "order": "date_done desc",
+            },
+            use_cache=True,
+        )
+
+        if not picking_result or not isinstance(picking_result, list):
+            return []
+
+        picking_ids = [p["id"] for p in picking_result]
+        picking_map = {p["id"]: p for p in picking_result}
+
+        # Find move lines with lots from these pickings
+        move_domain: list[Any] = [
+            ["picking_id", "in", picking_ids],
+            ["lot_id", "!=", False],
+            ["state", "=", "done"],
+        ]
+
+        move_result = await self.execute_method(
+            model="stock.move.line",
+            method="search_read",
+            kwargs={
+                "domain": move_domain,
+                "fields": ["lot_id", "picking_id"],
+                "limit": limit * 2,  # Over-fetch for filtering
+            },
+            use_cache=True,
+        )
+
+        if not move_result or not isinstance(move_result, list):
+            return []
+
+        # Get unique lot IDs
+        lot_ids = list({
+            m["lot_id"][0] if isinstance(m["lot_id"], list) else m["lot_id"]
+            for m in move_result if m.get("lot_id")
+        })
+
+        if not lot_ids:
+            return []
+
+        # Fetch lot details
+        lot_domain: list[Any] = [["id", "in", lot_ids]]
+        if query:
+            lot_domain.append(["name", "ilike", query])
+
+        lot_result = await self.execute_method(
+            model="stock.lot",
+            method="search_read",
+            kwargs={
+                "domain": lot_domain,
+                "fields": self.SERIAL_FIELDS,
+                "limit": limit,
+            },
+            use_cache=True,
+        )
+
+        serials = []
+        if lot_result and isinstance(lot_result, list):
+            # Build lot_id to picking mapping
+            lot_to_picking: dict[int, dict[str, Any]] = {}
+            for move in move_result:
+                lot_id = move["lot_id"]
+                if isinstance(lot_id, list):
+                    lot_id = lot_id[0]
+                picking_id = move["picking_id"]
+                if isinstance(picking_id, list):
+                    picking_id = picking_id[0]
+                if lot_id and picking_id:
+                    lot_to_picking[lot_id] = picking_map.get(picking_id, {})
+
+            for lot_data in lot_result:
+                serial = OdooSerial.from_odoo(lot_data)
+                # Add customer info
+                serial.customer_id = customer_id
+                # Get customer name
+                customer_result = await self.execute_method(
+                    model="res.partner",
+                    method="read",
+                    args=[[customer_id]],
+                    kwargs={"fields": ["name"]},
+                    use_cache=True,
+                )
+                if customer_result and isinstance(customer_result, list):
+                    serial.customer_name = customer_result[0].get("name")
+
+                # Add delivery info from mapping
+                picking_info = lot_to_picking.get(serial.id)
+                if picking_info:
+                    serial.delivery_ref = picking_info.get("name")
+                    date_done = picking_info.get("date_done")
+                    if date_done:
+                        serial.delivery_date = datetime.fromisoformat(
+                            date_done.replace("Z", "+00:00")
+                        )
+
+                serials.append(serial)
+
+        return serials
+
+    async def _enrich_serial_delivery_info(self, serial: OdooSerial) -> None:
+        """Enrich serial with delivery information.
+
+        Args:
+            serial: Serial to enrich (modified in place).
+        """
+        # Find most recent delivery
+        move_result = await self.execute_method(
+            model="stock.move.line",
+            method="search_read",
+            kwargs={
+                "domain": [
+                    ["lot_id", "=", serial.id],
+                    ["state", "=", "done"],
+                ],
+                "fields": ["picking_id", "date"],
+                "limit": 1,
+                "order": "date desc",
+            },
+            use_cache=True,
+        )
+
+        if not move_result or not isinstance(move_result, list) or len(move_result) == 0:
+            return
+
+        picking_id = move_result[0].get("picking_id")
+        if isinstance(picking_id, list):
+            picking_id = picking_id[0]
+
+        if not picking_id:
+            return
+
+        # Get picking details with partner
+        picking_result = await self.execute_method(
+            model="stock.picking",
+            method="read",
+            args=[[picking_id]],
+            kwargs={"fields": ["partner_id", "name", "date_done"]},
+            use_cache=True,
+        )
+
+        if not picking_result or not isinstance(picking_result, list):
+            return
+
+        picking = picking_result[0]
+        serial.delivery_ref = picking.get("name")
+
+        date_done = picking.get("date_done")
+        if date_done:
+            serial.delivery_date = datetime.fromisoformat(
+                date_done.replace("Z", "+00:00")
+            )
+
+        partner = picking.get("partner_id")
+        if isinstance(partner, list) and len(partner) > 1:
+            serial.customer_id = partner[0]
+            serial.customer_name = partner[1]
+
+    async def get_serial_info(self, serial: str) -> OdooSerial | None:
+        """Get detailed information about a serial number.
+
+        Args:
+            serial: The serial number string.
+
+        Returns:
+            OdooSerial with full details or None if not found.
+        """
+        result = await self.execute_method(
+            model="stock.lot",
+            method="search_read",
+            kwargs={
+                "domain": [["name", "=", serial]],
+                "fields": self.SERIAL_FIELDS,
+                "limit": 1,
+            },
+            use_cache=True,
+        )
+
+        if not result or not isinstance(result, list) or len(result) == 0:
+            return None
+
+        serial_obj = OdooSerial.from_odoo(result[0])
+        await self._enrich_serial_delivery_info(serial_obj)
+
+        return serial_obj
+
+    async def get_product_serials(
+        self,
+        product_id: int,
+        limit: int = 50,
+    ) -> list[OdooSerial]:
+        """Get all serial numbers for a product.
+
+        Args:
+            product_id: Odoo product ID.
+            limit: Maximum results (1-100, default 50).
+
+        Returns:
+            List of serial numbers for this product.
+        """
+        limit = max(1, min(100, limit))
+
+        result = await self.execute_method(
+            model="stock.lot",
+            method="search_read",
+            kwargs={
+                "domain": [["product_id", "=", product_id]],
+                "fields": self.SERIAL_FIELDS,
+                "limit": limit,
+                "order": "create_date desc",
+            },
+            use_cache=True,
+        )
+
+        serials = []
+        if result and isinstance(result, list):
+            for lot_data in result:
+                serial = OdooSerial.from_odoo(lot_data)
+                await self._enrich_serial_delivery_info(serial)
+                serials.append(serial)
+
+        return serials
 
     # =========================================================================
     # Cache Management

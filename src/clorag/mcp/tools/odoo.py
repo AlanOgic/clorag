@@ -575,4 +575,190 @@ def register_odoo_tools(mcp: FastMCP[MCPServices]) -> None:
             logger.error("Odoo repair creation failed", error=str(e))
             return {"error": str(e)}
 
+    # =========================================================================
+    # Serial Number Tools
+    # =========================================================================
+
+    @mcp.tool()
+    async def search_serials(
+        query: str | None = None,
+        product_id: int | None = None,
+        customer_id: int | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Search for serial numbers in Odoo inventory.
+
+        Search serial numbers (stock.lot records) by partial match, product,
+        or customer. When searching by customer, finds all serials that have
+        been delivered to that customer.
+
+        Args:
+            query: Partial serial number to search (uses wildcard matching).
+            product_id: Filter serials by Odoo product ID.
+            customer_id: Find serials delivered to this customer (partner ID).
+            limit: Maximum results to return (1-100, default 20).
+
+        Returns:
+            List of serial numbers with product and delivery information.
+        """
+        from clorag.services.odoo_mcp_client import (
+            OdooMCPError,
+            get_odoo_mcp_client,
+        )
+
+        if not query and not product_id and not customer_id:
+            return {
+                "error": "At least one search parameter "
+                "(query, product_id, or customer_id) is required"
+            }
+
+        try:
+            client = get_odoo_mcp_client()
+
+            serials = await client.search_serials(
+                query=query,
+                product_id=product_id,
+                customer_id=customer_id,
+                limit=limit,
+            )
+
+            return {
+                "query": query,
+                "product_id": product_id,
+                "customer_id": customer_id,
+                "total": len(serials),
+                "serials": [
+                    {
+                        "id": s.id,
+                        "serial": s.name,
+                        "product_id": s.product_id,
+                        "product_name": s.product_name,
+                        "customer_id": s.customer_id,
+                        "customer_name": s.customer_name,
+                        "delivery_date": (
+                            s.delivery_date.isoformat() if s.delivery_date else None
+                        ),
+                        "delivery_ref": s.delivery_ref,
+                        "create_date": (
+                            s.create_date.isoformat() if s.create_date else None
+                        ),
+                    }
+                    for s in serials
+                ],
+            }
+
+        except OdooMCPError as e:
+            logger.error("Odoo serial search failed", error=str(e))
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_serial_info(serial: str) -> dict[str, Any]:
+        """Get detailed information about a specific serial number.
+
+        Looks up a serial number in Odoo and retrieves full details including
+        product information and delivery history (customer, date, reference).
+
+        Args:
+            serial: The exact serial number to look up.
+
+        Returns:
+            Full serial number details or not found message.
+        """
+        from clorag.services.odoo_mcp_client import (
+            OdooMCPError,
+            get_odoo_mcp_client,
+        )
+
+        try:
+            client = get_odoo_mcp_client()
+
+            result = await client.get_serial_info(serial)
+
+            if result:
+                return {
+                    "found": True,
+                    "serial": {
+                        "id": result.id,
+                        "serial": result.name,
+                        "product_id": result.product_id,
+                        "product_name": result.product_name,
+                        "customer_id": result.customer_id,
+                        "customer_name": result.customer_name,
+                        "delivery_date": (
+                            result.delivery_date.isoformat() if result.delivery_date else None
+                        ),
+                        "delivery_ref": result.delivery_ref,
+                        "create_date": (
+                            result.create_date.isoformat() if result.create_date else None
+                        ),
+                        "company_id": result.company_id,
+                        "company_name": result.company_name,
+                    },
+                }
+            else:
+                return {
+                    "found": False,
+                    "message": f"Serial number '{serial}' not found in Odoo",
+                }
+
+        except OdooMCPError as e:
+            logger.error("Odoo serial info lookup failed", error=str(e))
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_product_serials(
+        product_id: int,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Get all serial numbers for a specific product.
+
+        Lists all serial numbers (stock.lot records) associated with a product,
+        with delivery information where available.
+
+        Args:
+            product_id: Odoo product ID to get serials for.
+            limit: Maximum results to return (1-100, default 50).
+
+        Returns:
+            List of serial numbers for this product.
+        """
+        from clorag.services.odoo_mcp_client import (
+            OdooMCPError,
+            get_odoo_mcp_client,
+        )
+
+        try:
+            client = get_odoo_mcp_client()
+
+            serials = await client.get_product_serials(
+                product_id=product_id,
+                limit=limit,
+            )
+
+            return {
+                "product_id": product_id,
+                "total": len(serials),
+                "serials": [
+                    {
+                        "id": s.id,
+                        "serial": s.name,
+                        "product_name": s.product_name,
+                        "customer_id": s.customer_id,
+                        "customer_name": s.customer_name,
+                        "delivery_date": (
+                            s.delivery_date.isoformat() if s.delivery_date else None
+                        ),
+                        "delivery_ref": s.delivery_ref,
+                        "create_date": (
+                            s.create_date.isoformat() if s.create_date else None
+                        ),
+                    }
+                    for s in serials
+                ],
+            }
+
+        except OdooMCPError as e:
+            logger.error("Odoo product serials lookup failed", error=str(e))
+            return {"error": str(e)}
+
     logger.info("Odoo MCP tools registered successfully")

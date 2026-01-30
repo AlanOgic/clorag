@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Odoo MCP Integration - Technical Documentation</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root { --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; --ifm-font-family-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace; --cyan-blue: #00a8e8; --cyan-dark: #0077b6; --cyanview-navy: #003366; --hero-bg: #003366; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--ifm-font-family-base); line-height: 1.65; color: #1c1e21; background: #f8f9fa; padding-bottom: 60px; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; background: #fff; padding: 12px; font-size: 0.85rem; border-top: 1px solid #e0e0e0; z-index: 50; color: #606770; }
+        .footer a { color: var(--cyan-dark); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: #fff; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 100; height: 60px; }
+        .navbar__brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit; font-weight: 700; font-size: 1.1rem; }
+        .navbar__logo { height: 32px; }
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+        .navbar__link { color: #606770; text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+        .navbar__link:hover { color: var(--cyan-blue); }
+        .navbar__link--active { color: var(--cyan-blue); font-weight: 600; }
+        .hero { background: var(--hero-bg); padding: 1.5rem 2rem; color: white; }
+        .hero__breadcrumb { font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.5rem; }
+        .hero__breadcrumb a { color: white; text-decoration: none; }
+        .hero__breadcrumb a:hover { text-decoration: underline; }
+        .hero__title { font-size: 1.8rem; font-weight: 700; }
+        .main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .docs-layout { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; }
+        @media (max-width: 900px) { .docs-layout { grid-template-columns: 1fr; } .docs-nav { display: none; } }
+        .docs-nav { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+        .docs-nav__section { margin-bottom: 1.5rem; }
+        .docs-nav__title { font-size: 0.7rem; font-weight: 600; color: #606770; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+        .docs-nav__list { list-style: none; }
+        .docs-nav__link { display: block; padding: 0.35rem 0.75rem; color: #444; text-decoration: none; font-size: 0.85rem; border-radius: 6px; transition: all 0.15s; }
+        .docs-nav__link:hover { background: #e3f2fd; color: var(--cyan-dark); }
+        .docs-nav__link--active { background: var(--cyan-blue); color: white; }
+        .docs-nav__link--page { font-weight: 500; }
+        .docs-content { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+        .docs-content h1 { font-size: 1.8rem; font-weight: 700; color: var(--cyanview-navy); margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e1e4e8; }
+        .docs-content h2 { font-size: 1.4rem; font-weight: 600; color: var(--cyanview-navy); margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e1e4e8; }
+        .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+        .docs-content h3 { font-size: 1.1rem; font-weight: 600; color: #333; margin: 1.5rem 0 0.75rem; }
+        .docs-content p { margin-bottom: 1rem; }
+        .docs-content ul, .docs-content ol { margin: 0 0 1rem 1.5rem; }
+        .docs-content li { margin-bottom: 0.5rem; }
+        .docs-content code { background: #f1f3f5; padding: 0.15rem 0.4rem; border-radius: 4px; font-family: var(--ifm-font-family-mono); font-size: 0.9em; }
+        .docs-content pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: 0.85rem; }
+        .docs-content pre code { background: transparent; padding: 0; color: inherit; }
+        .docs-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+        .docs-content th, .docs-content td { border: 1px solid #e1e4e8; padding: 0.6rem; text-align: left; }
+        .docs-content th { background: #f6f8fa; font-weight: 600; }
+        .info-box { border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+        .info-box--info { background: #e3f2fd; border-left: 4px solid var(--cyan-blue); }
+        .info-box--warning { background: #fff3e0; border-left: 4px solid #ff9800; }
+        .info-box--success { background: #e8f5e9; border-left: 4px solid #4caf50; }
+        .info-box__title { font-weight: 600; margin-bottom: 0.5rem; }
+        .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e1e4e8; }
+        .page-nav__link { display: flex; flex-direction: column; padding: 1rem; border-radius: 8px; text-decoration: none; color: inherit; transition: background 0.2s; max-width: 45%; }
+        .page-nav__link:hover { background: #f6f8fa; }
+        .page-nav__label { font-size: 0.75rem; color: #606770; text-transform: uppercase; }
+        .page-nav__title { font-weight: 600; color: var(--cyan-dark); }
+        .page-nav__link--next { text-align: right; margin-left: auto; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Admin</a>
+            <a href="/admin/docs" class="navbar__link navbar__link--active">Docs</a>
+            <span id="authLoading" class="navbar__link">...</span>
+            <a href="#" id="logoutBtn" class="navbar__link" style="display:none;">Logout</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero__breadcrumb"><a href="/admin/docs">Documentation</a> / Odoo MCP Integration</div>
+        <h1 class="hero__title">Odoo MCP Integration</h1>
+    </section>
+
+    <main class="main">
+        <div class="docs-layout">
+            <nav class="docs-nav">
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">Documentation</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="/admin/docs/architecture" class="docs-nav__link docs-nav__link--page">Architecture</a></li>
+                        <li><a href="/admin/docs/retrieval" class="docs-nav__link docs-nav__link--page">Retrieval System</a></li>
+                        <li><a href="/admin/docs/ingestion" class="docs-nav__link docs-nav__link--page">Data Ingestion</a></li>
+                        <li><a href="/admin/docs/content" class="docs-nav__link docs-nav__link--page">Content Management</a></li>
+                        <li><a href="/admin/docs/features" class="docs-nav__link docs-nav__link--page">Features</a></li>
+                        <li><a href="/admin/docs/odoo" class="docs-nav__link docs-nav__link--page docs-nav__link--active">Odoo MCP</a></li>
+                        <li><a href="/admin/docs/api" class="docs-nav__link docs-nav__link--page">API Reference</a></li>
+                        <li><a href="/admin/docs/security" class="docs-nav__link docs-nav__link--page">Security</a></li>
+                        <li><a href="/admin/docs/operations" class="docs-nav__link docs-nav__link--page">Operations</a></li>
+                        <li><a href="/admin/docs/commands" class="docs-nav__link docs-nav__link--page">CLI Commands</a></li>
+                    </ul>
+                </div>
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">On This Page</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="#overview" class="docs-nav__link">Overview</a></li>
+                        <li><a href="#architecture" class="docs-nav__link">Architecture</a></li>
+                        <li><a href="#tools" class="docs-nav__link">Available Tools</a></li>
+                        <li><a href="#data-models" class="docs-nav__link">Data Models</a></li>
+                        <li><a href="#configuration" class="docs-nav__link">Configuration</a></li>
+                        <li><a href="#deployment" class="docs-nav__link">Deployment</a></li>
+                        <li><a href="#workflows" class="docs-nav__link">Workflow Examples</a></li>
+                        <li><a href="#troubleshooting" class="docs-nav__link">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="docs-content">
+                <h1>Odoo MCP Integration</h1>
+
+                <h2 id="overview">Overview</h2>
+                <p>CLORAG integrates with Odoo ERP via the <strong>Odoo MCP Server</strong> to provide CRM, sales, and support capabilities directly within the AI assistant. This enables seamless workflows combining knowledge base search with real-time customer data.</p>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">What is MCP?</div>
+                    <p>The Model Context Protocol (MCP) is a standard for connecting AI assistants to external tools and data sources. Odoo MCP Server exposes Odoo's API as MCP tools that Claude can invoke.</p>
+                </div>
+
+                <h3>Key Benefits</h3>
+                <ul>
+                    <li><strong>Unified Support:</strong> Search knowledge base AND look up customer data in one conversation</li>
+                    <li><strong>Serial Number Tracking:</strong> Trace devices through deliveries to customers</li>
+                    <li><strong>Warranty Verification:</strong> Instant warranty status checks by serial number</li>
+                    <li><strong>Sales Integration:</strong> Create quotations and view purchase history</li>
+                    <li><strong>Repair Management:</strong> Create and track RMA/repair orders</li>
+                </ul>
+
+                <h2 id="architecture">Architecture</h2>
+                <p>The integration uses a two-tier architecture with CLORAG as the client and Odoo MCP Server as the bridge to Odoo:</p>
+
+                <pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                      INTEGRATION ARCHITECTURE                        │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────┐
+│     User Query       │
+│  "Check warranty     │
+│   for serial X"      │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                     CLORAG SERVER (Port 8080)                     │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │                      Claude Agent                          │  │
+│  │                                                            │  │
+│  │   Tool Selection:  hybrid_search → check_warranty         │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                              │                                    │
+│  ┌─────────────────┐   ┌─────┴─────────────────┐                │
+│  │  RAG Pipeline   │   │   OdooMCPClient       │                │
+│  │  Qdrant Search  │   │   (httpx async)       │                │
+│  │  Claude Synth   │   │   LRU Cache (100)     │                │
+│  └─────────────────┘   └───────────┬───────────┘                │
+│                                    │                             │
+└────────────────────────────────────┼─────────────────────────────┘
+                                     │ JSON-RPC 2.0
+                                     │ Bearer Auth
+                                     ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                  ODOO MCP SERVER (Port 8081)                      │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │                    FastMCP 3.0+                            │  │
+│  │                                                            │  │
+│  │   3 Core Tools:                                           │  │
+│  │   • execute_method   - Universal Odoo API access          │  │
+│  │   • batch_execute    - Multiple operations atomically     │  │
+│  │   • execute_workflow - Pre-built multi-step workflows     │  │
+│  │                                                            │  │
+│  │   19 Resources: models, schema, methods, docs...          │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                              │                                    │
+└──────────────────────────────┼────────────────────────────────────┘
+                               │ Odoo v2 JSON-2 API
+                               │ Bearer Token + X-Odoo-Database
+                               ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                         ODOO 19+                                  │
+│                   (cyalan01.odoo.com)                            │
+│                                                                   │
+│   Models Used:                                                    │
+│   • res.partner      - Customers and contacts                    │
+│   • product.product  - Products catalog                          │
+│   • sale.order       - Quotations and sales orders               │
+│   • stock.lot        - Serial numbers (lots)                     │
+│   • stock.picking    - Deliveries                                │
+│   • stock.move.line  - Delivery lines with serial tracking       │
+│   • repair.order     - Repair/RMA orders                         │
+└──────────────────────────────────────────────────────────────────┘</code></pre>
+
+                <h3>Communication Flow</h3>
+                <ol>
+                    <li><strong>CLORAG receives query</strong> - Claude agent analyzes intent</li>
+                    <li><strong>Tool selection</strong> - Agent chooses Odoo tool (e.g., <code>check_warranty</code>)</li>
+                    <li><strong>OdooMCPClient call</strong> - HTTP request to Odoo MCP Server</li>
+                    <li><strong>MCP Server processes</strong> - Translates to Odoo v2 API calls</li>
+                    <li><strong>Odoo responds</strong> - Data flows back through the chain</li>
+                    <li><strong>Claude synthesizes</strong> - Combines with RAG results for response</li>
+                </ol>
+
+                <h2 id="tools">Available Tools (14 total)</h2>
+
+                <h3>Customer Tools</h3>
+                <table>
+                    <tr><th>Tool</th><th>Description</th><th>Parameters</th></tr>
+                    <tr>
+                        <td><code>lookup_customer</code></td>
+                        <td>Find customer by email or serial number</td>
+                        <td><code>email</code> OR <code>serial</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>create_customer</code></td>
+                        <td>Create new customer/contact</td>
+                        <td><code>name</code>, <code>email</code>, <code>company?</code>, <code>country_id?</code>, <code>phone?</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>get_customer_contacts</code></td>
+                        <td>List contacts for a company</td>
+                        <td><code>customer_id</code></td>
+                    </tr>
+                </table>
+
+                <h3>Sales Tools</h3>
+                <table>
+                    <tr><th>Tool</th><th>Description</th><th>Parameters</th></tr>
+                    <tr>
+                        <td><code>search_products</code></td>
+                        <td>Search products by name/SKU</td>
+                        <td><code>query</code>, <code>category?</code>, <code>limit?</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>get_purchase_history</code></td>
+                        <td>Customer's confirmed orders</td>
+                        <td><code>customer_id</code>, <code>limit?</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>create_quotation</code></td>
+                        <td>Create sales quotation</td>
+                        <td><code>customer_id</code>, <code>products[]</code>, <code>validity_days?</code>, <code>note?</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>get_quotation</code></td>
+                        <td>Get quotation details</td>
+                        <td><code>quotation_id</code></td>
+                    </tr>
+                </table>
+
+                <h3>Support Tools</h3>
+                <table>
+                    <tr><th>Tool</th><th>Description</th><th>Parameters</th></tr>
+                    <tr>
+                        <td><code>check_warranty</code></td>
+                        <td>Check warranty by serial</td>
+                        <td><code>serial</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>get_repair_history</code></td>
+                        <td>Customer's repair orders</td>
+                        <td><code>customer_id</code>, <code>limit?</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>create_repair</code></td>
+                        <td>Create RMA/repair order</td>
+                        <td><code>customer_id</code>, <code>product_id</code>, <code>description</code>, <code>lot_id?</code></td>
+                    </tr>
+                </table>
+
+                <h3>Serial Number Tools</h3>
+                <table>
+                    <tr><th>Tool</th><th>Description</th><th>Parameters</th></tr>
+                    <tr>
+                        <td><code>search_serials</code></td>
+                        <td>Search serials by partial match, product, or customer</td>
+                        <td><code>query?</code>, <code>product_id?</code>, <code>customer_id?</code>, <code>limit?</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>get_serial_info</code></td>
+                        <td>Detailed serial info with delivery history</td>
+                        <td><code>serial</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>get_product_serials</code></td>
+                        <td>All serials for a product</td>
+                        <td><code>product_id</code>, <code>limit?</code></td>
+                    </tr>
+                </table>
+
+                <h2 id="data-models">Data Models</h2>
+
+                <h3>OdooCustomer</h3>
+                <pre><code>OdooCustomer:
+  id: int                    # Partner ID
+  name: str                  # Display name
+  email: str | None          # Email address
+  phone: str | None          # Phone number
+  mobile: str | None         # Mobile phone
+  company_name: str | None   # Parent company name
+  country: str | None        # Country name
+  country_id: int | None     # Country ID
+  vat: str | None            # VAT number
+  is_company: bool           # True if company, False if contact</code></pre>
+
+                <h3>OdooSerial</h3>
+                <pre><code>OdooSerial:
+  id: int                    # Lot ID (stock.lot)
+  name: str                  # Serial number string
+  product_id: int | None     # Product ID
+  product_name: str | None   # Product name
+  customer_id: int | None    # Customer who received it
+  customer_name: str | None  # Customer name
+  delivery_date: datetime    # When delivered
+  delivery_ref: str | None   # Delivery reference (e.g., WH/OUT/00001)</code></pre>
+
+                <h3>WarrantyStatus</h3>
+                <pre><code>WarrantyStatus:
+  serial: str                # Serial number
+  product_name: str | None   # Product name
+  product_id: int | None     # Product ID
+  purchase_date: datetime    # Original delivery date
+  warranty_end: datetime     # Warranty expiration
+  is_under_warranty: bool    # Current warranty status
+  customer_id: int | None    # Owner customer ID
+  customer_name: str | None  # Owner name</code></pre>
+
+                <h2 id="configuration">Configuration</h2>
+
+                <h3>Environment Variables</h3>
+                <table>
+                    <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+                    <tr>
+                        <td><code>ODOO_MCP_ENABLED</code></td>
+                        <td><code>false</code></td>
+                        <td>Enable Odoo integration</td>
+                    </tr>
+                    <tr>
+                        <td><code>ODOO_MCP_URL</code></td>
+                        <td><code>http://localhost:8081</code></td>
+                        <td>Odoo MCP Server URL</td>
+                    </tr>
+                    <tr>
+                        <td><code>ODOO_MCP_API_KEY</code></td>
+                        <td>-</td>
+                        <td>Bearer token for MCP auth</td>
+                    </tr>
+                    <tr>
+                        <td><code>ODOO_MCP_TIMEOUT</code></td>
+                        <td><code>30</code></td>
+                        <td>Request timeout (seconds)</td>
+                    </tr>
+                    <tr>
+                        <td><code>ODOO_MCP_CACHE_TTL</code></td>
+                        <td><code>300</code></td>
+                        <td>Cache TTL for read operations</td>
+                    </tr>
+                </table>
+
+                <h3>Odoo Server Configuration (for Odoo MCP Server)</h3>
+                <table>
+                    <tr><th>Variable</th><th>Description</th></tr>
+                    <tr><td><code>ODOO_URL</code></td><td>Odoo server URL (e.g., https://company.odoo.com)</td></tr>
+                    <tr><td><code>ODOO_DB</code></td><td>Database name</td></tr>
+                    <tr><td><code>ODOO_USERNAME</code></td><td>API username</td></tr>
+                    <tr><td><code>ODOO_API_KEY</code></td><td>Odoo API key</td></tr>
+                </table>
+
+                <h3>Example .env Configuration</h3>
+                <pre><code># CLORAG Odoo Integration
+ODOO_MCP_ENABLED=true
+ODOO_MCP_URL=http://odoo-mcp:8080        # Docker internal network
+ODOO_MCP_API_KEY=your-secret-bearer-token
+ODOO_MCP_TIMEOUT=30
+ODOO_MCP_CACHE_TTL=300
+
+# Odoo Server (used by Odoo MCP Server container)
+ODOO_URL=https://your-company.odoo.com
+ODOO_DB=your-database
+ODOO_USERNAME=api-user@company.com
+ODOO_API_KEY=your-odoo-api-key</code></pre>
+
+                <h2 id="deployment">Deployment</h2>
+
+                <h3>Docker Compose</h3>
+                <p>The Odoo MCP Server runs as a separate Docker container using the <code>odoo</code> profile:</p>
+
+                <pre><code># Start with Odoo MCP enabled
+docker compose --profile odoo up -d
+
+# Start without Odoo (default)
+docker compose up -d
+
+# View logs
+docker compose logs -f clorag-odoo-mcp</code></pre>
+
+                <h3>docker-compose.yml excerpt</h3>
+                <pre><code>services:
+  clorag-web:
+    build: .
+    environment:
+      - ODOO_MCP_ENABLED=${ODOO_MCP_ENABLED:-false}
+      - ODOO_MCP_URL=http://odoo-mcp:8080
+      - ODOO_MCP_API_KEY=${ODOO_MCP_API_KEY}
+
+  odoo-mcp:
+    image: alanogik/odoo-mcp-19:latest
+    environment:
+      - ODOO_URL=${ODOO_URL}
+      - ODOO_DB=${ODOO_DB}
+      - ODOO_USERNAME=${ODOO_USERNAME}
+      - ODOO_API_KEY=${ODOO_API_KEY}
+      - MCP_TRANSPORT=streamable-http
+      - MCP_API_KEY=${ODOO_MCP_API_KEY}
+    profiles:
+      - odoo  # Only starts with --profile odoo</code></pre>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Platform Compatibility</div>
+                    <p>The Docker image must match the server architecture. Build with <code>docker buildx build --platform linux/amd64</code> for x86 servers if building on Apple Silicon.</p>
+                </div>
+
+                <h2 id="workflows">Workflow Examples</h2>
+
+                <h3>Support Workflow</h3>
+                <p>When a support email arrives:</p>
+                <pre><code>1. lookup_customer(email="customer@example.com")
+   → Get customer info and ID
+
+2. get_purchase_history(customer_id=123)
+   → See what products they've bought
+
+3. search_serials(customer_id=123)
+   → Find all serials delivered to them
+
+4. check_warranty(serial="CY-RIO-48-001")
+   → Verify warranty status
+
+5. hybrid_search("RIO connection issue")
+   → Search knowledge base
+
+6. create_repair(customer_id=123, product_id=45, description="...")
+   → Create RMA if needed</code></pre>
+
+                <h3>Pre-Sales Workflow</h3>
+                <pre><code>1. search_products(query="RIO")
+   → Find relevant products
+
+2. lookup_customer(email="prospect@company.com")
+   → Check if customer exists
+
+3. create_customer(name="...", email="...", company="...")
+   → Create if not found
+
+4. create_quotation(
+     customer_id=456,
+     products=[
+       {"product_id": 1, "quantity": 2},
+       {"product_id": 5, "quantity": 1, "discount": 10}
+     ],
+     validity_days=30,
+     note="Special pricing for new customer"
+   )
+   → Generate quotation in Odoo</code></pre>
+
+                <h3>Serial Number Tracing</h3>
+                <pre><code># Find serial with partial match
+search_serials(query="CY-RIO-48")
+→ Returns all matching serials with delivery info
+
+# Get detailed info for specific serial
+get_serial_info(serial="CY-RIO-48-001")
+→ Returns product, customer, delivery date, delivery reference
+
+# List all serials for a product
+get_product_serials(product_id=45)
+→ Returns all serials with their current owners</code></pre>
+
+                <h2 id="troubleshooting">Troubleshooting</h2>
+
+                <h3>Common Issues</h3>
+                <table>
+                    <tr><th>Issue</th><th>Cause</th><th>Solution</th></tr>
+                    <tr>
+                        <td>Connection refused</td>
+                        <td>Odoo MCP Server not running</td>
+                        <td><code>docker compose --profile odoo up -d</code></td>
+                    </tr>
+                    <tr>
+                        <td>401 Unauthorized</td>
+                        <td>API key mismatch</td>
+                        <td>Verify <code>ODOO_MCP_API_KEY</code> matches on both sides</td>
+                    </tr>
+                    <tr>
+                        <td>Timeout errors</td>
+                        <td>Slow Odoo server</td>
+                        <td>Increase <code>ODOO_MCP_TIMEOUT</code></td>
+                    </tr>
+                    <tr>
+                        <td>Serial not found</td>
+                        <td>No stock.lot record</td>
+                        <td>Verify serial exists in Odoo Inventory</td>
+                    </tr>
+                    <tr>
+                        <td>Platform mismatch</td>
+                        <td>arm64 image on amd64 host</td>
+                        <td>Rebuild with <code>--platform linux/amd64</code></td>
+                    </tr>
+                </table>
+
+                <h3>Checking Connection</h3>
+                <pre><code># Check if Odoo MCP Server is running
+docker compose --profile odoo ps
+
+# View Odoo MCP Server logs
+docker compose logs --tail=50 clorag-odoo-mcp
+
+# Test connection from CLORAG container
+docker compose exec clorag-web curl -s http://odoo-mcp:8080/health</code></pre>
+
+                <h3>Cache Management</h3>
+                <p>The OdooMCPClient uses an LRU cache (100 entries, configurable TTL) for read operations. Cache is cleared on server restart.</p>
+
+                <div class="page-nav">
+                    <a href="/admin/docs/features" class="page-nav__link">
+                        <span class="page-nav__label">Previous</span>
+                        <span class="page-nav__title">Features</span>
+                    </a>
+                    <a href="/admin/docs/api" class="page-nav__link page-nav__link--next">
+                        <span class="page-nav__label">Next</span>
+                        <span class="page-nav__title">API Reference</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
+        AI Search with Claude AI, Voyage AI &amp; Qdrant
+    </footer>
+
+    <script nonce="{{ request.state.csp_nonce }}">
+        const authLoading = document.getElementById('authLoading');
+        const logoutBtn = document.getElementById('logoutBtn');
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session');
+                const data = await res.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+                authLoading.classList.add('hidden');
+                logoutBtn.style.display = 'block';
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                window.location.href = '/admin/login';
+            }
+        }
+        checkAuth();
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/login';
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
+    </script>
+</body>
+</html>
