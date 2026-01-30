@@ -9,82 +9,21 @@ from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import RedirectResponse
 from starlette.responses import Response as StarletteResponse
 
 from clorag.core.database import get_camera_database
 from clorag.models.camera import Camera
-from clorag.web.dependencies import get_templates, limiter
+from clorag.web.dependencies import limiter
 
 router = APIRouter()
 logger = structlog.get_logger()
 
 
-@router.get("/cameras", response_class=HTMLResponse)
-async def cameras_list(
-    request: Request,
-    manufacturer: str | None = None,
-    device_type: str | None = None,
-    port: str | None = None,
-    protocol: str | None = None,
-    page: int = 1,
-    page_size: int = 50,
-) -> Response:
-    """Render the public camera compatibility list with pagination."""
-    db = get_camera_database()
-    templates = get_templates()
-
-    # Clamp page_size to reasonable limits
-    page_size = max(10, min(100, page_size))
-    page = max(1, page)
-
-    # Get total count for pagination
-    total_count = db.count_cameras(
-        manufacturer=manufacturer,
-        device_type=device_type,
-        port=port,
-        protocol=protocol,
-    )
-    total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
-
-    # Clamp page to valid range
-    page = min(page, total_pages)
-    offset = (page - 1) * page_size
-
-    cameras = db.list_cameras(
-        manufacturer=manufacturer,
-        device_type=device_type,
-        port=port,
-        protocol=protocol,
-        offset=offset,
-        limit=page_size,
-    )
-    manufacturers = db.get_manufacturers()
-    device_types = db.get_device_types()
-    ports = db.get_all_ports()
-    protocols = db.get_all_protocols()
-    stats = db.get_stats()
-
-    return templates.TemplateResponse(
-        "cameras.html",
-        {
-            "request": request,
-            "cameras": cameras,
-            "manufacturers": manufacturers,
-            "device_types": device_types,
-            "ports": ports,
-            "protocols": protocols,
-            "selected_manufacturer": manufacturer,
-            "selected_device_type": device_type,
-            "selected_port": port,
-            "selected_protocol": protocol,
-            "stats": stats,
-            "page": page,
-            "page_size": page_size,
-            "total_count": total_count,
-            "total_pages": total_pages,
-        },
-    )
+@router.get("/cameras")
+async def cameras_redirect() -> RedirectResponse:
+    """Redirect public cameras URL to admin cameras page."""
+    return RedirectResponse(url="/admin/cameras", status_code=302)
 
 
 @router.get("/api/cameras", response_model=list[Camera])
