@@ -112,6 +112,8 @@
                         <li><a href="#anonymization" class="docs-nav__link">Data Anonymization</a></li>
                         <li><a href="#oauth" class="docs-nav__link">OAuth Token Security</a></li>
                         <li><a href="#sql" class="docs-nav__link">SQL Injection Prevention</a></li>
+                        <li><a href="#fts5" class="docs-nav__link">FTS5 Injection Prevention</a></li>
+                        <li><a href="#path-traversal" class="docs-nav__link">Path Traversal Prevention</a></li>
                         <li><a href="#checklist" class="docs-nav__link">Security Checklist</a></li>
                     </ul>
                 </div>
@@ -262,6 +264,49 @@
                     <li><strong>No String Concatenation</strong>: User input never concatenated into SQL strings</li>
                 </ul>
 
+                <h2 id="fts5">FTS5 Injection Prevention</h2>
+                <p>SQLite FTS5 full-text search queries are sanitized to prevent injection attacks:</p>
+                <ul>
+                    <li><strong>Special Character Removal</strong>: Characters <code>" ' ( ) * : ^ - +</code> are stripped from queries</li>
+                    <li><strong>Operator Sanitization</strong>: FTS5 operators <code>NEAR</code>, <code>NOT</code>, <code>OR</code>, <code>AND</code> are removed (whole word, case-insensitive)</li>
+                    <li><strong>Term Quoting</strong>: Each search term is quoted to prevent phrase interpretation</li>
+                    <li><strong>Prefix Matching</strong>: Wildcard suffix <code>*</code> added for user-friendly prefix search</li>
+                </ul>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Attack Prevention</div>
+                    <p>This sanitization prevents DoS attacks via complex FTS5 expressions (e.g., nested <code>NOT NOT NOT...</code>) and data extraction via FTS5 syntax injection.</p>
+                </div>
+
+                <h3>Protected Databases</h3>
+                <table>
+                    <tr><th>Database</th><th>Method</th><th>File</th></tr>
+                    <tr>
+                        <td>Camera Database</td>
+                        <td><code>_prepare_fts_query()</code></td>
+                        <td><code>core/database.py</code></td>
+                    </tr>
+                    <tr>
+                        <td>Support Cases</td>
+                        <td><code>_prepare_fts_query()</code></td>
+                        <td><code>core/support_case_db.py</code></td>
+                    </tr>
+                </table>
+
+                <h2 id="path-traversal">Path Traversal Prevention</h2>
+                <p>File upload endpoints validate filenames to prevent directory traversal attacks:</p>
+                <ul>
+                    <li><strong>Path Separator Rejection</strong>: Filenames containing <code>/</code> or <code>\</code> are rejected</li>
+                    <li><strong>Parent Directory Rejection</strong>: Filenames containing <code>..</code> sequences are rejected</li>
+                    <li><strong>Early Validation</strong>: Checks occur before any <code>Path()</code> operations on user input</li>
+                    <li><strong>Security Logging</strong>: Path traversal attempts are logged for monitoring</li>
+                </ul>
+
+                <pre><code># Example rejected filenames:
+../../../../etc/passwd.txt    # Path traversal attempt
+..\\..\\windows\\system32\\config  # Windows-style traversal
+uploads/../../../secrets.json  # Mixed path traversal</code></pre>
+
                 <h3>API Key Security</h3>
                 <p>API keys are handled securely:</p>
                 <ul>
@@ -287,6 +332,8 @@ QDRANT_API_KEY=your_qdrant_key               # Secures vector database</code></p
                     <tr><td>Brute force protection</td><td>✅</td><td>5 attempts → 5 min lockout</td></tr>
                     <tr><td>Token encryption</td><td>✅</td><td>Fernet with PBKDF2</td></tr>
                     <tr><td>SQL injection prevention</td><td>✅</td><td>Parameterized queries</td></tr>
+                    <tr><td>FTS5 injection prevention</td><td>✅</td><td>Query sanitization (v0.6.4)</td></tr>
+                    <tr><td>Path traversal prevention</td><td>✅</td><td>Filename validation (v0.6.4)</td></tr>
                     <tr><td>PII anonymization</td><td>✅</td><td>Before LLM processing</td></tr>
                     <tr><td>Rate limiting</td><td>✅</td><td>slowapi integration</td></tr>
                 </table>

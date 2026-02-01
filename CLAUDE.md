@@ -9,7 +9,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 
 Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
-**Version**: 0.6.3 | **Python**: 3.10-3.13
+**Version**: 0.6.4 | **Python**: 3.10-3.13
 
 ## Commands
 

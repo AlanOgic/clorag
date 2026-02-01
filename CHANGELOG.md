@@ -2,6 +2,28 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.6.4] - 2026-02-01
+
+### Security
+
+- **FTS5 SQL Injection Prevention** (Critical)
+  - Added `_prepare_fts_query()` sanitization to `SupportCaseDatabase.search_cases()`
+  - Removes FTS5 special characters: `" ' ( ) * : ^ - +`
+  - Removes FTS5 operators: `NEAR`, `NOT`, `OR`, `AND` (case-insensitive, whole word)
+  - Prevents DoS via complex FTS5 expressions and data extraction attacks
+  - Mirrors existing protection in `CameraDatabase._prepare_fts_query()`
+
+- **Path Traversal Prevention** (Critical)
+  - Added filename validation in document upload endpoint
+  - Rejects filenames containing `/`, `\`, or `..` sequences
+  - Logs path traversal attempts for security monitoring
+  - Applied before any `Path()` operations on user-provided filenames
+
+### Files
+
+- `src/clorag/core/support_case_db.py` - Added FTS5 query sanitization
+- `src/clorag/web/routers/admin/documents.py` - Added path traversal validation
+
 ## [0.6.3] - 2026-01-23
 
 ### Added
