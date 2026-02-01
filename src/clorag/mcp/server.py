@@ -77,6 +77,11 @@ async def lifespan(app: FastMCP[MCPServices]) -> AsyncIterator[MCPServices]:
         # Cleanup
         _services.camera_db.close()
         _services.support_case_db.close()
+
+        # Close Odoo MCP client if it was initialized
+        from clorag.services.odoo_mcp_client import close_odoo_mcp_client
+        await close_odoo_mcp_client()
+
         _services = None
 
 

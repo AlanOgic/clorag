@@ -345,6 +345,12 @@ class OdooMCPClient:
 
     Communicates with Odoo MCP Server using JSON-RPC 2.0 over HTTP.
     The MCP server acts as a bridge to Odoo's JSON-2 API.
+
+    Performance optimizations:
+    - Persistent HTTP client with connection pooling
+    - LRU cache with TTL for read operations
+    - Batch operations to reduce N+1 queries
+    - Parallel enrichment via asyncio.gather()
     """
 
     # Fields to request for common operations
@@ -402,6 +408,32 @@ class OdooMCPClient:
 
         # Request ID counter for JSON-RPC
         self._request_id = 0
+
+        # Persistent HTTP client with connection pooling
+        # Reuses TCP connections across requests (~50-100ms savings per request)
+        self._http_client: httpx.AsyncClient | None = None
+
+    async def _get_http_client(self) -> httpx.AsyncClient:
+        """Get or create the persistent HTTP client.
+
+        Lazily initializes client with connection pooling for better performance.
+        """
+        if self._http_client is None or self._http_client.is_closed:
+            self._http_client = httpx.AsyncClient(
+                timeout=self._timeout,
+                limits=httpx.Limits(
+                    max_keepalive_connections=5,
+                    max_connections=10,
+                    keepalive_expiry=30.0,
+                ),
+            )
+        return self._http_client
+
+    async def close(self) -> None:
+        """Close the HTTP client and release connections."""
+        if self._http_client is not None and not self._http_client.is_closed:
+            await self._http_client.aclose()
+            self._http_client = None
 
     def _get_next_request_id(self) -> int:
         """Get next JSON-RPC request ID."""
@@ -463,22 +495,23 @@ class OdooMCPClient:
         url = f"{self._base_url}/mcp"
 
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.post(
-                    url,
-                    json=request_data,
-                    headers=self._get_headers(),
-                )
+            # Use persistent HTTP client with connection pooling
+            client = await self._get_http_client()
+            response = await client.post(
+                url,
+                json=request_data,
+                headers=self._get_headers(),
+            )
 
-                if response.status_code == 401:
-                    raise OdooMCPAuthError("Authentication failed with Odoo MCP server")
+            if response.status_code == 401:
+                raise OdooMCPAuthError("Authentication failed with Odoo MCP server")
 
-                if response.status_code == 403:
-                    raise OdooMCPAuthError("Access denied to Odoo MCP server")
+            if response.status_code == 403:
+                raise OdooMCPAuthError("Access denied to Odoo MCP server")
 
-                response.raise_for_status()
+            response.raise_for_status()
 
-                result = response.json()
+            result = response.json()
 
         except httpx.ConnectError as e:
             raise OdooMCPConnectionError(f"Cannot connect to Odoo MCP server at {url}: {e}") from e
@@ -858,6 +891,9 @@ class OdooMCPClient:
     ) -> list[OdooPurchase]:
         """Get purchase history for a customer.
 
+        Optimized to batch-fetch all order lines in a single request instead of
+        N+1 queries (one per order).
+
         Args:
             partner_id: Customer partner ID.
             limit: Maximum results.
@@ -880,39 +916,59 @@ class OdooMCPClient:
             use_cache=True,
         )
 
-        purchases = []
-        if result and isinstance(result, list):
-            for order in result:
-                # Get product names from order lines
-                product_names = []
-                order_lines = order.get("order_line", [])
-                if order_lines and isinstance(order_lines, list):
-                    # Fetch line details
-                    lines_result = await self.execute_method(
-                        model="sale.order.line",
-                        method="read",
-                        args=[order_lines],
-                        kwargs={"fields": ["product_id"]},
-                        use_cache=True,
-                    )
-                    if lines_result and isinstance(lines_result, list):
-                        for line in lines_result:
-                            product = line.get("product_id")
-                            if isinstance(product, list) and len(product) > 1:
-                                product_names.append(product[1])
+        if not result or not isinstance(result, list):
+            return []
 
-                order_date_raw = order.get("date_order")
-                purchases.append(OdooPurchase(
-                    id=order.get("id", 0),
-                    name=order.get("name", ""),
-                    date=(
-                        datetime.fromisoformat(order_date_raw)
-                        if order_date_raw else None
-                    ),
-                    state=order.get("state", ""),
-                    amount_total=order.get("amount_total", 0.0),
-                    product_names=product_names,
-                ))
+        # Collect all order line IDs across all orders for batch fetch
+        all_line_ids: list[int] = []
+        order_to_lines: dict[int, list[int]] = {}
+
+        for order in result:
+            order_id = order.get("id", 0)
+            order_lines = order.get("order_line", [])
+            if order_lines and isinstance(order_lines, list):
+                order_to_lines[order_id] = order_lines
+                all_line_ids.extend(order_lines)
+
+        # Batch fetch all order lines in a single request (was N+1, now 1)
+        line_to_product: dict[int, str] = {}
+        if all_line_ids:
+            lines_result = await self.execute_method(
+                model="sale.order.line",
+                method="read",
+                args=[all_line_ids],
+                kwargs={"fields": ["id", "product_id"]},
+                use_cache=True,
+            )
+            if lines_result and isinstance(lines_result, list):
+                for line in lines_result:
+                    line_id = line.get("id")
+                    product = line.get("product_id")
+                    if line_id and isinstance(product, list) and len(product) > 1:
+                        line_to_product[line_id] = product[1]
+
+        # Build purchases with product names from batch-fetched data
+        purchases = []
+        for order in result:
+            order_id = order.get("id", 0)
+            order_line_ids = order_to_lines.get(order_id, [])
+            product_names = [
+                line_to_product[lid] for lid in order_line_ids
+                if lid in line_to_product
+            ]
+
+            order_date_raw = order.get("date_order")
+            purchases.append(OdooPurchase(
+                id=order_id,
+                name=order.get("name", ""),
+                date=(
+                    datetime.fromisoformat(order_date_raw)
+                    if order_date_raw else None
+                ),
+                state=order.get("state", ""),
+                amount_total=order.get("amount_total", 0.0),
+                product_names=product_names,
+            ))
 
         return purchases
 
@@ -1008,12 +1064,17 @@ class OdooMCPClient:
     async def check_warranty_status(self, serial: str) -> WarrantyStatus:
         """Check warranty status for a serial number.
 
+        Optimized to trace serial → move → picking → partner in a single flow,
+        avoiding the redundant lookup_customer_by_serial() call.
+
         Args:
             serial: Device serial number.
 
         Returns:
             Warranty status information.
         """
+        from datetime import timedelta
+
         # Find the lot (serial)
         lot_result = await self.execute_method(
             model="stock.lot",
@@ -1040,7 +1101,7 @@ class OdooMCPClient:
 
         lot_id = lot["id"]
 
-        # Find the sale order that delivered this serial
+        # Find the delivery move with picking_id (needed for partner lookup)
         move_result = await self.execute_method(
             model="stock.move.line",
             method="search_read",
@@ -1049,31 +1110,47 @@ class OdooMCPClient:
                     ["lot_id", "=", lot_id],
                     ["state", "=", "done"],
                 ],
-                "fields": ["move_id", "date"],
+                "fields": ["move_id", "date", "picking_id"],  # Include picking_id
                 "limit": 1,
                 "order": "date asc",  # First delivery
             },
             use_cache=True,
         )
 
-        if move_result and isinstance(move_result, list) and len(move_result) > 0:
-            move_data = move_result[0]
+        if not move_result or not isinstance(move_result, list) or len(move_result) == 0:
+            return status
 
-            if move_data.get("date"):
-                purchase_date = datetime.fromisoformat(move_data["date"].replace("Z", "+00:00"))
-                status.purchase_date = purchase_date
+        move_data = move_result[0]
 
-                # Assume 2-year warranty (configurable in a real implementation)
-                from datetime import timedelta
-                warranty_end = purchase_date + timedelta(days=730)
-                status.warranty_end = warranty_end
-                status.is_under_warranty = warranty_end > datetime.now(warranty_end.tzinfo or None)
+        # Extract purchase date and calculate warranty
+        if move_data.get("date"):
+            purchase_date = datetime.fromisoformat(move_data["date"].replace("Z", "+00:00"))
+            status.purchase_date = purchase_date
 
-        # Try to find customer
-        customer = await self.lookup_customer_by_serial(serial)
-        if customer:
-            status.customer_id = customer.id
-            status.customer_name = customer.name
+            # 2-year warranty
+            warranty_end = purchase_date + timedelta(days=730)
+            status.warranty_end = warranty_end
+            status.is_under_warranty = warranty_end > datetime.now(warranty_end.tzinfo or None)
+
+        # Get customer from picking → partner chain (avoids redundant serial lookup)
+        picking_id = move_data.get("picking_id")
+        if isinstance(picking_id, list):
+            picking_id = picking_id[0]
+
+        if picking_id:
+            picking_result = await self.execute_method(
+                model="stock.picking",
+                method="read",
+                args=[[picking_id]],
+                kwargs={"fields": ["partner_id"]},
+                use_cache=True,
+            )
+
+            if picking_result and isinstance(picking_result, list) and len(picking_result) > 0:
+                partner_id = picking_result[0].get("partner_id")
+                if isinstance(partner_id, list) and len(partner_id) > 1:
+                    status.customer_id = partner_id[0]
+                    status.customer_name = partner_id[1]
 
         return status
 
@@ -1171,6 +1248,9 @@ class OdooMCPClient:
     ) -> list[OdooSerial]:
         """Search for serial numbers in Odoo.
 
+        Optimized with parallel enrichment using asyncio.gather() instead of
+        sequential awaits.
+
         Args:
             query: Partial serial number search (uses ilike).
             product_id: Filter by product ID.
@@ -1180,6 +1260,8 @@ class OdooMCPClient:
         Returns:
             List of matching serial numbers with delivery info.
         """
+        import asyncio
+
         limit = max(1, min(100, limit))
 
         # If searching by customer, we need to find lots via delivery
@@ -1205,13 +1287,16 @@ class OdooMCPClient:
             use_cache=True,
         )
 
-        serials = []
-        if result and isinstance(result, list):
-            for lot_data in result:
-                serial = OdooSerial.from_odoo(lot_data)
-                # Enrich with delivery info
-                await self._enrich_serial_delivery_info(serial)
-                serials.append(serial)
+        if not result or not isinstance(result, list):
+            return []
+
+        # Create serial objects
+        serials = [OdooSerial.from_odoo(lot_data) for lot_data in result]
+
+        # Parallel enrichment (was sequential, now concurrent)
+        await asyncio.gather(
+            *[self._enrich_serial_delivery_info(serial) for serial in serials]
+        )
 
         return serials
 
@@ -1436,6 +1521,8 @@ class OdooMCPClient:
     ) -> list[OdooSerial]:
         """Get all serial numbers for a product.
 
+        Optimized with parallel enrichment using asyncio.gather().
+
         Args:
             product_id: Odoo product ID.
             limit: Maximum results (1-100, default 50).
@@ -1443,6 +1530,8 @@ class OdooMCPClient:
         Returns:
             List of serial numbers for this product.
         """
+        import asyncio
+
         limit = max(1, min(100, limit))
 
         result = await self.execute_method(
@@ -1457,12 +1546,16 @@ class OdooMCPClient:
             use_cache=True,
         )
 
-        serials = []
-        if result and isinstance(result, list):
-            for lot_data in result:
-                serial = OdooSerial.from_odoo(lot_data)
-                await self._enrich_serial_delivery_info(serial)
-                serials.append(serial)
+        if not result or not isinstance(result, list):
+            return []
+
+        # Create serial objects
+        serials = [OdooSerial.from_odoo(lot_data) for lot_data in result]
+
+        # Parallel enrichment (was sequential, now concurrent)
+        await asyncio.gather(
+            *[self._enrich_serial_delivery_info(serial) for serial in serials]
+        )
 
         return serials
 
@@ -1508,3 +1601,16 @@ def get_odoo_mcp_client() -> OdooMCPClient:
         )
 
     return _client
+
+
+async def close_odoo_mcp_client() -> None:
+    """Close the Odoo MCP client singleton and release resources.
+
+    Safe to call even if client was never initialized.
+    """
+    global _client
+
+    if _client is not None:
+        await _client.close()
+        _client = None
+        logger.info("Odoo MCP client closed")
