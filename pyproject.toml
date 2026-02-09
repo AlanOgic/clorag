@@ -1,6 +1,6 @@
 [project]
 name = "clorag"
-version = "0.6.3"
+version = "0.6.4"
 description = "Multi-RAG Agent with Claude Agent SDK - Docusaurus docs + Gmail support threads"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"

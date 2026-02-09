@@ -329,6 +329,46 @@ class SupportCaseDatabase:
         cases = [self._row_to_case(row) for row in rows]
         return cases, total
 
+    def _prepare_fts_query(self, query: str) -> str:
+        """Prepare a query string for FTS5.
+
+        SECURITY: Sanitizes user input to prevent FTS5 injection attacks.
+        Removes FTS5 special operators (NEAR, NOT, OR, AND) and characters
+        that could be used for syntax injection.
+
+        Args:
+            query: Raw user query.
+
+        Returns:
+            FTS5-safe query string.
+        """
+        if not query or not query.strip():
+            return '""'
+
+        # Remove FTS5 special characters that could cause syntax errors or injection
+        special_chars = ['"', "'", "(", ")", "*", ":", "^", "-", "+"]
+        clean_query = query
+        for char in special_chars:
+            clean_query = clean_query.replace(char, " ")
+
+        # Remove FTS5 operators (case-insensitive)
+        # These could be used for injection attacks like "NEAR(a,b,100000)" DoS
+        import re
+
+        for operator in ["NEAR", "NOT", "OR", "AND"]:
+            clean_query = re.sub(
+                rf"\b{operator}\b", " ", clean_query, flags=re.IGNORECASE
+            )
+
+        # Split into terms and add prefix matching
+        terms = clean_query.split()
+        if not terms:
+            return '""'
+
+        # Quote each term and add wildcard suffix for prefix matching
+        fts_terms = [f'"{term}"*' for term in terms if term]
+        return " OR ".join(fts_terms) if fts_terms else '""'
+
     def search_cases(self, query: str, limit: int = 20) -> list[SupportCase]:
         """Search support cases using FTS5.
 
@@ -339,6 +379,9 @@ class SupportCaseDatabase:
         Returns:
             List of matching cases.
         """
+        # SECURITY: Sanitize FTS5 query to prevent injection attacks
+        fts_query = self._prepare_fts_query(query)
+
         with self._cursor() as cursor:
             cursor.execute(
                 """
@@ -348,7 +391,7 @@ class SupportCaseDatabase:
                 ORDER BY bm25(support_cases_fts)
                 LIMIT ?
                 """,
-                (query, limit),
+                (fts_query, limit),
             )
             rows = cursor.fetchall()
 

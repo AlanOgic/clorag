@@ -173,6 +173,18 @@ async def api_knowledge_upload(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
+    # SECURITY: Validate filename to prevent path traversal attacks
+    # Reject filenames containing path separators or parent directory references
+    if "/" in file.filename or "\\" in file.filename or ".." in file.filename:
+        logger.warning(
+            "Path traversal attempt in file upload",
+            filename=file.filename,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename. Filenames cannot contain path separators or '..'",
+        )
+
     # Validate file extension
     filename = file.filename.lower()
     if not filename.endswith((".txt", ".md", ".pdf")):

@@ -17,7 +17,6 @@ from clorag.core.vectorstore import VectorStore
 from clorag.mcp.tools import (
     register_camera_tools,
     register_document_tools,
-    register_odoo_tools,
     register_search_tools,
     register_support_tools,
 )
@@ -103,7 +102,6 @@ def create_mcp_server() -> FastMCP[MCPServices]:
     register_camera_tools(mcp)
     register_document_tools(mcp)
     register_support_tools(mcp)
-    register_odoo_tools(mcp)  # Only registered if odoo_mcp_enabled=True
 
     return mcp
 
