@@ -472,11 +472,11 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         return "Untitled"
 
     def _apply_text_transformations(self, text: str) -> str:
-        """Apply product name transformations to text.
+        """Apply unambiguous product name transformations to text.
 
         Transforms:
         - RIO-Live / RIO Live / RIOLive -> RIO +LAN
-        - RIO (standalone) -> RIO +WAN
+        - RIO +WAN Live -> RIO +LAN
 
         Args:
             text: Input text to transform.

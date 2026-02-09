@@ -18,6 +18,7 @@ from clorag.models.custom_document import (
     CustomDocumentUpdate,
     DocumentCategory,
 )
+from clorag.utils.text_transforms import apply_product_name_transforms
 
 logger = structlog.get_logger(__name__)
 
@@ -64,15 +65,16 @@ class CustomDocumentService:
         doc_id = str(uuid4())
         now = datetime.utcnow()
 
-        # Apply RIO terminology fixes before embedding (if enabled)
+        # Apply product name transforms (always — unambiguous fixes like RIO-Live → RIO +LAN)
         settings = get_settings()
-        content_to_embed = doc.content
+        content_to_embed = apply_product_name_transforms(doc.content)
         rio_fixes_applied = 0
 
+        # Apply context-aware RIO terminology fixes (Haiku analysis, if enabled)
         if settings.rio_fix_on_ingest:
             analyzer = RIOTerminologyAnalyzer()
             fixed_content, applied_fixes = await apply_rio_fixes_before_embedding(
-                doc.content, analyzer, settings.rio_fix_min_confidence
+                content_to_embed, analyzer, settings.rio_fix_min_confidence
             )
             if applied_fixes:
                 content_to_embed = fixed_content
