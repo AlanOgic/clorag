@@ -2,6 +2,32 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.6.5] - 2026-02-09
+
+### Changed
+
+- **RIO Terminology Prompt Improvements**
+  - Updated `ANALYSIS_RIO_TERMINOLOGY` Haiku prompt with authoritative product definitions
+  - **RIO** = Generic hardware reference (dimensions, ports, grounding, power, wiring, mounting, weight)
+  - **RIO +WAN** = Full license (LAN & WAN, Cyanview cloud, REMI mode, Internet, 1-128 cameras)
+  - **RIO +LAN** = Formerly "RIO-Live" (LAN only, 1-2 camera companion, no WAN/cloud/REMI)
+  - Added "RIOLive" to legacy terms list (alongside "RIO-Live", "RIO Live", "RIO +WAN Live")
+  - More precise context rules: cloud/REMI/Internet/remote/multi-camera(>2) → +WAN, LAN-only/local/1-2 cameras → +LAN
+
+- **Query-Time RIO Term Normalization**
+  - Legacy terms in search queries are auto-normalized before embedding via `apply_product_name_transforms()`
+  - Injected in `MultiSourceRetriever.retrieve()` — single point covers web, MCP, and CLI
+  - "RIO-Live" / "RIO Live" / "RIOLive" → "RIO +LAN" in queries
+  - "RIO +WAN Live" → "RIO +LAN" in queries
+  - Normalized query also used for reranking
+
+### Files
+
+- `src/clorag/services/default_prompts.py` - Updated RIO terminology Haiku prompt
+- `src/clorag/core/retriever.py` - Added query normalization before embedding
+- `CLAUDE.md` - Updated RIO terminology section with accurate definitions
+- `README.md` - Added query normalization to pipeline diagram
+
 ## [0.6.3] - 2026-01-23
 
 ### Added

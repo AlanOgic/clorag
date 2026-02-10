@@ -9,6 +9,7 @@ from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.reranker import RerankerClient
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import SearchResult, VectorStore
+from clorag.utils.text_transforms import apply_product_name_transforms
 
 
 class SearchSource(Enum):
@@ -135,6 +136,9 @@ class MultiSourceRetriever:
         Returns:
             RetrievalResult with matched documents.
         """
+        # Normalize old RIO terms in query so "RIO-Live" matches "RIO +LAN" content
+        query = apply_product_name_transforms(query)
+
         # Determine if reranking is enabled for this query
         should_rerank = use_reranking if use_reranking is not None else self._rerank_enabled
 

@@ -97,9 +97,16 @@ The RAG system processes queries through a multi-stage pipeline optimized for ac
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                              USER QUERY                                      │
-│                        "How to configure RIO?"                               │
+│                      "How to configure RIO-Live?"                            │
 └──────────────────────────────────────────────────────────────────────────────┘
-                                    │ 
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                       QUERY NORMALIZATION                                     │
+│          Legacy RIO terms auto-corrected before embedding                    │
+│        "RIO-Live" → "RIO +LAN"  |  "RIO +WAN Live" → "RIO +LAN"           │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
                                     ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                         EMBEDDING GENERATION                                 │
@@ -503,6 +510,12 @@ uv run fix-rio-terminology --preview          # Scan for issues
 uv run fix-rio-terminology --stats            # View statistics
 uv run fix-rio-terminology --apply            # Apply approved fixes
 ```
+
+**RIO Product Naming:**
+- **RIO** = Generic hardware (physical dimensions, ports, grounding, power, wiring)
+- **RIO +WAN** = Full license (LAN & WAN, Cyanview cloud, REMI, 1-128 cameras)
+- **RIO +LAN** = Formerly "RIO-Live" (LAN only, 1-2 camera companion)
+- Legacy terms ("RIO-Live", "RIO Live", "RIOLive") are auto-normalized in queries
 
 #### Prompt Management
 ```bash

@@ -9,7 +9,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 
 Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
-**Version**: 0.6.4 | **Python**: 3.10-3.13
+**Version**: 0.6.5 | **Python**: 3.10-3.13
 
 ## Commands
 
@@ -194,11 +194,12 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 - **API usage**: `pm = get_prompt_manager(); prompt = pm.get_prompt("analysis.thread_analyzer", thread_content="...")`
 
 ### RIO Product Terminology
-- **RIO +WAN**: Full-featured RIO, works via LAN and WAN, for 1-128 distant cameras (REMI toolbox)
-- **RIO +LAN**: Local version, LAN only, designed as companion for 1 camera
-- **RIO**: Generic reference to hardware (when license isn't relevant)
-- Legacy terms ("RIO-Live", "RIO Live", "RIO +WAN Live") map to "RIO +LAN" in license context
-- Hardware context (grounding, power, wiring) uses generic "RIO" since license doesn't matter
+- **RIO**: Generic RIO hardware reference. Use when license is NOT relevant: physical dimensions, ports, grounding, power, wiring, mounting, weight
+- **RIO +WAN**: Full license. LAN & WAN connectivity, Cyanview cloud access, REMI mode, uses Internet, 1-128 cameras
+- **RIO +LAN**: Formerly "RIO-Live". LAN only, single camera companion (max 2). LAN production robustness. No WAN/cloud/REMI
+- Legacy terms ("RIO-Live", "RIO Live", "RIOLive", "RIO +WAN Live") all map to "RIO +LAN"
+- Context rules: cloud/REMI/Internet/WAN/remote/multi-camera(>2) → **RIO +WAN** | LAN-only/local/1-2 cameras → **RIO +LAN** | physical/hardware → generic **RIO**
+- **Query normalization**: Legacy terms in search queries are auto-normalized before embedding (via `apply_product_name_transforms`)
 - **Pre-ingestion fixes**: High-confidence fixes (≥0.85) auto-applied during ingestion before embedding
 - **Configuration**: `RIO_FIX_ON_INGEST` (default: true), `RIO_FIX_MIN_CONFIDENCE` (default: 0.85)
 - Admin UI at `/admin/terminology-fixes` for reviewing and applying corrections to existing chunks

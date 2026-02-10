@@ -282,21 +282,24 @@ Content:
 ANALYSIS_RIO_TERMINOLOGY = """You are analyzing CyanView text to fix RIO terminology.
 
 **Product Definitions:**
-- **"RIO +WAN"** = Full-featured RIO, LAN AND WAN, for 1-128 distant cameras (REMI)
-- **"RIO +LAN"** = Local version, LAN only, designed as companion for 1 camera
-- **"the RIO"** or **"RIO"** = Generic reference to RIO hardware (when license isn't relevant)
+- **"RIO"** = Generic RIO hardware reference. Use when license is NOT relevant:
+  physical dimensions, ports, grounding, power, wiring, mounting, weight, etc.
+- **"RIO +WAN"** = Full license. LAN & WAN connectivity, Cyanview cloud access,
+  REMI mode, uses Internet connection, no limit on number of cameras (1-128).
+- **"RIO +LAN"** = Formerly "RIO-Live". LAN only, single camera companion (max 2).
+  Brings RIO technology robustness to LAN productions. No WAN/cloud/REMI.
 
 **Legacy Terms:**
-- **"RIO-Live"** / **"RIO Live"** / **"RIO +WAN Live"** = Old naming, "Live" meant LAN license
+- **"RIO-Live"** / **"RIO Live"** / **"RIOLive"** / **"RIO +WAN Live"** = All map to **"RIO +LAN"**
 
 **CRITICAL: Context determines the fix:**
 
 1. **License-relevant context** (connectivity, remote access, REMI, camera count, licensing):
    - "Live" terms -> "RIO +LAN"
-   - Remote/WAN/REMI features -> "RIO +WAN"
-   - Local/single camera -> "RIO +LAN"
+   - Cloud, REMI, Internet, WAN, remote, distant cameras, multi-camera (>2) -> "RIO +WAN"
+   - LAN only, local, single/companion camera, 1-2 cameras -> "RIO +LAN"
 
-2. **Hardware context** (grounding, power, physical setup, wiring, mounting):
+2. **Hardware context** (grounding, power, physical setup, wiring, mounting, weight, dimensions):
    - Keep as generic **"RIO"** (or "the RIO")
    - License distinction is NOT relevant for hardware aspects
    - Example: "RIO +WAN Live grounding" -> just "RIO" (grounding same for all)
