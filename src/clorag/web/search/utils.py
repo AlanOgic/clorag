@@ -89,11 +89,22 @@ def filter_by_dynamic_threshold(
             filtered_results.append(result)
             filtered_chunks.append(chunk)
 
-    # Always return at least top 3 results even if below threshold
-    if len(filtered_results) < 3 and len(results) >= 3:
-        return list(results[:3]), list(chunks[:3])
+    # Always return at least 1 result even if below threshold
+    if not filtered_results and results:
+        return list(results[:1]), list(chunks[:1])
 
     return filtered_results, filtered_chunks
+
+
+def _group_key(chunk: dict[str, Any]) -> str:
+    """Get grouping key for a chunk (same page/thread/doc grouped together)."""
+    source_type = chunk.get("source_type")
+    if source_type == "documentation":
+        return chunk.get("url") or chunk.get("title", "unknown")
+    elif source_type == "custom_docs":
+        return chunk.get("url") or chunk.get("title", "unknown")
+    else:
+        return chunk.get("subject") or "Support Case"
 
 
 def build_context(
@@ -103,8 +114,11 @@ def build_context(
 ) -> str:
     """Build context string from chunks for Claude synthesis.
 
+    Groups chunks from the same source together so Claude sees coherent
+    blocks instead of interleaved fragments from different pages.
+
     Args:
-        chunks: Retrieved document chunks.
+        chunks: Retrieved document chunks (with optional 'score' field).
         max_chunks: Maximum chunks to include.
         graph_context: Optional graph enrichment context string.
     """
@@ -114,16 +128,40 @@ def build_context(
     if graph_context:
         parts.append(f"[Knowledge Graph Relationships]\n{graph_context}")
 
-    for i, chunk in enumerate(chunks[:max_chunks], 1):
-        text = chunk.get("text", "")[:2000]
-        source_type = chunk.get("source_type")
+    # Group chunks by source (same page/thread together)
+    groups: dict[str, list[dict[str, Any]]] = {}
+    group_order: list[str] = []  # Preserve order of first appearance
+    for chunk in chunks[:max_chunks]:
+        key = _group_key(chunk)
+        if key not in groups:
+            groups[key] = []
+            group_order.append(key)
+        groups[key].append(chunk)
+
+    idx = 1
+    for key in group_order:
+        group = groups[key]
+        # Use the best score in the group as the group relevance
+        best_score = max(c.get("score", 0) for c in group)
+        source_type = group[0].get("source_type")
+
         if source_type == "documentation":
-            parts.append(f"[{i} Doc: {chunk.get('url', '')}]\n{text}")
+            url = group[0].get("url", "")
+            header = f"[Source {idx}: Doc — {url}] (relevance: {best_score:.2f})"
         elif source_type == "custom_docs":
-            url = chunk.get("url") or "Custom Knowledge"
-            parts.append(f"[{i} Knowledge: {url}]\n{text}")
+            url = group[0].get("url") or "Custom Knowledge"
+            header = f"[Source {idx}: Knowledge — {url}] (relevance: {best_score:.2f})"
         else:
-            parts.append(f"[{i} Case: {chunk.get('subject', 'Support')}]\n{text}")
+            header = (
+                f"[Source {idx}: Case — {group[0].get('subject', 'Support')}]"
+                f" (relevance: {best_score:.2f})"
+            )
+
+        # Combine all chunks from this source
+        combined_text = "\n\n".join(c.get("text", "")[:2000] for c in group)
+        parts.append(f"{header}\n{combined_text}")
+        idx += 1
+
     return "\n---\n".join(parts)
 
 

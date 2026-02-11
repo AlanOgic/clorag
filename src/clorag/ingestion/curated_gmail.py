@@ -255,6 +255,7 @@ class CuratedGmailPipeline:
 
         # Collect all chunks and their metadata for batched processing
         all_chunk_texts: list[str] = []
+        all_chunk_texts_for_bm25: list[str] = []  # Keyword-enriched for BM25
         documents_chunks: list[list[str]] = []
         # (case, chunk_texts, chunk_metadata, sparse_start_idx, sparse_end_idx)
         case_chunk_info: list[
@@ -270,6 +271,15 @@ class CuratedGmailPipeline:
             if chunk_texts:
                 sparse_start = len(all_chunk_texts)
                 all_chunk_texts.extend(chunk_texts)
+                # Enrich BM25 text with case-level keywords so all chunks
+                # of a case match keyword searches (e.g., "VISCA" keyword
+                # boosts chunks that only describe wiring steps)
+                keywords_suffix = (
+                    "\n" + " ".join(case.keywords) if case.keywords else ""
+                )
+                all_chunk_texts_for_bm25.extend(
+                    t + keywords_suffix for t in chunk_texts
+                )
                 sparse_end = len(all_chunk_texts)
                 documents_chunks.append(chunk_texts)
                 case_chunk_info.append(
@@ -281,8 +291,9 @@ class CuratedGmailPipeline:
             return 0
 
         # Generate ALL sparse BM25 vectors in one batch (performance optimization)
-        logger.info("Generating sparse BM25 embeddings", total_chunks=len(all_chunk_texts))
-        all_sparse_vectors = self._sparse_embeddings.embed_batch(all_chunk_texts)
+        # Uses keyword-enriched texts for better term matching across chunks
+        logger.info("Generating sparse BM25 embeddings", total_chunks=len(all_chunk_texts_for_bm25))
+        all_sparse_vectors = self._sparse_embeddings.embed_batch(all_chunk_texts_for_bm25)
 
         # Generate contextualized dense embeddings (already batched by design)
         logger.info(

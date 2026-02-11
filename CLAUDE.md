@@ -126,9 +126,11 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Backward compatible**: Set `CHUNK_USE_TOKENS=false` for character-based mode
 
 ### Docusaurus Ingestion
-- **Jina Reader primary**: Uses `r.jina.ai` API for clean markdown extraction with table preservation
+- **Jina Reader primary**: Uses `r.jina.ai` JSON API (`Accept: application/json`) for structured title + content extraction
+- **Jina noise reduction**: `X-Retain-Images: none`, `X-Target-Selector` for Docusaurus content, `X-Remove-Selector` for nav/sidebar/ToC
 - **BeautifulSoup fallback**: Automatic fallback on Jina 429/503 errors with retry logic (3 attempts)
 - **Table preservation**: HTML tables converted to markdown format before text extraction (BeautifulSoup fallback)
+- **Keyword extraction**: Haiku extracts 5-10 technical keywords per page (parallel, 10 concurrent). Stored on all chunks
 - **RIO terminology fixes**: High-confidence fixes auto-applied during ingestion before embedding
 - **Camera extraction**: Claude Haiku extracts camera compatibility info post-ingestion
 
@@ -181,7 +183,7 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 ```
 
 ### Custom Documents
-10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search.
+10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search. Haiku-generated keywords auto-enriched alongside user-provided tags.
 
 ### Prompt Management
 - **Admin-editable prompts**: 11 LLM prompts stored in SQLite, editable via `/admin/prompts` without code changes

@@ -346,6 +346,35 @@ Only valid JSON, no markdown."""
 
 
 # =============================================================================
+# KEYWORD EXTRACTION PROMPTS
+# =============================================================================
+
+ANALYSIS_KEYWORD_EXTRACTOR = """Extract 5-10 technical keywords from this Cyanview documentation page.
+
+Focus on:
+- Product names (RIO, RCP, CI0, VP4, Live Composer)
+- Camera models and manufacturers
+- Protocols (VISCA, LANC, IP, RS-422, NDI, SRT, etc.)
+- Technical concepts (firmware, tally, color correction, shading, etc.)
+- Features and use cases (REMI, multi-camera, live production, etc.)
+
+Rules:
+- Return lowercase keywords/keyphrases (1-3 words each)
+- Prioritize terms that help someone FIND this page via search
+- Include both specific terms (e.g., "visca protocol") and broader topics (e.g., "camera control")
+- Do NOT include generic terms like "documentation", "guide", "setup" unless combined with a specific topic
+
+<title>{title}</title>
+
+<content>
+{content}
+</content>
+
+Respond ONLY with a JSON array of strings, no markdown:
+["keyword1", "keyword2", "keyword3"]"""
+
+
+# =============================================================================
 # GRAPH PROMPTS
 # =============================================================================
 
@@ -506,6 +535,9 @@ CONTENT RULES:
 - Sound natural - avoid "based on the context" or "according to the documentation"
 - For unknowns: suggest checking the specific product page
 - Never say "contact Cyanview support" (you ARE the support)
+- Each source has a relevance score — focus your answer on the highest-scoring sources
+- If a source seems unrelated to the question, IGNORE it completely — do not try to weave every source into your answer
+- When multiple sources cover the same topic, synthesize them; when they cover DIFFERENT topics, only use the ones that answer the question
 
 ALWAYS END WITH:
 After your answer, add a "Related documentation:" section with 1-3 most relevant links from the context (use the URLs provided in [Doc: url] tags).
@@ -623,6 +655,16 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         category="analysis",
         content=ANALYSIS_RIO_TERMINOLOGY,
         variables=["chunk_text", "matched_text"],
+    ),
+    # Keyword extraction prompts
+    PromptDefinition(
+        key="analysis.keyword_extractor",
+        name="Keyword Extraction Prompt",
+        description="Extracts technical keywords from documentation for search enrichment",
+        model="haiku",
+        category="analysis",
+        content=ANALYSIS_KEYWORD_EXTRACTOR,
+        variables=["title", "content"],
     ),
     # Graph prompts
     PromptDefinition(

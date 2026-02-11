@@ -178,6 +178,7 @@ async def perform_search(
                     "source_type": "documentation",
                     "url": doc.payload.get("url"),
                     "title": doc.payload.get("title", "Untitled"),
+                    "score": doc.score,
                 })
 
         elif req.source == SearchSource.GMAIL:
@@ -199,6 +200,7 @@ async def perform_search(
                     "text": case.payload.get("text", ""),
                     "source_type": "gmail_case",
                     "subject": case.payload.get("subject", "Support Case"),
+                    "score": case.score,
                 })
 
         else:
@@ -223,6 +225,7 @@ async def perform_search(
                         "source_type": "documentation",
                         "url": item.payload.get("url"),
                         "title": item.payload.get("title", "Untitled"),
+                        "score": item.score,
                     })
                 elif source_type == "custom_docs":
                     results.append(
@@ -240,6 +243,7 @@ async def perform_search(
                         "source_type": "custom_docs",
                         "url": item.payload.get("url_reference"),
                         "title": item.payload.get("title", "Custom Knowledge"),
+                        "score": item.score,
                     })
                 else:
                     results.append(
@@ -256,6 +260,7 @@ async def perform_search(
                         "text": item.payload.get("text", ""),
                         "source_type": "gmail_case",
                         "subject": item.payload.get("subject", "Support Case"),
+                        "score": item.score,
                     })
 
         # Apply dynamic threshold filtering based on query characteristics
@@ -294,7 +299,9 @@ async def perform_search(
                             snippet=orig.snippet,
                             metadata=orig.metadata,
                         ))
-                        reranked_chunks.append(chunks_for_synthesis[idx])
+                        reranked_chunk = {**chunks_for_synthesis[idx]}
+                        reranked_chunk["score"] = rr.relevance_score
+                        reranked_chunks.append(reranked_chunk)
 
                 results = reranked_results
                 chunks_for_synthesis = reranked_chunks

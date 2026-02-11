@@ -1,8 +1,10 @@
 """Service for managing custom documents in the knowledge base."""
 
+import json
 from datetime import datetime
 from uuid import uuid4
 
+import anthropic
 import structlog
 
 from clorag.analysis.rio_analyzer import RIOTerminologyAnalyzer, apply_rio_fixes_before_embedding
@@ -18,6 +20,7 @@ from clorag.models.custom_document import (
     CustomDocumentUpdate,
     DocumentCategory,
 )
+from clorag.services.prompt_manager import get_prompt
 from clorag.utils.text_transforms import apply_product_name_transforms
 
 logger = structlog.get_logger(__name__)
@@ -86,6 +89,13 @@ class CustomDocumentService:
                     fixes_applied=rio_fixes_applied,
                 )
 
+        # Extract keywords using Haiku to enrich user-provided tags
+        generated_keywords = await self._extract_keywords(doc.title, content_to_embed)
+        # Merge: user tags + generated keywords (deduplicated)
+        all_keywords = list(dict.fromkeys(
+            [t.lower().strip() for t in doc.tags] + generated_keywords
+        ))
+
         # Chunk the content with semantic awareness
         # Map document category to content type for optimal chunking
         content_type = ContentType.GENERIC
@@ -116,14 +126,21 @@ class CustomDocumentService:
         )
         dense_vectors = dense_result.vectors
 
-        # Sparse embeddings
-        sparse_vectors = self._sparse_embeddings.embed_batch(chunk_texts)
+        # Sparse embeddings — enrich with keywords for better BM25 term matching
+        # Keywords propagate document-level terms to every chunk
+        if all_keywords:
+            keywords_suffix = "\n" + " ".join(all_keywords)
+            texts_for_bm25 = [t + keywords_suffix for t in chunk_texts]
+        else:
+            texts_for_bm25 = chunk_texts
+        sparse_vectors = self._sparse_embeddings.embed_batch(texts_for_bm25)
 
         # Prepare metadata for each chunk
         base_metadata: dict[str, str | list[str] | int | None] = {
             "source": "custom_docs",
             "title": doc.title,
             "tags": doc.tags,
+            "keywords": all_keywords,
             "category": doc.category.value,
             "url_reference": doc.url_reference,
             "expiration_date": doc.expiration_date.isoformat() if doc.expiration_date else None,
@@ -183,6 +200,56 @@ class CustomDocumentService:
             updated_at=now,
             created_by=created_by,
         )
+
+    async def _extract_keywords(self, title: str, content: str) -> list[str]:
+        """Extract keywords from document content using Haiku.
+
+        Args:
+            title: Document title.
+            content: Document text content.
+
+        Returns:
+            List of extracted keywords (lowercase, 5-10 items).
+        """
+        settings = get_settings()
+        try:
+            client = anthropic.AsyncAnthropic(
+                api_key=settings.anthropic_api_key.get_secret_value()
+            )
+            prompt = get_prompt(
+                "analysis.keyword_extractor",
+                title=title,
+                content=content[:4000],
+            )
+            response = await client.messages.create(
+                model=settings.haiku_model,
+                max_tokens=256,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text if response.content else "[]"
+            try:
+                keywords = json.loads(text)
+            except json.JSONDecodeError:
+                if "```" in text:
+                    json_str = text.split("```")[1]
+                    if json_str.startswith("json"):
+                        json_str = json_str[4:]
+                    json_str = json_str.split("```")[0].strip()
+                    keywords = json.loads(json_str)
+                else:
+                    return []
+
+            if isinstance(keywords, list):
+                return [str(k).lower().strip() for k in keywords if k][:10]
+            return []
+
+        except Exception as e:
+            logger.warning(
+                "Keyword extraction failed for custom document",
+                title=title,
+                error=str(e),
+            )
+            return []
 
     async def get_document(self, doc_id: str) -> CustomDocument | None:
         """Get a document by ID (reconstructs from chunks).

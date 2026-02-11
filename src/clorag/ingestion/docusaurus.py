@@ -1,9 +1,11 @@
 """Docusaurus documentation ingestion pipeline."""
 
 import asyncio
+import json
 from urllib.parse import urljoin
 from uuid import uuid4
 
+import anthropic
 import httpx
 
 from clorag.analysis.camera_extractor import CameraExtractor
@@ -16,6 +18,7 @@ from clorag.core.vectorstore import VectorStore
 from clorag.ingestion.base import BaseIngestionPipeline, Document
 from clorag.ingestion.chunker import ContentType, SemanticChunker
 from clorag.models.camera import CameraSource
+from clorag.services.prompt_manager import get_prompt
 from clorag.utils.logger import get_logger
 from clorag.utils.text_transforms import apply_product_name_transforms
 
@@ -95,10 +98,16 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
             logger.info("Found pages in sitemap", count=len(url_entries))
 
             # Fetch pages in parallel batches
-            # Jina free tier: ~20 requests/min, so use smaller batches with delays
+            # Jina free tier: ~20 requests/min — use conservative batching to
+            # ensure all pages go through Jina (avoid 429 → BS4 fallback)
             documents: list[Document] = []
-            batch_size = 5 if self._use_jina else 10
-            batch_delay = 3.0 if self._use_jina and not self._jina_api_key else 0.0
+            if self._use_jina and not self._jina_api_key:
+                batch_size = 2  # Free tier: conservative to avoid 429s
+            elif self._use_jina:
+                batch_size = 5  # Paid tier
+            else:
+                batch_size = 10
+            batch_delay = 5.0 if self._use_jina and not self._jina_api_key else 0.0
 
             for i in range(0, len(url_entries), batch_size):
                 batch_entries = url_entries[i : i + batch_size]
@@ -212,6 +221,10 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         if title:
             title = self._apply_text_transformations(title)
 
+        if not title:
+            logger.warning("Title extraction failed, falling back to 'Untitled'", url=url,
+                           extractor="jina" if used_jina else "beautifulsoup")
+
         metadata = {
             "source": "docusaurus",
             "url": url,
@@ -232,6 +245,9 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
     ) -> tuple[str, str | None] | None:
         """Fetch page content using Jina Reader API with retry on rate limit.
 
+        Uses JSON response format to get structured title + content without
+        metadata prefix noise. Adds noise-reduction headers for cleaner output.
+
         Args:
             client: HTTP client.
             url: Page URL to fetch.
@@ -243,9 +259,15 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         jina_url = f"{self.JINA_READER_URL}{url}"
 
         headers = {
-            "Accept": "text/plain",
-            "X-Return-Format": "markdown",
-            "X-No-Cache": "true",  # Fresh content for ingestion
+            "Accept": "application/json",
+            "X-No-Cache": "true",
+            # Noise reduction: strip images (we only need text for embeddings)
+            "X-Retain-Images": "none",
+            # Target Docusaurus main content area
+            "X-Target-Selector": "article, main, .markdown, [class*='docItemCol']",
+            # Remove navigation, sidebar, ToC noise
+            "X-Remove-Selector": "nav, .sidebar, .toc, header, footer, "
+            ".pagination-nav, .theme-doc-breadcrumbs, .theme-doc-toc-mobile",
         }
 
         # Add API key if available (for higher rate limits)
@@ -267,17 +289,19 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
 
                 response.raise_for_status()
 
-                content = response.text.strip()
+                # Parse structured JSON response
+                data = response.json()
+                jina_data = data.get("data", {})
+
+                content = (jina_data.get("content") or "").strip()
+                title = (jina_data.get("title") or "").strip() or None
+
                 if not content or len(content) < 50:
                     return None
 
-                # Extract title from Jina markdown (first # heading)
-                title = self._extract_title_from_markdown(content)
-
-                # Clean up Jina output (remove URL line at start if present)
-                lines = content.split("\n")
-                if lines and lines[0].startswith("URL:"):
-                    content = "\n".join(lines[1:]).strip()
+                # Fall back to markdown heading extraction if JSON title is empty
+                if not title:
+                    title = self._extract_title_from_markdown(content)
 
                 return (content, title)
 
@@ -489,7 +513,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
     async def process(self, documents: list[Document]) -> list[tuple[Document, list[Document]]]:
         """Chunk documents for contextualized embedding.
 
-        Optionally applies RIO terminology fixes before chunking based on settings.
+        Applies RIO terminology fixes and keyword extraction before chunking.
 
         Args:
             documents: Raw documents.
@@ -505,6 +529,11 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
             documents = await self._apply_rio_fixes(
                 documents, settings.rio_fix_min_confidence
             )
+
+        # Extract keywords for all documents (Haiku batch)
+        keywords_map = await self._extract_keywords_batch(documents)
+        for doc in documents:
+            doc.metadata["keywords"] = keywords_map.get(doc.id, [])
 
         for doc in documents:
             # Use semantic chunking with documentation content type
@@ -587,9 +616,18 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         logger.info("Generated dense embeddings", count=len(flat_dense_vectors))
 
         # Generate sparse BM25 embeddings for all chunks
+        # Enrich with keywords so BM25 matches document-level terms even in chunks
+        # that don't contain them (e.g., "REMI" keyword boosts all chunks of a REMI page)
         texts = [doc.text for doc in all_chunk_docs]
-        logger.info("Generating sparse BM25 embeddings", count=len(texts))
-        sparse_vectors = self._sparse_embeddings.embed_batch(texts)
+        texts_for_bm25 = []
+        for doc in all_chunk_docs:
+            keywords = doc.metadata.get("keywords", [])
+            if keywords:
+                texts_for_bm25.append(doc.text + "\n" + " ".join(keywords))
+            else:
+                texts_for_bm25.append(doc.text)
+        logger.info("Generating sparse BM25 embeddings", count=len(texts_for_bm25))
+        sparse_vectors = self._sparse_embeddings.embed_batch(texts_for_bm25)
         logger.info("Generated sparse embeddings", count=len(sparse_vectors))
 
         # Store in Qdrant with hybrid vectors
@@ -660,6 +698,89 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
             )
 
         return fixed_documents
+
+    async def _extract_keywords_batch(
+        self, documents: list[Document], max_concurrent: int = 10
+    ) -> dict[str, list[str]]:
+        """Extract keywords from documents using Haiku in parallel.
+
+        Args:
+            documents: List of documents to extract keywords from.
+            max_concurrent: Maximum concurrent Haiku requests.
+
+        Returns:
+            Dict mapping document ID to list of keywords.
+        """
+        if not documents:
+            return {}
+
+        settings = get_settings()
+        client = anthropic.AsyncAnthropic(
+            api_key=settings.anthropic_api_key.get_secret_value()
+        )
+        semaphore = asyncio.Semaphore(max_concurrent)
+        results: dict[str, list[str]] = {}
+
+        async def extract_one(doc: Document) -> None:
+            async with semaphore:
+                title = doc.metadata.get("title", "Untitled")
+                # Truncate content to avoid exceeding token limits
+                content = doc.text[:4000]
+                try:
+                    prompt = get_prompt(
+                        "analysis.keyword_extractor",
+                        title=title,
+                        content=content,
+                    )
+                    response = await client.messages.create(
+                        model=settings.haiku_model,
+                        max_tokens=256,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    text = response.content[0].text if response.content else "[]"
+                    # Parse JSON array from response
+                    try:
+                        keywords = json.loads(text)
+                    except json.JSONDecodeError:
+                        # Try extracting from markdown code block
+                        if "```" in text:
+                            json_str = text.split("```")[1]
+                            if json_str.startswith("json"):
+                                json_str = json_str[4:]
+                            json_str = json_str.split("```")[0].strip()
+                            keywords = json.loads(json_str)
+                        else:
+                            keywords = []
+
+                    if isinstance(keywords, list):
+                        results[doc.id] = [
+                            str(k).lower().strip() for k in keywords if k
+                        ][:6]
+                    else:
+                        results[doc.id] = []
+
+                except Exception as e:
+                    logger.warning(
+                        "Keyword extraction failed for document",
+                        doc_id=doc.id,
+                        title=title,
+                        error=str(e),
+                    )
+                    results[doc.id] = []
+
+        # Run all extractions in parallel with semaphore
+        await asyncio.gather(*[extract_one(doc) for doc in documents])
+
+        extracted_count = sum(1 for kw in results.values() if kw)
+        total_keywords = sum(len(kw) for kw in results.values())
+        logger.info(
+            "Keyword extraction complete",
+            documents=len(documents),
+            with_keywords=extracted_count,
+            total_keywords=total_keywords,
+        )
+
+        return results
 
     async def _extract_cameras_from_docs(
         self, doc_chunks: list[tuple[Document, list[Document]]]

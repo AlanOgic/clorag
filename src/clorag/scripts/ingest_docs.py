@@ -11,12 +11,15 @@ from clorag.utils.logger import get_logger, setup_logging
 logger = get_logger(__name__)
 
 
-async def run_ingestion(url: str | None = None, fresh: bool = False) -> int:
+async def run_ingestion(
+    url: str | None = None, fresh: bool = False, extract_cameras: bool = True
+) -> int:
     """Run the Docusaurus ingestion pipeline.
 
     Args:
         url: Optional URL override.
         fresh: If True, delete the collection before re-ingesting.
+        extract_cameras: Whether to extract camera compatibility info.
 
     Returns:
         Number of documents ingested.
@@ -31,7 +34,9 @@ async def run_ingestion(url: str | None = None, fresh: bool = False) -> int:
         except Exception as e:
             logger.warning("Could not delete collection (may not exist)", error=str(e))
 
-    pipeline = DocusaurusIngestionPipeline(base_url=url, vector_store=vectorstore)
+    pipeline = DocusaurusIngestionPipeline(
+        base_url=url, vector_store=vectorstore, extract_cameras=extract_cameras
+    )
     return await pipeline.run()
 
 
@@ -46,16 +51,22 @@ def main() -> None:
         action="store_true",
         help="Delete existing collection before re-ingesting (complete refresh)",
     )
+    parser.add_argument(
+        "--no-cameras",
+        action="store_true",
+        help="Skip camera compatibility extraction (faster ingestion)",
+    )
     args = parser.parse_args()
 
     logger.info(
         "Starting Docusaurus ingestion",
         url=args.url or "from config",
         fresh=args.fresh,
+        extract_cameras=not args.no_cameras,
     )
 
     try:
-        count = anyio.run(run_ingestion, args.url, args.fresh)
+        count = anyio.run(run_ingestion, args.url, args.fresh, not args.no_cameras)
         logger.info("Ingestion completed", documents=count)
     except Exception as e:
         logger.error("Ingestion failed", error=str(e))
