@@ -461,6 +461,7 @@ async def run_curated_ingestion(
     offset: int = 0,
     min_confidence: float = 0.7,
     since_days: int | None = None,
+    extract_cameras: bool = True,
 ) -> int:
     """Run curated Gmail ingestion.
 
@@ -469,6 +470,7 @@ async def run_curated_ingestion(
         offset: Number of threads to skip (for incremental ingestion).
         min_confidence: Minimum confidence for resolved cases.
         since_days: Only fetch threads from the last N days.
+        extract_cameras: Whether to extract camera compatibility info.
 
     Returns:
         Number of cases ingested.
@@ -478,5 +480,6 @@ async def run_curated_ingestion(
         offset=offset,
         min_confidence=min_confidence,
         since_days=since_days,
+        extract_cameras=extract_cameras,
     )
     return await pipeline.run()

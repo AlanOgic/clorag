@@ -17,6 +17,7 @@ async def run_ingestion(
     offset: int,
     min_confidence: float,
     fresh: bool = False,
+    extract_cameras: bool = True,
 ) -> int:
     """Run the curated ingestion.
 
@@ -25,6 +26,7 @@ async def run_ingestion(
         offset: Number of threads to skip.
         min_confidence: Minimum confidence for resolved cases.
         fresh: If True, delete the collection before re-ingesting.
+        extract_cameras: Whether to extract camera compatibility info.
 
     Returns:
         Number of cases ingested.
@@ -42,6 +44,7 @@ async def run_ingestion(
         max_threads=max_threads,
         offset=offset,
         min_confidence=min_confidence,
+        extract_cameras=extract_cameras,
     )
 
 
@@ -74,6 +77,11 @@ def main() -> None:
         action="store_true",
         help="Delete existing collection before re-ingesting (complete refresh)",
     )
+    parser.add_argument(
+        "--no-cameras",
+        action="store_true",
+        help="Skip camera compatibility extraction (use enrich-cameras later)",
+    )
 
     args = parser.parse_args()
 
@@ -83,11 +91,17 @@ def main() -> None:
         offset=args.offset,
         min_confidence=args.min_confidence,
         fresh=args.fresh,
+        extract_cameras=not args.no_cameras,
     )
 
     try:
         count = anyio.run(
-            run_ingestion, args.max_threads, args.offset, args.min_confidence, args.fresh
+            run_ingestion,
+            args.max_threads,
+            args.offset,
+            args.min_confidence,
+            args.fresh,
+            not args.no_cameras,
         )
         logger.info("Curated ingestion completed", cases=count)
     except Exception as e:

@@ -12,7 +12,9 @@ logger = get_logger(__name__)
 
 
 async def run_ingestion(
-    url: str | None = None, fresh: bool = False, extract_cameras: bool = True
+    url: str | None = None,
+    fresh: bool = False,
+    extract_cameras: bool = True,
 ) -> int:
     """Run the Docusaurus ingestion pipeline.
 
@@ -54,7 +56,7 @@ def main() -> None:
     parser.add_argument(
         "--no-cameras",
         action="store_true",
-        help="Skip camera compatibility extraction (faster ingestion)",
+        help="Skip camera compatibility extraction (use enrich-cameras later)",
     )
     args = parser.parse_args()
 
