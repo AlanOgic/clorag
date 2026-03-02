@@ -102,9 +102,9 @@ The RAG system processes queries through a multi-stage pipeline optimized for ac
                                     │
                                     ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                       QUERY NORMALIZATION                                     │
+│                       QUERY NORMALIZATION                                    │
 │          Legacy RIO terms auto-corrected before embedding                    │
-│        "RIO-Live" → "RIO +LAN"  |  "RIO +WAN Live" → "RIO +LAN"           │
+│        "RIO-Live" → "RIO +LAN"  |  "RIO +WAN Live" → "RIO +LAN"              │
 └──────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
