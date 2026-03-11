@@ -46,7 +46,7 @@ KNOWN_CONTROLS = [
 
 
 class EntityExtractor:
-    """Extract entities and relationships from text using Claude Haiku."""
+    """Extract entities and relationships from text using Claude Sonnet."""
 
     def __init__(self) -> None:
         """Initialize the extractor with Anthropic client."""
@@ -54,7 +54,7 @@ class EntityExtractor:
         self._client = anthropic.AsyncAnthropic(
             api_key=settings.anthropic_api_key.get_secret_value()
         )
-        self._model = settings.haiku_model
+        self._model = settings.sonnet_model
 
     async def extract_entities(
         self, content: str, source_chunk_id: str | None = None

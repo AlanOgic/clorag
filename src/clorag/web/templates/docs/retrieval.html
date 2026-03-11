@@ -388,7 +388,7 @@ result = await retriever.retrieve(query, use_reranking=False)
                 </table>
 
                 <h3>Graph Population</h3>
-                <p>The knowledge graph is populated from Qdrant chunks using Claude Haiku for entity extraction:</p>
+                <p>The knowledge graph is populated from Qdrant chunks using Claude Sonnet for entity extraction:</p>
                 <pre><code># Populate graph from all collections
 uv run populate-graph
 
@@ -400,7 +400,7 @@ uv run populate-graph --max-chunks 100</code></pre>
 
                 <div class="info-box info-box--info">
                     <div class="info-box__title">Entity Extraction</div>
-                    <p>Each chunk is analyzed by Claude Haiku to extract entities and relationships. The process is idempotent - running it multiple times will merge new entities with existing ones.</p>
+                    <p>Each chunk is analyzed by Claude Sonnet to extract entities and relationships. The process is idempotent - running it multiple times will merge new entities with existing ones.</p>
                 </div>
 
                 <h3>Configuration</h3>

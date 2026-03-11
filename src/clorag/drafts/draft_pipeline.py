@@ -23,7 +23,7 @@ class DraftCreationPipeline:
     Flow:
     1. Fetch threads with support label from Gmail
     2. Get existing draft thread IDs (to avoid duplicates)
-    3. Analyze threads with ThreadAnalyzer (Haiku) to identify unanswered ones
+    3. Analyze threads with ThreadAnalyzer (Sonnet) to identify unanswered ones
     4. Filter for is_cyanview_response=false AND no existing draft
     5. Generate RAG-based response for each
     6. Create Gmail draft as reply
@@ -130,7 +130,7 @@ class DraftCreationPipeline:
                 anonymizer = TextAnonymizer()
                 anonymized, _ = anonymizer.anonymize(content)
 
-                # Analyze with Haiku
+                # Analyze with Sonnet
                 analysis = await self._analyzer.analyze_thread(
                     thread_id=thread_info.thread_id,
                     thread_content=anonymized,

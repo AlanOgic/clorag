@@ -85,5 +85,5 @@ async def api_search_debug(
         llm_prompt=user_prompt,
         system_prompt=get_prompt("synthesis.web_answer"),
         llm_response=llm_response,
-        model=settings.haiku_model,
+        model=settings.sonnet_model,
     )

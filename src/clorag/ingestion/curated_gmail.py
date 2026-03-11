@@ -37,7 +37,7 @@ class CuratedGmailPipeline:
 
     Pipeline flow:
     1. Fetch Gmail threads
-    2. Analyze with Haiku (parallel) - extract problem/solution/keywords
+    2. Analyze with Sonnet (parallel) - extract problem/solution/keywords
     3. Filter for resolved cases
     4. QC with Sonnet - refine and validate
     5. Chunk and embed with voyage-context-3 (contextualized)
@@ -49,7 +49,7 @@ class CuratedGmailPipeline:
         max_threads: int | None = None,
         offset: int = 0,
         min_confidence: float = 0.7,
-        haiku_concurrent: int = 10,
+        analyzer_concurrent: int = 10,
         sonnet_concurrent: int = 5,
         extract_cameras: bool = True,
         since_days: int | None = None,
@@ -60,7 +60,7 @@ class CuratedGmailPipeline:
             max_threads: Maximum threads to fetch from Gmail.
             offset: Number of threads to skip (for incremental ingestion).
             min_confidence: Minimum confidence for resolved classification.
-            haiku_concurrent: Concurrent Haiku requests.
+            analyzer_concurrent: Concurrent analysis requests.
             sonnet_concurrent: Concurrent Sonnet requests.
             extract_cameras: Whether to extract camera compatibility info.
             since_days: Only fetch threads from the last N days.
@@ -74,7 +74,7 @@ class CuratedGmailPipeline:
         self._gmail = GmailIngestionPipeline(
             max_threads=max_threads, offset=offset, since_days=since_days
         )
-        self._analyzer = ThreadAnalyzer(max_concurrent=haiku_concurrent)
+        self._analyzer = ThreadAnalyzer(max_concurrent=analyzer_concurrent)
         self._qc = QualityController()
         self._embeddings = EmbeddingsClient()
         self._sparse_embeddings = SparseEmbeddingsClient()
@@ -137,8 +137,8 @@ class CuratedGmailPipeline:
         raw_documents = anonymized_documents
         logger.info("Anonymized and transformed threads", count=len(raw_documents))
 
-        # Step 2: Analyze with Haiku
-        logger.info("Step 2: Analyzing threads with Haiku")
+        # Step 2: Analyze with Sonnet
+        logger.info("Step 2: Analyzing threads with Sonnet")
         threads_for_analysis = [
             (doc.metadata.get("thread_id", doc.id), doc.text)
             for doc in raw_documents

@@ -15,7 +15,7 @@ logger = structlog.get_logger(__name__)
 class QualityController:
     """Quality controller using Claude Sonnet for final review and structuring.
 
-    Reviews Haiku's analysis and produces refined, high-quality case documentation.
+    Reviews initial analysis and produces refined, high-quality case documentation.
     """
 
     def __init__(
@@ -42,7 +42,7 @@ class QualityController:
         """Review and refine an analyzed support case.
 
         Args:
-            analysis: Haiku's analysis of the thread.
+            analysis: Initial analysis of the thread.
             thread_content: Original thread content.
 
         Returns:

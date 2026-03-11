@@ -264,6 +264,7 @@
             background: #fff3cd;
             color: #856404;
         }
+        /* Legacy: keep haiku style for backward compatibility with existing DB entries */
 
         .model-badge--sonnet {
             background: #cce5ff;
@@ -371,7 +372,6 @@
                     <div class="form-group" style="flex: 1;">
                         <label class="form-label">Model</label>
                         <select class="form-select" name="model" id="editModel">
-                            <option value="haiku">Haiku</option>
                             <option value="sonnet">Sonnet</option>
                             <option value="claude">Claude</option>
                         </select>
@@ -548,7 +548,7 @@
                 document.getElementById('editPromptKey').value = prompt.key;
                 document.getElementById('editName').value = prompt.name || '';
                 document.getElementById('editDescription').value = prompt.description || '';
-                document.getElementById('editModel').value = prompt.model || 'haiku';
+                document.getElementById('editModel').value = prompt.model || 'sonnet';
                 document.getElementById('editContent').value = prompt.content || '';
                 document.getElementById('editChangeNote').value = '';
 

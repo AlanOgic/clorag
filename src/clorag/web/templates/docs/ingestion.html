@@ -142,7 +142,7 @@
 ┌───────────────┐     ┌───────────────┐
 │    QDRANT     │     │    CAMERA     │
 │    UPSERT     │────▶│  EXTRACTION   │
-│ docusaurus_   │     │ Claude Haiku  │
+│ docusaurus_   │     │ Claude Sonnet  │
 │    docs       │     └───────────────┘
 └───────────────┘</code></pre>
 
@@ -185,7 +185,7 @@
                     </tr>
                     <tr>
                         <td>8. Camera Extraction</td>
-                        <td>Claude Haiku extracts camera compatibility info</td>
+                        <td>Claude Sonnet extracts camera compatibility info</td>
                         <td>Camera database entries</td>
                     </tr>
                 </table>
@@ -216,7 +216,7 @@
         ┌───────────────────────────────────────────┘
         ▼
 ┌───────────────┐     ┌───────────────┐     ┌───────────────┐
-│ HAIKU ANALYZE │     │   FILTER      │     │  SONNET QC    │
+│SONNET ANALYZE │     │   FILTER      │     │  SONNET QC    │
 │  (parallel)   │────▶│   RESOLVED    │────▶│   REFINEMENT  │
 │ problem/soln  │     │ conf >= 0.7   │     │  quality ctrl │
 └───────────────┘     └───────────────┘     └───────────────┘
@@ -234,7 +234,7 @@
 ┌───────────────┐     ┌───────────────┐
 │    QDRANT     │     │    CAMERA     │
 │    UPSERT     │────▶│  EXTRACTION   │
-│ gmail_cases   │     │ Claude Haiku  │
+│ gmail_cases   │     │ Claude Sonnet  │
 └───────────────┘     └───────────────┘</code></pre>
 
                 <table>
@@ -242,18 +242,18 @@
                     <tr><td>1</td><td>Fetch Threads</td><td>Gmail API</td><td>Fetch threads from configured label with pagination</td></tr>
                     <tr><td>1.5</td><td>RMA Filter</td><td>Metadata check</td><td>Exclude RMA (Return Merchandise) cases</td></tr>
                     <tr><td>1.6</td><td>Anonymization</td><td>TextAnonymizer</td><td>Replace PII with placeholders: <code>[SERIAL:XXX-N]</code>, <code>[EMAIL-N]</code></td></tr>
-                    <tr><td>2</td><td>Haiku Analysis</td><td>Claude Haiku</td><td>Parallel classification: problem, solution, keywords, is_resolved, confidence</td></tr>
+                    <tr><td>2</td><td>Sonnet Analysis</td><td>Claude Sonnet</td><td>Parallel classification: problem, solution, keywords, is_resolved, confidence</td></tr>
                     <tr><td>3</td><td>Resolution Filter</td><td>Logic filter</td><td>Keep only resolved cases with confidence >= 0.7</td></tr>
                     <tr><td>4</td><td>Sonnet QC</td><td>Claude Sonnet</td><td>Refine problem/solution, validate quality, generate clean document</td></tr>
                     <tr><td>5</td><td>Build Cases</td><td>SupportCase model</td><td>Create structured objects with metadata</td></tr>
                     <tr><td>6</td><td>Embed</td><td>Voyage + BM25</td><td>Generate contextualized dense and sparse vectors</td></tr>
                     <tr><td>7</td><td>Store</td><td>Qdrant</td><td>Upsert to <code>gmail_cases</code> collection with hybrid vectors</td></tr>
-                    <tr><td>8</td><td>Camera Extraction</td><td>Claude Haiku</td><td>Extract camera compatibility from resolved cases</td></tr>
+                    <tr><td>8</td><td>Camera Extraction</td><td>Claude Sonnet</td><td>Extract camera compatibility from resolved cases</td></tr>
                 </table>
 
                 <div class="info-box info-box--success">
                     <div class="info-box__title">Quality Assurance</div>
-                    <p>The two-stage LLM analysis (Haiku for speed + Sonnet for quality) ensures only high-quality, resolved cases with proper anonymization are indexed. Unresolved or low-confidence cases are discarded.</p>
+                    <p>The two-stage LLM analysis (Sonnet for classification + Sonnet QC for quality) ensures only high-quality, resolved cases with proper anonymization are indexed. Unresolved or low-confidence cases are discarded.</p>
                 </div>
 
                 <h2 id="incremental">Incremental Ingestion</h2>

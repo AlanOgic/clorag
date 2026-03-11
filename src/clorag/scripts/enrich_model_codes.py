@@ -325,7 +325,7 @@ async def search_enrichment(
         # Use LLM to extract model code and URL
         settings = get_settings()
         llm_response = await anthropic_client.messages.create(
-            model=settings.haiku_model,
+            model=settings.sonnet_model,
             max_tokens=200,
             messages=[
                 {

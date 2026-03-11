@@ -119,9 +119,8 @@ class TestSettings:
 
     def test_model_names(self, test_settings: Settings) -> None:
         """Test that model names are configured correctly."""
-        assert test_settings.claude_model == "claude-sonnet-4-20250514"
-        assert test_settings.haiku_model == "claude-haiku-4-5-20251001"
-        assert test_settings.sonnet_model == "claude-sonnet-4-5-20250929"
+        assert test_settings.claude_model == "claude-sonnet-4-6"
+        assert test_settings.sonnet_model == "claude-sonnet-4-6"
 
 
 class TestGetSettings:

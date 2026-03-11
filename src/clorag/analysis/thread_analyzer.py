@@ -1,4 +1,4 @@
-"""Thread analyzer using Claude Haiku for fast parallel analysis."""
+"""Thread analyzer using Claude Sonnet for parallel analysis."""
 
 import json
 
@@ -13,9 +13,9 @@ logger = structlog.get_logger(__name__)
 
 
 class ThreadAnalyzer:
-    """Analyzes Gmail threads using Claude Haiku for fast parallel processing.
+    """Analyzes Gmail threads using Claude Sonnet for parallel processing.
 
-    Uses Haiku for cost-effective, high-throughput analysis of email threads
+    Uses Sonnet for high-quality analysis of email threads
     to determine if they represent resolved support cases.
     """
 
@@ -29,12 +29,12 @@ class ThreadAnalyzer:
 
         Args:
             api_key: Anthropic API key. Defaults to ANTHROPIC_API_KEY env var.
-            model: Model to use for analysis. Defaults to settings.haiku_model.
+            model: Model to use for analysis. Defaults to settings.sonnet_model.
             max_concurrent: Maximum concurrent requests.
         """
         settings = get_settings()
         self._api_key = api_key or settings.anthropic_api_key.get_secret_value()
-        self._model = model or settings.haiku_model
+        self._model = model or settings.sonnet_model
         self._max_concurrent = max_concurrent
         self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
 

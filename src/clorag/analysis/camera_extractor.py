@@ -100,7 +100,7 @@ def normalize_manufacturer(manufacturer: str | None) -> str | None:
 
 
 class CameraExtractor:
-    """Extract camera compatibility info using Claude Haiku."""
+    """Extract camera compatibility info using Claude Sonnet."""
 
     def __init__(self) -> None:
         """Initialize the extractor with Anthropic client."""
@@ -147,7 +147,7 @@ class CameraExtractor:
         try:
             settings = get_settings()
             response = await self._client.messages.create(
-                model=settings.haiku_model,
+                model=settings.sonnet_model,
                 max_tokens=2048,
                 messages=[
                     {
@@ -319,7 +319,7 @@ class CameraExtractor:
             # Use LLM to extract specs
             settings = get_settings()
             llm_response = await self._client.messages.create(
-                model=settings.haiku_model,
+                model=settings.sonnet_model,
                 max_tokens=1024,
                 messages=[
                     {

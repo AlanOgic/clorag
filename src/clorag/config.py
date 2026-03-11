@@ -76,18 +76,14 @@ class Settings(BaseSettings):
 
     # Agent
     claude_model: str = Field(
-        default="claude-sonnet-4-20250514", description="Claude model for agent"
+        default="claude-sonnet-4-6", description="Claude model for agent"
     )
     max_turns: int = Field(default=50, description="Maximum conversation turns")
 
     # LLM Models for analysis pipeline
-    haiku_model: str = Field(
-        default="claude-haiku-4-5-20251001",
-        description="Claude Haiku model for fast analysis and synthesis",
-    )
     sonnet_model: str = Field(
-        default="claude-sonnet-4-5-20250929",
-        description="Claude Sonnet model for quality control",
+        default="claude-sonnet-4-6",
+        description="Claude Sonnet model for analysis, synthesis, and quality control",
     )
 
     # Camera Database

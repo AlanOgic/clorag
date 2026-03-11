@@ -530,7 +530,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
                 documents, settings.rio_fix_min_confidence
             )
 
-        # Extract keywords for all documents (Haiku batch)
+        # Extract keywords for all documents (Sonnet batch)
         keywords_map = await self._extract_keywords_batch(documents)
         for doc in documents:
             doc.metadata["keywords"] = keywords_map.get(doc.id, [])
@@ -702,11 +702,11 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
     async def _extract_keywords_batch(
         self, documents: list[Document], max_concurrent: int = 10
     ) -> dict[str, list[str]]:
-        """Extract keywords from documents using Haiku in parallel.
+        """Extract keywords from documents using Sonnet in parallel.
 
         Args:
             documents: List of documents to extract keywords from.
-            max_concurrent: Maximum concurrent Haiku requests.
+            max_concurrent: Maximum concurrent Sonnet requests.
 
         Returns:
             Dict mapping document ID to list of keywords.
@@ -733,7 +733,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
                         content=content,
                     )
                     response = await client.messages.create(
-                        model=settings.haiku_model,
+                        model=settings.sonnet_model,
                         max_tokens=256,
                         messages=[{"role": "user", "content": prompt}],
                     )

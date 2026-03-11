@@ -339,7 +339,7 @@ class PromptDatabase:
             content: The prompt text.
             category: Category (agent, analysis, synthesis, drafts, graph, scripts).
             description: Optional description.
-            model: Target model (haiku, sonnet, claude).
+            model: Target model (sonnet, claude).
             variables: List of variable names in the prompt.
             created_by: Who created this prompt.
 

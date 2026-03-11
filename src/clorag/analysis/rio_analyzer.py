@@ -1,4 +1,4 @@
-"""RIO terminology analyzer using Claude Haiku for context analysis."""
+"""RIO terminology analyzer using Claude Sonnet for context analysis."""
 
 from __future__ import annotations
 
@@ -44,9 +44,9 @@ class RIOAnalysisResult:
 
 
 class RIOTerminologyAnalyzer:
-    """Analyzes chunks for RIO terminology issues using Claude Haiku.
+    """Analyzes chunks for RIO terminology issues using Claude Sonnet.
 
-    Uses Haiku for cost-effective, fast analysis of text chunks to identify
+    Uses Sonnet for high-quality analysis of text chunks to identify
     and suggest corrections for RIO product terminology.
     """
 
@@ -60,12 +60,12 @@ class RIOTerminologyAnalyzer:
 
         Args:
             api_key: Anthropic API key. Defaults to ANTHROPIC_API_KEY env var.
-            model: Model to use for analysis. Defaults to settings.haiku_model.
+            model: Model to use for analysis. Defaults to settings.sonnet_model.
             max_concurrent: Maximum concurrent requests.
         """
         settings = get_settings()
         self._api_key = api_key or settings.anthropic_api_key.get_secret_value()
-        self._model = model or settings.haiku_model
+        self._model = model or settings.sonnet_model
         self._max_concurrent = max_concurrent
         self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
 

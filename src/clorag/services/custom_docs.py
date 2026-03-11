@@ -73,7 +73,7 @@ class CustomDocumentService:
         content_to_embed = apply_product_name_transforms(doc.content)
         rio_fixes_applied = 0
 
-        # Apply context-aware RIO terminology fixes (Haiku analysis, if enabled)
+        # Apply context-aware RIO terminology fixes (Sonnet analysis, if enabled)
         if settings.rio_fix_on_ingest:
             analyzer = RIOTerminologyAnalyzer()
             fixed_content, applied_fixes = await apply_rio_fixes_before_embedding(
@@ -89,7 +89,7 @@ class CustomDocumentService:
                     fixes_applied=rio_fixes_applied,
                 )
 
-        # Extract keywords using Haiku to enrich user-provided tags
+        # Extract keywords using Sonnet to enrich user-provided tags
         generated_keywords = await self._extract_keywords(doc.title, content_to_embed)
         # Merge: user tags + generated keywords (deduplicated)
         all_keywords = list(dict.fromkeys(
@@ -202,7 +202,7 @@ class CustomDocumentService:
         )
 
     async def _extract_keywords(self, title: str, content: str) -> list[str]:
-        """Extract keywords from document content using Haiku.
+        """Extract keywords from document content using Sonnet.
 
         Args:
             title: Document title.
@@ -222,7 +222,7 @@ class CustomDocumentService:
                 content=content[:4000],
             )
             response = await client.messages.create(
-                model=settings.haiku_model,
+                model=settings.sonnet_model,
                 max_tokens=256,
                 messages=[{"role": "user", "content": prompt}],
             )

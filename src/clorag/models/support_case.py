@@ -40,7 +40,7 @@ class SupportCase:
     status: CaseStatus
     resolution_quality: ResolutionQuality | None = None
 
-    # Extracted content (by Haiku/Sonnet)
+    # Extracted content (by Sonnet)
     problem_summary: str = ""
     solution_summary: str = ""
     keywords: list[str] = field(default_factory=list)
@@ -103,7 +103,7 @@ class SupportCase:
 
 @dataclass
 class ThreadAnalysis:
-    """Result of Haiku analysis on a Gmail thread."""
+    """Result of Sonnet analysis on a Gmail thread."""
 
     thread_id: str
     is_resolved: bool

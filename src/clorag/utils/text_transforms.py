@@ -4,7 +4,7 @@ import re
 
 # Product name transformations (order matters - more specific patterns first)
 # Only unambiguous fixes here. Context-dependent cases (standalone "RIO") are
-# handled by the Haiku-based RIO analyzer which understands hardware vs license context.
+# handled by the Sonnet-based RIO analyzer which understands hardware vs license context.
 TEXT_TRANSFORMATIONS: list[tuple[re.Pattern[str], str]] = [
     # Legacy "RIO-Live" / "RIO Live" variants -> "RIO +LAN" (always correct)
     (re.compile(r"\bRIO[-\s]?Live\b", re.IGNORECASE), "RIO +LAN"),
@@ -21,7 +21,7 @@ def apply_product_name_transforms(text: str) -> str:
     - RIO +WAN Live -> RIO +LAN
 
     Standalone "RIO" is NOT transformed here — it may be correct as-is
-    in hardware contexts. The Haiku-based RIO analyzer handles
+    in hardware contexts. The Sonnet-based RIO analyzer handles
     context-dependent disambiguation when rio_fix_on_ingest is enabled.
 
     Args:

@@ -17,7 +17,7 @@ class PromptDefinition:
     key: str
     name: str
     description: str
-    model: str  # "haiku", "sonnet", "claude"
+    model: str  # "sonnet", "claude"
     category: str  # "agent", "analysis", "synthesis", "drafts", "graph", "scripts"
     content: str
     variables: list[str]
@@ -111,6 +111,13 @@ These placeholders are intentional for anonymization. Do NOT try to reveal or gu
 {thread_content}
 </thread>
 
+Product Reference (for accurate classification):
+- Controllers: RCP (compact, aka "RCP Compact"), RCP-J (with iris joystick, standard OB van rack size). Both need DUO/QUATTRO/OCTO/MSU license
+- Interfaces: CI0 (serial, stateless), CI0BM (CI0 + Blackmagic SDI), RIO (maintains camera/lens connection, USB+serial)
+- RIO licenses: RIO +WAN (REMI/cloud), RIO +LAN (local only, formerly "RIO-Live")
+- Other: VP4 (color corrector), NIO (tally GPIO), RSBM (SDI board, used with CI0 or RIO)
+- Connection types: IP (direct to RCP), Serial (needs CI0/RIO), USB (needs RIO), SDI (needs CI0BM or CI0/RIO+RSBM)
+
 Analyze the thread and respond with a JSON object containing:
 
 1. **is_resolved**: boolean - Is this a resolved support case?
@@ -134,9 +141,9 @@ Analyze the thread and respond with a JSON object containing:
 
 6. **keywords**: array of strings - 5-10 technical keywords for search (e.g., "RCP", "network", "connection", "firmware", "IP address")
 
-7. **category**: string - Main category: "RCP", "Network", "Hardware", "Software", "Configuration", "Installation", "Other"
+7. **category**: string - Main category: "RCP", "RIO", "CI0", "VP4", "Network", "Firmware", "Configuration", "Installation", "REMI", "Tally", "Other"
 
-8. **product**: string or null - Specific CyanView product mentioned (e.g., "RCP", "RIO", "CVP", null if unclear)
+8. **product**: string or null - Specific CyanView product: "RCP", "RCP-J", "RIO", "RIO +WAN", "RIO +LAN", "CI0", "CI0BM", "VP4", "NIO", "RSBM", or null if unclear
 
 9. **resolution_quality**: integer 1-5 or null - Quality of the resolution:
    - 5: Excellent - Clear problem, complete solution, verified working
@@ -170,13 +177,21 @@ Review this analyzed support case and:
 3. ENSURE all summaries are fully anonymized (no customer/company names)
 4. Ensure keywords are comprehensive and useful for search
 5. Validate the category assignment
-6. Generate a final structured document for the knowledge base
+6. Validate product identification:
+   - "RIO-Live" or "RIO Live" in thread → product should be "RIO +LAN"
+   - REMI/cloud/remote mentions → product should include "RIO +WAN"
+   - USB camera control → product should include "RIO"
+   - Serial-only conversion → product could be "CI0" or "RIO"
+   - SDI control → product should be "CI0BM" or "CI0/RIO + RSBM"
+   - License mentions (DUO/QUATTRO/OCTO/MSU) → category should be "RCP"
+   - Lens motor control → could be CI0 or RIO, but RIO preferred for reliability
+7. Generate a final structured document for the knowledge base
 
 <original_thread>
 {thread_content}
 </original_thread>
 
-<haiku_analysis>
+<initial_analysis>
 Problem Summary: {problem_summary}
 Solution Summary: {solution_summary}
 Keywords: {keywords}
@@ -184,7 +199,7 @@ Category: {category}
 Product: {product}
 Resolution Quality: {resolution_quality}
 Anonymized Subject: {anonymized_subject}
-</haiku_analysis>
+</initial_analysis>
 
 Respond with a JSON object:
 
@@ -474,6 +489,16 @@ FORMAT RULES:
 - Keep paragraphs short and scannable
 - Total length: 150-400 words (adapt to complexity)
 
+PRODUCT KNOWLEDGE:
+- Network drops losing camera/lens control → likely CI0 (stateless). Suggest RIO — it maintains camera+lens connections independently, even when network is unstable
+- REMI/remote/cloud → requires RIO +WAN. CI0 alone is NOT sufficient for remote production
+- USB camera issues → only RIO supports USB (not CI0)
+- SDI camera control → requires CI0BM or CI0/RIO + RSBM board
+- Lens motor control (Cine-Servo, Cabrio) → works with CI0 or RIO, but RIO recommended for reliability
+- "RIO-Live" / "RIO Live" → old name for RIO +LAN
+- RCP / RCP-J licenses: DUO (2 cam), QUATTRO (4), OCTO (8), MSU (128)
+- Some cameras need adapters: FX6 needs USB-C to Ethernet, FX9 needs XDCA extension
+
 CONTENT RULES:
 - Use ONLY information from the provided context - never invent details
 - Be specific and technical when the context supports it
@@ -498,6 +523,38 @@ Match the customer's language (English or French based on their message)."""
 # =============================================================================
 
 SYNTHESIS_WEB_ANSWER = """You are a Cyanview support expert, representing Cyanview's excellence in broadcast camera control solutions.
+
+CYANVIEW ECOSYSTEM (use this to give accurate product guidance):
+
+Products:
+- **RCP** (aka "RCP Compact"): Compact controller panel. Optional mounting frame available for standard rack size
+- **RCP-J**: Controller panel with iris joystick. Standard size for OB van / control room rack mounting
+- Both RCP and RCP-J need a license tier: DUO (2 cam), QUATTRO (4), OCTO (8), MSU (128)
+- **CI0**: Serial-to-IP converter (2 ports). Stateless — loses camera control if network drops
+- **CI0BM**: CI0 with integrated Blackmagic SDI control board
+- **RIO**: Autonomous camera interface (2 serial ports + USB). Maintains connection with cameras and lenses even on lossy/latent networks — if the link between RCP and RIO breaks, the RIO keeps controlling cameras and lens motors independently
+  - **RIO +WAN**: License for REMI/cloud/remote production over WAN/4G (1-128 cameras)
+  - **RIO +LAN**: License for LAN-only local production (max 2 cameras). Formerly "RIO-Live"
+- **VP4**: 4-channel color corrector / CCU
+- **NIO**: 16 GPIO channels for tally over Ethernet/WiFi/4G
+- **RSBM**: SDI control injection board for Blackmagic cameras. Used with CI0 or RIO (not standalone)
+
+Camera → Product Connection Rules:
+- IP cameras (Sony CGI/SDK, Canon XC, Panasonic PTZ, Blackmagic REST, BirdDog, ARRI CAP, VISCA IP) → direct to RCP, no CI0/RIO needed
+  - Note: Some IP cameras need adapters — Sony FX6 requires USB-C to Ethernet adapter; Sony FX9 needs optional XDCA-FX9 extension unit for direct Ethernet
+- Serial cameras (Sony 8-pin, LANC, VISCA RS-232/422, RS-485) → need CI0 or RIO as interface
+- USB cameras (Sony Alpha, Canon R5) → need RIO (only RIO has USB)
+- SDI camera control (Blackmagic) → need CI0BM or CI0/RIO + RSBM board
+
+Lens Control:
+- External motorized lenses (Canon Cine-Servo, Fujinon Cabrio) can use CI0 or RIO
+- For reliability: use RIO — it maintains lens motor connection even when network is unstable
+- CI0 works but loses lens control if network drops (stateless)
+
+Key Decision Points:
+- CI0 vs RIO: CI0 is budget/stateless — network drop = lost camera AND lens control. RIO is autonomous — maintains camera+lens connections independently of network. For broadcast/mission-critical: recommend RIO
+- REMI (remote production): ALWAYS requires at least 1 RIO +WAN as cloud gateway — even for IP-only setups
+- "RIO-Live" / "RIO Live" = old name for RIO +LAN
 
 TONE: Empathetic, warm, professional. Like a knowledgeable colleague explaining things over coffee.
 
@@ -606,7 +663,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         key="analysis.thread_analyzer",
         name="Thread Analysis Prompt",
         description="Analyzes Gmail support threads to extract structured information",
-        model="haiku",
+        model="sonnet",
         category="analysis",
         content=ANALYSIS_THREAD_ANALYZER,
         variables=["thread_content"],
@@ -633,7 +690,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         key="analysis.camera_extractor",
         name="Camera Extraction Prompt",
         description="Extracts camera compatibility information from documentation",
-        model="haiku",
+        model="sonnet",
         category="analysis",
         content=ANALYSIS_CAMERA_EXTRACTOR,
         variables=["content"],
@@ -642,7 +699,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         key="analysis.camera_enrichment",
         name="Camera Enrichment Prompt",
         description="Extracts technical specifications from camera product pages",
-        model="haiku",
+        model="sonnet",
         category="analysis",
         content=ANALYSIS_CAMERA_ENRICHMENT,
         variables=["content"],
@@ -651,7 +708,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         key="analysis.rio_terminology",
         name="RIO Terminology Prompt",
         description="Analyzes and fixes RIO product terminology in documentation",
-        model="haiku",
+        model="sonnet",
         category="analysis",
         content=ANALYSIS_RIO_TERMINOLOGY,
         variables=["chunk_text", "matched_text"],
@@ -661,7 +718,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         key="analysis.keyword_extractor",
         name="Keyword Extraction Prompt",
         description="Extracts technical keywords from documentation for search enrichment",
-        model="haiku",
+        model="sonnet",
         category="analysis",
         content=ANALYSIS_KEYWORD_EXTRACTOR,
         variables=["title", "content"],
@@ -671,7 +728,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         key="graph.entity_extractor",
         name="Entity Extraction Prompt",
         description="Extracts entities and relationships for the knowledge graph",
-        model="haiku",
+        model="sonnet",
         category="graph",
         content=GRAPH_ENTITY_EXTRACTOR,
         variables=["content"],
@@ -691,7 +748,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         key="synthesis.web_answer",
         name="Web Answer Synthesis",
         description="Synthesizes answers for the web UI from retrieved context",
-        model="haiku",
+        model="sonnet",
         category="synthesis",
         content=SYNTHESIS_WEB_ANSWER,
         variables=[],
@@ -701,7 +758,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         key="scripts.model_code_lookup",
         name="Model Code Lookup",
         description="Extracts camera model codes from search results",
-        model="haiku",
+        model="sonnet",
         category="scripts",
         content=SCRIPTS_MODEL_CODE_LOOKUP,
         variables=["camera_name", "manufacturer", "search_results"],

@@ -9,7 +9,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 
 Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
-**Version**: 0.6.5 | **Python**: 3.10-3.13
+**Version**: 0.7.0 | **Python**: 3.10-3.13
 
 ## Commands
 
@@ -50,11 +50,11 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 ### Source Layout
 
-**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Haiku), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool), `prompt_db.py` (LLM prompts SQLite with version history), `terminology_db.py` (RIO terminology fixes SQLite storage), `cache.py` (generic thread-safe LRU cache with TTL)
+**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Sonnet), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool), `prompt_db.py` (LLM prompts SQLite with version history), `terminology_db.py` (RIO terminology fixes SQLite storage), `cache.py` (generic thread-safe LRU cache with TTL)
 
-**Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Haiku→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler with Jina Reader + BeautifulSoup fallback), `chunker.py`, `base.py`
+**Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Sonnet→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler with Jina Reader + BeautifulSoup fallback), `chunker.py`, `base.py`
 
-**Analysis** (`analysis/`): `thread_analyzer.py` (Haiku classification), `quality_controller.py` (Sonnet QC), `camera_extractor.py`, `rio_analyzer.py` (RIO terminology context analysis)
+**Analysis** (`analysis/`): `thread_analyzer.py` (Sonnet classification), `quality_controller.py` (Sonnet QC), `camera_extractor.py`, `rio_analyzer.py` (RIO terminology context analysis)
 
 **Agent** (`agent/`): `tools.py` (Claude Agent SDK MCP tools), `prompts.py`
 
@@ -130,14 +130,14 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Jina noise reduction**: `X-Retain-Images: none`, `X-Target-Selector` for Docusaurus content, `X-Remove-Selector` for nav/sidebar/ToC
 - **BeautifulSoup fallback**: Automatic fallback on Jina 429/503 errors with retry logic (3 attempts)
 - **Table preservation**: HTML tables converted to markdown format before text extraction (BeautifulSoup fallback)
-- **Keyword extraction**: Haiku extracts 5-10 technical keywords per page (parallel, 10 concurrent). Stored on all chunks
+- **Keyword extraction**: Sonnet extracts 5-10 technical keywords per page (parallel, 10 concurrent). Stored on all chunks
 - **RIO terminology fixes**: High-confidence fixes auto-applied during ingestion before embedding
-- **Camera extraction**: Claude Haiku extracts camera compatibility info post-ingestion
+- **Camera extraction**: Sonnet extracts camera compatibility info post-ingestion
 
 ### Data Protection
 - **Anonymization**: Gmail threads use placeholders (`[SERIAL:XXX-N]`, `[EMAIL-N]`) before LLM processing
 - **Human edits preserved**: Admin-modified chunks/cameras are NOT overwritten by automated ingestion
-- **Camera extraction**: Haiku extracts camera info during ingestion; upsert merges multiple sources
+- **Camera extraction**: Sonnet extracts camera info during ingestion; upsert merges multiple sources
 
 ### Camera Database
 - **FTS5 search**: Full-text search with BM25 ranking and Porter stemming via SQLite FTS5 virtual table
@@ -183,7 +183,7 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 ```
 
 ### Custom Documents
-10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search. Haiku-generated keywords auto-enriched alongside user-provided tags.
+10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search. Sonnet-generated keywords auto-enriched alongside user-provided tags.
 
 ### Prompt Management
 - **Admin-editable prompts**: 11 LLM prompts stored in SQLite, editable via `/admin/prompts` without code changes
@@ -217,7 +217,19 @@ ssh root@cyanview.cloud "cd /opt/clorag && docker compose build && docker compos
 
 Production: https://cyanview.cloud/ (Docker maps 8085→8080)
 
-## Recent Updates (2026-01-23)
+## Recent Updates (2026-03-11)
+
+### v0.7.0: Product Knowledge in Prompts + Unified Sonnet Model
+
+- **Product ecosystem knowledge**: Injected Cyanview product context (RCP, RIO, CI0, VP4, NIO, RSBM, connection rules, licensing) into 4 LLM prompts: `synthesis.web_answer`, `analysis.thread_analyzer`, `analysis.quality_controller`, `drafts.email_generator`
+- **Unified Sonnet model**: Replaced all Haiku usage with Sonnet (`claude-sonnet-4-6`) across the entire pipeline — analysis, keyword extraction, camera extraction, entity extraction, and RIO terminology analysis
+- **Removed `haiku_model` config**: Single `sonnet_model` setting for all LLM tasks
+- **Updated model IDs**: All model references use `claude-sonnet-4-6` (no date suffix)
+- **CSP fix**: Added `api.fontshare.com` / `cdn.fontshare.com` to Content Security Policy
+- **Thread analyzer categories**: Expanded to RCP, RIO, CI0, VP4, Network, Firmware, Configuration, Installation, REMI, Tally, Other
+- **Product field**: Now supports RCP, RCP-J, RIO, RIO +WAN, RIO +LAN, CI0, CI0BM, VP4, NIO, RSBM
+
+### Previous Updates (2026-01-23)
 
 ### Major Refactoring: Modular Web Architecture
 
