@@ -181,6 +181,13 @@ async def admin_cameras_review(
     )
 
 
+@router.get("/admin/cameras-list", response_class=HTMLResponse)
+async def admin_cameras_browser(request: Request) -> HTMLResponse:
+    """Admin camera browser page with detail popup."""
+    templates = get_templates()
+    return templates.TemplateResponse("admin_cameras_list.html", {"request": request})
+
+
 @router.get("/admin/analytics", response_class=HTMLResponse)
 async def admin_analytics(request: Request) -> HTMLResponse:
     """Admin analytics dashboard page."""

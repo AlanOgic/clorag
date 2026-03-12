@@ -73,8 +73,8 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 - `schemas.py` - Request/response Pydantic models
 - `search/` - Search pipeline: `pipeline.py`, `synthesis.py`, `utils.py`
 - `dependencies.py` - FastAPI dependency injection
-- `templates/` - 29 Jinja2 templates including `/admin/docs` (10 doc pages)
-- Admin UI at `/admin/{cameras,knowledge,analytics,drafts,chunks,graph,support-cases,prompts,terminology-fixes}`, REST APIs at `/api/`
+- `templates/` - 30 Jinja2 templates including `/admin/docs` (10 doc pages)
+- Admin UI at `/admin/{cameras,cameras-list,knowledge,analytics,drafts,chunks,graph,support-cases,prompts,terminology-fixes}`, REST APIs at `/api/`
 
 **Models** (`models/`): `camera.py`, `custom_document.py` (10 categories), `support_case.py`
 

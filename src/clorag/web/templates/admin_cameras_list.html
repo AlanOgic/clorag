@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Camera Browser - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        /* Page-specific: Wide layout */
+        .main { max-width: 1400px; }
+
+        /* Page-specific: Search bar */
+        .search-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--cyan-blue);
+        }
+
+        .filter-select {
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        /* Page-specific: Camera table */
+        .cameras-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .cameras-table th,
+        .cameras-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cameras-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #606770;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .cameras-table th:hover {
+            background: #e9ecef;
+        }
+
+        .cameras-table th .sort-arrow {
+            margin-left: 0.25rem;
+            opacity: 0.3;
+        }
+
+        .cameras-table th.sorted .sort-arrow {
+            opacity: 1;
+        }
+
+        .cameras-table tbody tr {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .cameras-table tbody tr:hover {
+            background: #e8f4fd;
+        }
+
+        .cameras-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .camera-name {
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .camera-type {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .camera-list-items {
+            font-size: 0.85rem;
+            color: #555;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Page-specific: Confidence colors */
+        .confidence-high { color: #2e7d32; font-weight: 600; }
+        .confidence-medium { color: #f57c00; font-weight: 600; }
+        .confidence-low { color: #c62828; font-weight: 600; }
+
+        /* Page-specific: Review badge */
+        .badge-review {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            background: #fff3e0;
+            color: #e65100;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Page-specific: Modal detail grid */
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-field {
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .detail-field__label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+
+        .detail-field__value {
+            font-size: 0.95rem;
+            color: #333;
+            word-break: break-word;
+        }
+
+        .detail-field--full {
+            grid-column: 1 / -1;
+        }
+
+        .detail-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+
+        .detail-link {
+            color: var(--cyan-dark);
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .detail-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Page-specific: Modal header with meta */
+        .modal-camera-header {
+            margin-bottom: 1rem;
+        }
+
+        .modal-camera-header__subtitle {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .modal-camera-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .cameras-table {
+                display: block;
+                overflow-x: auto;
+            }
+            .search-bar {
+                flex-direction: column;
+            }
+            .search-input {
+                width: 100%;
+                min-width: unset;
+            }
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <script src="/static/js/admin.js"></script>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Dashboard</a>
+            <a href="/admin/ingestion" class="navbar__link">Ingestion</a>
+            <a href="/admin/analytics" class="navbar__link">Analytics</a>
+            <a href="/admin/metrics" class="navbar__link">Metrics</a>
+            <a href="/admin/docs" class="navbar__link">Docs</a>
+            <a href="/admin/prompts" class="navbar__link">Prompts</a>
+            <span class="navbar__divider"></span>
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/admin/cameras" class="navbar__link">Cameras</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">Camera Browser</h1>
+        </div>
+
+        <!-- Alert container -->
+        <div id="alertContainer"></div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-card__label">Total Cameras</div>
+                <div class="stat-card__value" id="statTotal">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">Manufacturers</div>
+                <div class="stat-card__value" id="statManufacturers">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">Device Types</div>
+                <div class="stat-card__value" id="statDeviceTypes">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">By Source</div>
+                <div class="stat-card__breakdown" id="statSources">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Search & Filters -->
+        <div class="search-bar">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search cameras (FTS5)...">
+            <select class="filter-select" id="filterManufacturer">
+                <option value="">All Manufacturers</option>
+            </select>
+            <select class="filter-select" id="filterDeviceType">
+                <option value="">All Device Types</option>
+            </select>
+            <button class="btn btn-primary" data-action="search-cameras">Search</button>
+            <button class="btn btn-secondary" data-action="clear-filters">Clear</button>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container">
+            <table class="cameras-table">
+                <thead>
+                    <tr>
+                        <th data-sort="name">Name <span class="sort-arrow">▲</span></th>
+                        <th data-sort="manufacturer">Manufacturer <span class="sort-arrow">▲</span></th>
+                        <th data-sort="code_model">Model Code <span class="sort-arrow">▲</span></th>
+                        <th data-sort="device_type">Device Type <span class="sort-arrow">▲</span></th>
+                        <th>Ports</th>
+                        <th>Protocols</th>
+                        <th data-sort="source">Source <span class="sort-arrow">▲</span></th>
+                        <th data-sort="confidence">Confidence <span class="sort-arrow">▲</span></th>
+                    </tr>
+                </thead>
+                <tbody id="camerasBody">
+                    <tr><td colspan="8" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination">
+            <button class="btn btn-secondary btn-sm" id="prevBtn" data-action="prev-page" disabled>Previous</button>
+            <span class="pagination__info" id="paginationInfo">Page 1</span>
+            <button class="btn btn-secondary btn-sm" id="nextBtn" data-action="next-page" disabled>Next</button>
+        </div>
+    </main>
+
+    <!-- Camera Detail Modal -->
+    <div class="modal" id="cameraModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Camera Details</h2>
+                <button class="modal-close" data-action="close-modal">&times;</button>
+            </div>
+
+            <div class="modal-camera-header">
+                <div class="modal-camera-header__subtitle" id="modalSubtitle"></div>
+            </div>
+
+            <div class="modal-camera-meta" id="modalMeta"></div>
+
+            <div class="detail-grid" id="modalGrid"></div>
+
+            <div id="modalNotes" style="display: none;">
+                <div class="detail-field detail-field--full">
+                    <div class="detail-field__label">Notes</div>
+                    <div class="detail-field__value" id="modalNotesContent" style="white-space: pre-wrap;"></div>
+                </div>
+            </div>
+
+            <div id="modalLinks" style="display: none; margin-top: 1rem;">
+                <div class="detail-grid" id="modalLinksGrid"></div>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                <a id="modalEditBtn" href="#" class="btn btn-primary">Edit Camera</a>
+                <button class="btn btn-secondary" data-action="close-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script nonce="{{ request.state.csp_nonce }}">
+        let currentPage = 1;
+        const pageSize = 50;
+        let allManufacturers = [];
+        let allDeviceTypes = [];
+        let sortField = 'name';
+        let sortDir = 'asc';
+
+        // Session check
+        async function checkSession() {
+            try {
+                const response = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return false;
+                }
+                document.getElementById('logoutBtn').style.display = 'block';
+                return true;
+            } catch {
+                window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                return false;
+            }
+        }
+
+        // Logout handler
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/login';
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/cameras/stats');
+                const stats = await response.json();
+
+                document.getElementById('statTotal').textContent = stats.total_cameras || 0;
+                document.getElementById('statManufacturers').textContent = stats.manufacturers || 0;
+
+                // Sources breakdown
+                const srcEl = document.getElementById('statSources');
+                if (stats.by_source && Object.keys(stats.by_source).length > 0) {
+                    srcEl.innerHTML = Object.entries(stats.by_source)
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join('<br>');
+                } else {
+                    srcEl.textContent = 'No data';
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        // Populate filter dropdowns from full camera list
+        async function populateFilters() {
+            try {
+                const response = await fetch('/api/cameras');
+                const cameras = await response.json();
+
+                // Extract unique manufacturers
+                const manufacturers = new Set();
+                const deviceTypes = new Set();
+                cameras.forEach(c => {
+                    if (c.manufacturer) manufacturers.add(c.manufacturer);
+                    if (c.device_type) deviceTypes.add(c.device_type);
+                });
+
+                allManufacturers = [...manufacturers].sort();
+                allDeviceTypes = [...deviceTypes].sort();
+
+                // Device types count for stats
+                document.getElementById('statDeviceTypes').textContent = allDeviceTypes.length;
+
+                // Populate manufacturer dropdown
+                const mfSelect = document.getElementById('filterManufacturer');
+                mfSelect.innerHTML = '<option value="">All Manufacturers</option>' +
+                    allManufacturers.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+
+                // Populate device type dropdown
+                const dtSelect = document.getElementById('filterDeviceType');
+                dtSelect.innerHTML = '<option value="">All Device Types</option>' +
+                    allDeviceTypes.map(d => `<option value="${escapeHtml(d)}">${formatDeviceType(d)}</option>`).join('');
+            } catch (error) {
+                console.error('Failed to populate filters:', error);
+            }
+        }
+
+        // Load cameras
+        async function loadCameras() {
+            const searchQuery = document.getElementById('searchInput').value.trim();
+            const manufacturer = document.getElementById('filterManufacturer').value;
+            const deviceType = document.getElementById('filterDeviceType').value;
+
+            let url;
+            if (searchQuery) {
+                url = `/api/cameras/search?q=${encodeURIComponent(searchQuery)}`;
+            } else {
+                url = `/api/cameras?page=${currentPage}&page_size=${pageSize}`;
+                if (manufacturer) url += `&manufacturer=${encodeURIComponent(manufacturer)}`;
+                if (deviceType) url += `&device_type=${encodeURIComponent(deviceType)}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                let cameras = await response.json();
+
+                // Client-side sort
+                cameras = sortCameras(cameras);
+
+                const tbody = document.getElementById('camerasBody');
+                if (cameras.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No cameras found.</td></tr>';
+                    updatePagination(0);
+                    return;
+                }
+
+                tbody.innerHTML = cameras.map(c => `
+                    <tr data-id="${c.id}">
+                        <td class="camera-name">${escapeHtml(c.name)}</td>
+                        <td>${escapeHtml(c.manufacturer || '-')}</td>
+                        <td>${escapeHtml(c.code_model || '-')}</td>
+                        <td class="camera-type">${c.device_type ? formatDeviceType(c.device_type) : '-'}</td>
+                        <td class="camera-list-items" title="${escapeHtml((c.ports || []).join(', '))}">${(c.ports || []).join(', ') || '-'}</td>
+                        <td class="camera-list-items" title="${escapeHtml((c.protocols || []).join(', '))}">${(c.protocols || []).join(', ') || '-'}</td>
+                        <td><span class="tag">${escapeHtml(c.source || '-')}</span></td>
+                        <td>
+                            <span class="${confidenceClass(c.confidence)}">${(c.confidence * 100).toFixed(0)}%</span>
+                            ${c.needs_review ? ' <span class="badge-review">Review</span>' : ''}
+                        </td>
+                    </tr>
+                `).join('');
+
+                updatePagination(cameras.length);
+            } catch (error) {
+                showAlert('Failed to load cameras: ' + error.message, 'error');
+            }
+        }
+
+        // Sort cameras client-side
+        function sortCameras(cameras) {
+            return cameras.sort((a, b) => {
+                let va = a[sortField] || '';
+                let vb = b[sortField] || '';
+                if (typeof va === 'number' && typeof vb === 'number') {
+                    return sortDir === 'asc' ? va - vb : vb - va;
+                }
+                va = String(va).toLowerCase();
+                vb = String(vb).toLowerCase();
+                if (va < vb) return sortDir === 'asc' ? -1 : 1;
+                if (va > vb) return sortDir === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        // Column sort click
+        document.querySelectorAll('.cameras-table th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const field = th.dataset.sort;
+                if (sortField === field) {
+                    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortField = field;
+                    sortDir = 'asc';
+                }
+                // Update visual
+                document.querySelectorAll('.cameras-table th').forEach(h => h.classList.remove('sorted'));
+                th.classList.add('sorted');
+                th.querySelector('.sort-arrow').textContent = sortDir === 'asc' ? '▲' : '▼';
+                loadCameras();
+            });
+        });
+
+        // Pagination
+        function updatePagination(count) {
+            const searchQuery = document.getElementById('searchInput').value.trim();
+            const info = document.getElementById('paginationInfo');
+
+            if (searchQuery) {
+                info.textContent = `${count} results`;
+                document.getElementById('prevBtn').disabled = true;
+                document.getElementById('nextBtn').disabled = true;
+            } else {
+                info.textContent = `Page ${currentPage}`;
+                document.getElementById('prevBtn').disabled = currentPage <= 1;
+                document.getElementById('nextBtn').disabled = count < pageSize;
+            }
+        }
+
+        // Row click → modal
+        document.getElementById('camerasBody').addEventListener('click', (e) => {
+            const row = e.target.closest('tr[data-id]');
+            if (row) viewCamera(row.dataset.id);
+        });
+
+        // View camera detail
+        async function viewCamera(id) {
+            try {
+                const response = await fetch(`/api/cameras/${id}`);
+                if (!response.ok) throw new Error('Camera not found');
+                const c = await response.json();
+
+                document.getElementById('modalTitle').textContent = c.name;
+                document.getElementById('modalSubtitle').textContent = c.manufacturer || '';
+
+                // Meta tags
+                const meta = [];
+                if (c.device_type) meta.push(`<span class="tag">${formatDeviceType(c.device_type)}</span>`);
+                if (c.source) meta.push(`<span class="tag">${escapeHtml(c.source)}</span>`);
+                meta.push(`<span class="tag ${confidenceClass(c.confidence)}">Confidence: ${(c.confidence * 100).toFixed(0)}%</span>`);
+                if (c.needs_review) meta.push('<span class="badge-review">Needs Review</span>');
+                if (c.created_at) meta.push(`<span class="tag">Created: ${new Date(c.created_at).toLocaleDateString()}</span>`);
+                if (c.updated_at) meta.push(`<span class="tag">Updated: ${new Date(c.updated_at).toLocaleDateString()}</span>`);
+                document.getElementById('modalMeta').innerHTML = meta.join('');
+
+                // Detail grid
+                const grid = [];
+                grid.push(detailField('Model Code', c.code_model || '-'));
+                grid.push(detailField('Device Type', c.device_type ? formatDeviceType(c.device_type) : '-'));
+                grid.push(detailField('Ports', tagsHtml(c.ports)));
+                grid.push(detailField('Protocols', tagsHtml(c.protocols)));
+                grid.push(detailFieldFull('Supported Controls', tagsHtml(c.supported_controls)));
+                document.getElementById('modalGrid').innerHTML = grid.join('');
+
+                // Notes
+                const notesEl = document.getElementById('modalNotes');
+                const notesContent = document.getElementById('modalNotesContent');
+                if (c.notes && c.notes.length > 0) {
+                    notesContent.textContent = c.notes.join('\n');
+                    notesEl.style.display = 'block';
+                } else {
+                    notesEl.style.display = 'none';
+                }
+
+                // Links
+                const linksEl = document.getElementById('modalLinks');
+                const linksGrid = document.getElementById('modalLinksGrid');
+                if (c.doc_url || c.manufacturer_url) {
+                    let linksHtml = '';
+                    if (c.doc_url) {
+                        linksHtml += detailField('Documentation URL', `<a href="${escapeHtml(c.doc_url)}" target="_blank" class="detail-link">${escapeHtml(c.doc_url)}</a>`);
+                    }
+                    if (c.manufacturer_url) {
+                        linksHtml += detailField('Manufacturer URL', `<a href="${escapeHtml(c.manufacturer_url)}" target="_blank" class="detail-link">${escapeHtml(c.manufacturer_url)}</a>`);
+                    }
+                    linksGrid.innerHTML = linksHtml;
+                    linksEl.style.display = 'block';
+                } else {
+                    linksEl.style.display = 'none';
+                }
+
+                // Edit button
+                document.getElementById('modalEditBtn').href = `/admin/cameras/${c.id}/edit`;
+
+                document.getElementById('cameraModal').classList.add('active');
+            } catch (error) {
+                showAlert('Failed to load camera: ' + error.message, 'error');
+            }
+        }
+
+        // Helper: detail field HTML
+        function detailField(label, value) {
+            return `<div class="detail-field">
+                <div class="detail-field__label">${label}</div>
+                <div class="detail-field__value">${value}</div>
+            </div>`;
+        }
+
+        function detailFieldFull(label, value) {
+            return `<div class="detail-field detail-field--full">
+                <div class="detail-field__label">${label}</div>
+                <div class="detail-field__value">${value}</div>
+            </div>`;
+        }
+
+        function tagsHtml(items) {
+            if (!items || items.length === 0) return '-';
+            return '<div class="detail-tags">' + items.map(i => `<span class="tag">${escapeHtml(i)}</span>`).join('') + '</div>';
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('cameraModal').classList.remove('active');
+        }
+
+        document.getElementById('cameraModal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) closeModal();
+        });
+
+        // Format device type for display
+        function formatDeviceType(dt) {
+            if (!dt) return '-';
+            return dt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        // Confidence CSS class
+        function confidenceClass(conf) {
+            if (conf >= 0.8) return 'confidence-high';
+            if (conf >= 0.5) return 'confidence-medium';
+            return 'confidence-low';
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Show alert
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // Event delegation for actions
+        document.addEventListener('click', (e) => {
+            const action = e.target.closest('[data-action]');
+            if (!action) return;
+
+            switch (action.dataset.action) {
+                case 'search-cameras':
+                    currentPage = 1;
+                    loadCameras();
+                    break;
+                case 'clear-filters':
+                    document.getElementById('searchInput').value = '';
+                    document.getElementById('filterManufacturer').value = '';
+                    document.getElementById('filterDeviceType').value = '';
+                    currentPage = 1;
+                    loadCameras();
+                    break;
+                case 'prev-page':
+                    if (currentPage > 1) { currentPage--; loadCameras(); }
+                    break;
+                case 'next-page':
+                    currentPage++;
+                    loadCameras();
+                    break;
+                case 'close-modal':
+                    closeModal();
+                    break;
+            }
+        });
+
+        // Search on Enter
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                currentPage = 1;
+                loadCameras();
+            }
+        });
+
+        // Initialize
+        checkSession().then(ok => {
+            if (ok) {
+                loadStats();
+                populateFilters();
+                loadCameras();
+            }
+        });
+    </script>
+</body>
+</html>
