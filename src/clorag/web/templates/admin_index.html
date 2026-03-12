@@ -194,6 +194,7 @@
         </a>
         <div class="navbar__links">
             <a href="/admin" class="navbar__link navbar__link--active">Dashboard</a>
+            <a href="/admin/ingestion" class="navbar__link">Ingestion</a>
             <a href="/admin/analytics" class="navbar__link">Analytics</a>
             <a href="/admin/metrics" class="navbar__link">Metrics</a>
             <a href="/admin/docs" class="navbar__link">Docs</a>
@@ -246,6 +247,18 @@
         </div>
         <!-- Admin Cards -->
         <div class="admin-grid">
+            <a href="/admin/ingestion" class="admin-card">
+                <div class="admin-card__icon" style="background: #e8eaf6;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3949ab" stroke-width="2">
+                        <polyline points="16 16 12 12 8 16"/>
+                        <line x1="12" y1="12" x2="12" y2="21"/>
+                        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+                    </svg>
+                </div>
+                <h2 class="admin-card__title">Ingestion Management</h2>
+                <p class="admin-card__description">Start, monitor, and review ingestion processes with real-time log streaming.</p>
+            </a>
+
             <a href="/admin/cameras" class="admin-card">
                 <div class="admin-card__icon admin-card__icon--cameras">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2">

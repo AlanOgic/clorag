@@ -3,7 +3,7 @@
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     pass
@@ -44,6 +44,27 @@ from clorag.web.search import (
 logger = structlog.get_logger()
 
 
+def _inject_structlog_processor(processor: Any) -> None:
+    """Inject a processor into structlog's chain (before ConsoleRenderer).
+
+    This allows the ingestion log capture processor to intercept log events
+    without disrupting normal stdout logging.
+
+    Args:
+        processor: Structlog processor callable.
+    """
+    config = structlog.get_config()
+    processors = list(config.get("processors", []))
+
+    # Insert before the last processor (typically ConsoleRenderer)
+    if processors:
+        processors.insert(-1, processor)
+    else:
+        processors.append(processor)
+
+    structlog.configure(processors=processors)
+
+
 # =============================================================================
 # Middleware Configuration
 # =============================================================================
@@ -55,7 +76,14 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        """Process request with 60 second timeout."""
+        """Process request with 60 second timeout.
+
+        SSE streaming endpoints are exempt from timeout.
+        """
+        # Skip timeout for SSE log streaming endpoints
+        if "/logs/stream" in request.url.path:
+            return await call_next(request)
+
         try:
             with anyio.fail_after(60):  # 60 second timeout
                 return await call_next(request)
@@ -190,7 +218,20 @@ async def lifespan(app: FastAPI):
             interval_minutes=settings.draft_poll_interval_minutes,
         )
 
+    # Initialize ingestion runner (marks stale jobs, cleans old entries)
+    from clorag.services.ingestion_runner import get_ingestion_runner, ingestion_log_capture
+
+    ingestion_runner = get_ingestion_runner()
+    await ingestion_runner.startup()
+
+    # Inject structlog processor for per-job log capture
+    _inject_structlog_processor(ingestion_log_capture)
+    logger.info("Ingestion runner initialized")
+
     yield
+
+    # Shutdown ingestion runner (cancel running tasks)
+    await ingestion_runner.shutdown()
 
     if _scheduler:
         _scheduler.shutdown()

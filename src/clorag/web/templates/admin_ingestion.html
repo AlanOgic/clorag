@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Ingestion Management - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        /* Page-specific: Status cards row */
+        .status-cards {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .status-card {
+            flex: 1;
+            min-width: 150px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+        }
+
+        .status-card__label {
+            font-size: 0.8rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+
+        .status-card__value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--cyanview-navy);
+        }
+
+        /* Page-specific: Job type cards */
+        .job-types-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .job-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1.25rem;
+            transition: border-color 0.2s;
+        }
+
+        .job-card:hover {
+            border-color: var(--cyan-dark);
+        }
+
+        .job-card__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .job-card__title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin: 0;
+        }
+
+        .job-card__description {
+            font-size: 0.85rem;
+            color: #666;
+            margin: 0 0 0.75rem 0;
+        }
+
+        .job-card__params {
+            display: none;
+            margin-bottom: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .job-card__params.visible {
+            display: block;
+        }
+
+        .job-card__actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .param-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .param-group label {
+            font-size: 0.8rem;
+            color: #555;
+            min-width: 120px;
+        }
+
+        .param-group input[type="number"],
+        .param-group input[type="text"],
+        .param-group select {
+            padding: 0.3rem 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            width: 160px;
+        }
+
+        .param-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Page-specific: Status badges */
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge--running { background: #e3f2fd; color: #1565c0; }
+        .badge--completed { background: #e8f5e9; color: #2e7d32; }
+        .badge--failed { background: #fce4ec; color: #c62828; }
+        .badge--cancelled { background: #fff3e0; color: #e65100; }
+        .badge--pending { background: #f5f5f5; color: #616161; }
+        .badge--idle { background: #f5f5f5; color: #9e9e9e; }
+
+        /* Page-specific: Log viewer */
+        .log-viewer {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            max-height: 500px;
+            overflow-y: auto;
+            position: relative;
+            min-height: 200px;
+        }
+
+        .log-viewer__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .log-viewer__title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+        }
+
+        .log-viewer__controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .log-viewer__empty {
+            color: #666;
+            text-align: center;
+            padding: 2rem;
+            font-style: italic;
+        }
+
+        .log-entry { margin: 0; white-space: pre-wrap; word-break: break-all; }
+        .log-entry--info { color: #6a9955; }
+        .log-entry--warning { color: #dcdcaa; }
+        .log-entry--error { color: #f44747; }
+        .log-entry--debug { color: #808080; }
+        .log-entry--critical { color: #f44747; font-weight: bold; }
+
+        .log-entry__time {
+            color: #808080;
+            margin-right: 0.5rem;
+        }
+
+        .log-entry__level {
+            font-weight: bold;
+            margin-right: 0.5rem;
+            min-width: 55px;
+            display: inline-block;
+        }
+
+        /* Page-specific: Job history table */
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .history-table th {
+            text-align: left;
+            padding: 0.6rem 0.75rem;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #555;
+        }
+
+        .history-table td {
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .history-table tr:hover td {
+            background: #f8f9fa;
+        }
+
+        .history-table tr {
+            cursor: pointer;
+        }
+
+        .duration-cell {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Page-specific: Section headers */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-header h2 {
+            font-size: 1.1rem;
+            color: var(--cyanview-navy);
+            margin: 0;
+        }
+
+        /* Connection indicator */
+        .sse-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .sse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9e9e9e;
+        }
+
+        .sse-dot--connected { background: #4caf50; }
+        .sse-dot--disconnected { background: #f44336; }
+
+        /* Toggle params button */
+        .btn-toggle {
+            background: none;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0.2rem 0.5rem;
+            font-size: 0.75rem;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .btn-toggle:hover {
+            border-color: var(--cyan-dark);
+            color: var(--cyan-dark);
+        }
+
+        /* Auto-scroll indicator */
+        .log-viewer__autoscroll {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+        }
+
+        .log-viewer__autoscroll.visible {
+            display: block;
+        }
+
+        @media (max-width: 600px) {
+            .job-types-grid { grid-template-columns: 1fr; }
+            .status-cards { flex-direction: column; }
+        }
+    </style>
+    <script src="/static/js/admin.js"></script>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="https://support.cyanview.com/img/siteGfx/Logo_Cyan_flat.svg" alt="Cyanview" class="navbar__logo">
+            <span>Admin</span>
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Dashboard</a>
+            <a href="/admin/ingestion" class="navbar__link navbar__link--active">Ingestion</a>
+            <a href="/admin/analytics" class="navbar__link">Analytics</a>
+            <a href="/admin/metrics" class="navbar__link">Metrics</a>
+            <a href="/admin/docs" class="navbar__link">Docs</a>
+            <a href="/admin/prompts" class="navbar__link">Prompts</a>
+            <span class="navbar__divider"></span>
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/admin/cameras" class="navbar__link">Cameras</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Auth loading overlay -->
+    <div id="authLoading" class="auth-loading" style="position: fixed; inset: 0; background: #f8f9fa; display: flex; align-items: center; justify-content: center; z-index: 1000;">
+        <span>Checking authentication...</span>
+    </div>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero__title">Ingestion Management</h1>
+        <p class="hero__subtitle">Start, monitor, and review ingestion processes</p>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Alert container -->
+        <div id="alertContainer"></div>
+
+        <!-- Status cards -->
+        <div class="status-cards">
+            <div class="status-card">
+                <div class="status-card__label">Running Jobs</div>
+                <div class="status-card__value" id="runningCount">0</div>
+            </div>
+            <div class="status-card">
+                <div class="status-card__label">Total Jobs (30d)</div>
+                <div class="status-card__value" id="totalCount">-</div>
+            </div>
+            <div class="status-card">
+                <div class="status-card__label">Last Completed</div>
+                <div class="status-card__value" id="lastCompleted" style="font-size: 0.9rem;">-</div>
+            </div>
+        </div>
+
+        <!-- Job Launcher -->
+        <div class="section-header">
+            <h2>Job Launcher</h2>
+        </div>
+        <div class="job-types-grid" id="jobTypesGrid">
+            <!-- Populated by JS -->
+        </div>
+
+        <!-- Log Viewer -->
+        <div class="section-header">
+            <div class="log-viewer__title">
+                Log Viewer
+                <span class="sse-indicator" id="sseIndicator" style="display: none;">
+                    <span class="sse-dot" id="sseDot"></span>
+                    <span id="sseLabel">Disconnected</span>
+                </span>
+            </div>
+            <div class="log-viewer__controls">
+                <button class="btn btn-sm" id="clearLogsBtn">Clear</button>
+                <button class="btn btn-sm" id="downloadLogsBtn">Download</button>
+            </div>
+        </div>
+        <div class="log-viewer" id="logViewer">
+            <div class="log-viewer__empty" id="logEmpty">Select a job or start a new one to see logs</div>
+            <div class="log-viewer__autoscroll visible" id="autoScrollBtn" style="display: none;">
+                ↓ Auto-scroll
+            </div>
+        </div>
+
+        <!-- Job History -->
+        <div class="section-header">
+            <h2>Job History</h2>
+            <button class="btn btn-sm" id="refreshHistoryBtn">Refresh</button>
+        </div>
+        <div class="table-container">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Started</th>
+                        <th>Duration</th>
+                        <th>Result</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    <tr><td colspan="6" style="text-align: center; color: #999;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script nonce="{{ request.state.csp_nonce }}">
+    (function() {
+        'use strict';
+
+        // State
+        let jobTypes = [];
+        let currentSSE = null;
+        let currentJobId = null;
+        let autoScroll = true;
+        let csrfToken = null;
+
+        const logViewer = document.getElementById('logViewer');
+        const logEmpty = document.getElementById('logEmpty');
+        const sseIndicator = document.getElementById('sseIndicator');
+        const sseDot = document.getElementById('sseDot');
+        const sseLabel = document.getElementById('sseLabel');
+        const autoScrollBtn = document.getElementById('autoScrollBtn');
+
+        // ================================================================
+        // Auth & Init
+        // ================================================================
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await res.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+                csrfToken = data.csrf_token;
+                document.getElementById('authLoading').style.display = 'none';
+                document.getElementById('logoutBtn').style.display = 'block';
+                init();
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                window.location.href = '/admin/login';
+            }
+        }
+
+        async function init() {
+            await Promise.all([loadJobTypes(), loadStatus(), loadHistory()]);
+            // Poll status every 10 seconds
+            setInterval(loadStatus, 10000);
+        }
+
+        // ================================================================
+        // API Helpers
+        // ================================================================
+
+        async function apiGet(path) {
+            const res = await fetch(path, { credentials: 'include' });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: res.statusText }));
+                throw new Error(err.detail || res.statusText);
+            }
+            return res.json();
+        }
+
+        async function apiPost(path, body) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+            const res = await fetch(path, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body || {}),
+                credentials: 'include',
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: res.statusText }));
+                throw new Error(err.detail || res.statusText);
+            }
+            return res.json();
+        }
+
+        async function apiDelete(path) {
+            const headers = {};
+            if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+            const res = await fetch(path, {
+                method: 'DELETE',
+                headers,
+                credentials: 'include',
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: res.statusText }));
+                throw new Error(err.detail || res.statusText);
+            }
+            return res.json();
+        }
+
+        // ================================================================
+        // Job Types
+        // ================================================================
+
+        async function loadJobTypes() {
+            try {
+                jobTypes = await apiGet('/api/admin/ingestion/job-types');
+                renderJobTypes();
+            } catch (e) {
+                showAlert('Failed to load job types: ' + e.message, 'error');
+            }
+        }
+
+        function renderJobTypes() {
+            const grid = document.getElementById('jobTypesGrid');
+            grid.innerHTML = jobTypes.map(jt => {
+                const paramHtml = Object.entries(jt.params).map(([key, info]) => {
+                    let input;
+                    if (info.type === 'bool') {
+                        input = `<input type="checkbox" data-param="${key}" ${info.default ? 'checked' : ''}>`;
+                    } else if (info.type === 'int') {
+                        input = `<input type="number" data-param="${key}" value="${info.default}" min="0" step="1">`;
+                    } else if (info.type === 'float') {
+                        input = `<input type="number" data-param="${key}" value="${info.default}" min="0" step="0.1">`;
+                    } else {
+                        input = `<input type="text" data-param="${key}" value="${info.default || ''}">`;
+                    }
+                    return `<div class="param-group">
+                        <label title="${info.description}">${key}</label>
+                        ${input}
+                    </div>`;
+                }).join('');
+
+                const hasParams = Object.keys(jt.params).length > 0;
+                return `<div class="job-card" data-job-type="${jt.name}">
+                    <div class="job-card__header">
+                        <h3 class="job-card__title">${formatJobType(jt.name)}</h3>
+                        <span class="badge badge--idle" id="badge-${jt.name}">Idle</span>
+                    </div>
+                    <p class="job-card__description">${jt.description}</p>
+                    ${hasParams ? `<div class="job-card__params" id="params-${jt.name}">${paramHtml}</div>` : ''}
+                    <div class="job-card__actions">
+                        <button class="btn btn-primary btn-sm" data-action="start-job" data-type="${jt.name}">Start</button>
+                        <button class="btn btn-sm" data-action="cancel-job" data-type="${jt.name}" style="display: none; color: #c62828;">Cancel</button>
+                        ${hasParams ? `<button class="btn-toggle" data-action="toggle-params" data-type="${jt.name}">Options</button>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // ================================================================
+        // Status Polling
+        // ================================================================
+
+        async function loadStatus() {
+            try {
+                const data = await apiGet('/api/admin/ingestion/status');
+                document.getElementById('runningCount').textContent = data.running_count;
+
+                // Update job cards
+                const runningTypes = new Set(data.running_jobs.map(j => j.job_type));
+                jobTypes.forEach(jt => {
+                    const badge = document.getElementById('badge-' + jt.name);
+                    const card = document.querySelector(`[data-job-type="${jt.name}"]`);
+                    if (!card) return;
+                    const startBtn = card.querySelector('[data-action="start-job"]');
+                    const cancelBtn = card.querySelector('[data-action="cancel-job"]');
+                    if (runningTypes.has(jt.name)) {
+                        if (badge) { badge.className = 'badge badge--running'; badge.textContent = 'Running'; }
+                        if (startBtn) startBtn.disabled = true;
+                        if (cancelBtn) cancelBtn.style.display = 'inline-block';
+                    } else {
+                        if (badge) { badge.className = 'badge badge--idle'; badge.textContent = 'Idle'; }
+                        if (startBtn) startBtn.disabled = false;
+                        if (cancelBtn) cancelBtn.style.display = 'none';
+                    }
+                });
+            } catch (e) {
+                console.error('Status poll failed:', e);
+            }
+        }
+
+        // ================================================================
+        // Job History
+        // ================================================================
+
+        async function loadHistory() {
+            try {
+                const data = await apiGet('/api/admin/ingestion/jobs?limit=30');
+                document.getElementById('totalCount').textContent = data.total;
+                renderHistory(data.jobs);
+
+                // Update last completed
+                const lastDone = data.jobs.find(j => j.status === 'completed');
+                const el = document.getElementById('lastCompleted');
+                if (lastDone && lastDone.finished_at) {
+                    el.textContent = formatJobType(lastDone.job_type) + ' ' + timeAgo(lastDone.finished_at);
+                } else {
+                    el.textContent = '-';
+                }
+            } catch (e) {
+                showAlert('Failed to load history: ' + e.message, 'error');
+            }
+        }
+
+        function renderHistory(jobs) {
+            const tbody = document.getElementById('historyBody');
+            if (!jobs.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No jobs yet</td></tr>';
+                return;
+            }
+            tbody.innerHTML = jobs.map(j => {
+                const duration = j.duration_seconds != null
+                    ? formatDuration(j.duration_seconds)
+                    : '-';
+                const resultText = j.result_summary
+                    ? Object.entries(j.result_summary).filter(([k]) => k !== 'elapsed_seconds').map(([k, v]) => `${k}: ${v}`).join(', ')
+                    : (j.error_message ? j.error_message.substring(0, 80) : '-');
+                return `<tr data-job-id="${j.id}">
+                    <td>${formatJobType(j.job_type)}</td>
+                    <td><span class="badge badge--${j.status}">${j.status}</span></td>
+                    <td>${j.started_at ? formatTime(j.started_at) : '-'}</td>
+                    <td class="duration-cell">${duration}</td>
+                    <td title="${escapeHtml(resultText)}">${truncate(resultText, 50)}</td>
+                    <td>
+                        <button class="btn btn-sm" data-action="view-logs" data-job-id="${j.id}" title="View logs">Logs</button>
+                        <button class="btn btn-sm" data-action="delete-job" data-job-id="${j.id}" title="Delete" style="color: #c62828;">×</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        // ================================================================
+        // Log Viewer
+        // ================================================================
+
+        function clearLogs() {
+            logViewer.querySelectorAll('.log-entry').forEach(el => el.remove());
+            logEmpty.style.display = 'block';
+            disconnectSSE();
+        }
+
+        function appendLog(entry) {
+            logEmpty.style.display = 'none';
+            const div = document.createElement('div');
+            const level = (entry.level || 'INFO').toLowerCase();
+            div.className = 'log-entry log-entry--' + level;
+
+            const time = entry.timestamp ? entry.timestamp.split('T')[1]?.substring(0, 8) || '' : '';
+            const extra = entry.extra
+                ? Object.entries(entry.extra).filter(([, v]) => v !== '' && v != null).map(([k, v]) => `${k}=${v}`).join(' ')
+                : '';
+
+            div.innerHTML = `<span class="log-entry__time">${time}</span><span class="log-entry__level">${(entry.level || 'INFO').padEnd(7)}</span>${escapeHtml(entry.message || '')}${extra ? ' <span style="color: #569cd6;">' + escapeHtml(extra) + '</span>' : ''}`;
+            logViewer.appendChild(div);
+
+            if (autoScroll) {
+                logViewer.scrollTop = logViewer.scrollHeight;
+            }
+        }
+
+        function connectSSE(jobId) {
+            disconnectSSE();
+            currentJobId = jobId;
+
+            sseIndicator.style.display = 'inline-flex';
+            sseDot.className = 'sse-dot sse-dot--connected';
+            sseLabel.textContent = 'Connected';
+            autoScrollBtn.style.display = 'block';
+
+            currentSSE = new EventSource(`/api/admin/ingestion/jobs/${jobId}/logs/stream`);
+
+            currentSSE.addEventListener('log', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    appendLog(data);
+                } catch (err) {
+                    console.error('SSE parse error:', err);
+                }
+            });
+
+            currentSSE.addEventListener('status', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    appendLog({
+                        level: data.status === 'completed' ? 'INFO' : (data.status === 'failed' ? 'ERROR' : 'WARNING'),
+                        message: `=== Job ${data.status.toUpperCase()} ===` + (data.error ? ` ${data.error}` : ''),
+                        timestamp: new Date().toISOString(),
+                    });
+                    // Refresh status and history
+                    loadStatus();
+                    loadHistory();
+                } catch (err) {
+                    console.error('SSE status parse error:', err);
+                }
+            });
+
+            currentSSE.addEventListener('end', () => {
+                disconnectSSE();
+            });
+
+            currentSSE.onerror = () => {
+                sseDot.className = 'sse-dot sse-dot--disconnected';
+                sseLabel.textContent = 'Disconnected';
+            };
+        }
+
+        function disconnectSSE() {
+            if (currentSSE) {
+                currentSSE.close();
+                currentSSE = null;
+            }
+            currentJobId = null;
+            sseDot.className = 'sse-dot';
+            sseLabel.textContent = 'Disconnected';
+            sseIndicator.style.display = 'none';
+            autoScrollBtn.style.display = 'none';
+        }
+
+        async function viewStoredLogs(jobId) {
+            try {
+                clearLogs();
+                const data = await apiGet(`/api/admin/ingestion/jobs/${jobId}/logs?limit=2000`);
+                data.logs.forEach(log => appendLog(log));
+
+                // If job is still running, connect SSE
+                if (data.job_status === 'running') {
+                    connectSSE(jobId);
+                }
+            } catch (e) {
+                showAlert('Failed to load logs: ' + e.message, 'error');
+            }
+        }
+
+        // Auto-scroll detection
+        logViewer.addEventListener('scroll', () => {
+            const atBottom = logViewer.scrollHeight - logViewer.scrollTop - logViewer.clientHeight < 50;
+            autoScroll = atBottom;
+            autoScrollBtn.classList.toggle('visible', !atBottom);
+        });
+
+        // ================================================================
+        // Event Handlers
+        // ================================================================
+
+        document.addEventListener('click', async (e) => {
+            const action = e.target.dataset?.action;
+            if (!action) return;
+
+            if (action === 'start-job') {
+                const type = e.target.dataset.type;
+                const card = document.querySelector(`[data-job-type="${type}"]`);
+                const params = {};
+                card.querySelectorAll('[data-param]').forEach(input => {
+                    const key = input.dataset.param;
+                    if (input.type === 'checkbox') {
+                        params[key] = input.checked;
+                    } else if (input.type === 'number') {
+                        params[key] = parseFloat(input.value) || 0;
+                    } else {
+                        params[key] = input.value;
+                    }
+                });
+
+                e.target.disabled = true;
+                try {
+                    const result = await apiPost('/api/admin/ingestion/jobs', { job_type: type, parameters: params });
+                    showAlert(`Job started: ${formatJobType(type)}`, 'success');
+                    clearLogs();
+                    connectSSE(result.job_id);
+                    loadStatus();
+                    loadHistory();
+                } catch (err) {
+                    showAlert(err.message, 'error');
+                    e.target.disabled = false;
+                }
+            }
+
+            else if (action === 'cancel-job') {
+                const type = e.target.dataset.type;
+                // Find job id for this type from running jobs
+                try {
+                    const status = await apiGet('/api/admin/ingestion/status');
+                    const running = status.running_jobs.find(j => j.job_type === type);
+                    if (running) {
+                        await apiPost(`/api/admin/ingestion/jobs/${running.id}/cancel`);
+                        showAlert(`Cancelling ${formatJobType(type)}...`, 'warning');
+                        loadStatus();
+                    }
+                } catch (err) {
+                    showAlert(err.message, 'error');
+                }
+            }
+
+            else if (action === 'toggle-params') {
+                const type = e.target.dataset.type;
+                const params = document.getElementById('params-' + type);
+                if (params) params.classList.toggle('visible');
+            }
+
+            else if (action === 'view-logs') {
+                const jobId = e.target.dataset.jobId;
+                viewStoredLogs(jobId);
+                // Scroll to log viewer
+                logViewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            else if (action === 'delete-job') {
+                const jobId = e.target.dataset.jobId;
+                if (!confirm('Delete this job and its logs?')) return;
+                try {
+                    await apiDelete(`/api/admin/ingestion/jobs/${jobId}`);
+                    showAlert('Job deleted', 'success');
+                    loadHistory();
+                } catch (err) {
+                    showAlert(err.message, 'error');
+                }
+            }
+        });
+
+        // Button handlers
+        document.getElementById('clearLogsBtn').addEventListener('click', clearLogs);
+
+        document.getElementById('downloadLogsBtn').addEventListener('click', () => {
+            const entries = logViewer.querySelectorAll('.log-entry');
+            if (!entries.length) return;
+            const text = Array.from(entries).map(el => el.textContent).join('\n');
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ingestion-logs-${new Date().toISOString().slice(0, 19)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        document.getElementById('refreshHistoryBtn').addEventListener('click', loadHistory);
+
+        autoScrollBtn.addEventListener('click', () => {
+            autoScroll = true;
+            logViewer.scrollTop = logViewer.scrollHeight;
+            autoScrollBtn.classList.remove('visible');
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/login';
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
+
+        // ================================================================
+        // Utilities
+        // ================================================================
+
+        function formatJobType(type) {
+            return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function formatDuration(seconds) {
+            if (seconds < 60) return seconds.toFixed(1) + 's';
+            const m = Math.floor(seconds / 60);
+            const s = Math.round(seconds % 60);
+            return m + 'm ' + s + 's';
+        }
+
+        function formatTime(iso) {
+            try {
+                const d = new Date(iso);
+                return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            } catch { return iso; }
+        }
+
+        function timeAgo(iso) {
+            try {
+                const diff = Date.now() - new Date(iso).getTime();
+                const mins = Math.floor(diff / 60000);
+                if (mins < 1) return 'just now';
+                if (mins < 60) return mins + 'm ago';
+                const hrs = Math.floor(mins / 60);
+                if (hrs < 24) return hrs + 'h ago';
+                return Math.floor(hrs / 24) + 'd ago';
+            } catch { return ''; }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function truncate(str, len) {
+            if (!str) return '-';
+            return str.length > len ? str.substring(0, len) + '...' : str;
+        }
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // ================================================================
+        // Start
+        // ================================================================
+
+        checkAuth();
+    })();
+    </script>
+</body>
+</html>
