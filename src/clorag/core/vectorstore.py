@@ -604,6 +604,51 @@ class VectorStore:
 
         return all_results[:limit]
 
+    async def create_snapshot(self, collection: str) -> str:
+        """Create a server-side snapshot of a collection.
+
+        Args:
+            collection: Collection name to snapshot.
+
+        Returns:
+            Snapshot name (filename on the Qdrant server).
+        """
+        snapshot = await self._client.create_snapshot(
+            collection_name=collection, wait=True
+        )
+        return snapshot.name
+
+    async def list_snapshots(self, collection: str) -> list[dict[str, Any]]:
+        """List existing snapshots for a collection.
+
+        Args:
+            collection: Collection name.
+
+        Returns:
+            List of dicts with name, creation_time, size.
+        """
+        snapshots = await self._client.list_snapshots(collection_name=collection)
+        return [
+            {
+                "name": s.name,
+                "creation_time": str(s.creation_time) if s.creation_time else None,
+                "size": s.size,
+            }
+            for s in snapshots
+        ]
+
+    async def recover_snapshot(self, collection: str, snapshot_name: str) -> None:
+        """Recover a collection from a server-local snapshot.
+
+        Args:
+            collection: Collection name to recover into.
+            snapshot_name: Name of the snapshot file on the server.
+        """
+        location = f"{self._url}/collections/{collection}/snapshots/{snapshot_name}"
+        await self._client.recover_snapshot(
+            collection_name=collection, location=location, wait=True
+        )
+
     async def delete_collection(self, collection: str) -> None:
         """Delete a collection.
 

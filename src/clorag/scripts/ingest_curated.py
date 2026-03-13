@@ -18,6 +18,8 @@ async def run_ingestion(
     min_confidence: float,
     fresh: bool = False,
     extract_cameras: bool = True,
+    since_days: int | None = None,
+    snapshot: bool = True,
 ) -> int:
     """Run the curated ingestion.
 
@@ -27,12 +29,32 @@ async def run_ingestion(
         min_confidence: Minimum confidence for resolved cases.
         fresh: If True, delete the collection before re-ingesting.
         extract_cameras: Whether to extract camera compatibility info.
+        since_days: Only fetch threads from the last N days.
+        snapshot: If True (default), auto-snapshot before --fresh delete.
 
     Returns:
         Number of cases ingested.
     """
     if fresh:
         vectorstore = VectorStore()
+
+        # Auto-snapshot before destructive delete
+        if snapshot:
+            try:
+                snap_name = await vectorstore.create_snapshot(
+                    vectorstore.cases_collection
+                )
+                logger.info(
+                    "Auto-snapshot created before fresh delete",
+                    collection=vectorstore.cases_collection,
+                    snapshot=snap_name,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Could not create snapshot (collection may not exist)",
+                    error=str(e),
+                )
+
         logger.info("Fresh ingestion requested - deleting existing collection")
         try:
             await vectorstore.delete_collection(vectorstore.cases_collection)
@@ -44,6 +66,7 @@ async def run_ingestion(
         max_threads=max_threads,
         offset=offset,
         min_confidence=min_confidence,
+        since_days=since_days,
         extract_cameras=extract_cameras,
     )
 
@@ -82,6 +105,16 @@ def main() -> None:
         action="store_true",
         help="Skip camera compatibility extraction (use enrich-cameras later)",
     )
+    parser.add_argument(
+        "--since-days",
+        type=int,
+        help="Only fetch threads from the last N days",
+    )
+    parser.add_argument(
+        "--no-snapshot",
+        action="store_true",
+        help="Skip auto-snapshot before --fresh delete",
+    )
 
     args = parser.parse_args()
 
@@ -91,6 +124,7 @@ def main() -> None:
         offset=args.offset,
         min_confidence=args.min_confidence,
         fresh=args.fresh,
+        since_days=args.since_days,
         extract_cameras=not args.no_cameras,
     )
 
@@ -102,6 +136,8 @@ def main() -> None:
             args.min_confidence,
             args.fresh,
             not args.no_cameras,
+            args.since_days,
+            not args.no_snapshot,
         )
         logger.info("Curated ingestion completed", cases=count)
     except Exception as e:
