@@ -1214,3 +1214,21 @@ async def get_graph_store() -> GraphStore:
             await _graph_store.init_schema()
 
     return _graph_store
+
+
+async def reassign_camera_db_id(old_id: int, new_id: int) -> None:
+    """Reassign camera_db_id in Neo4j from old to new (for merges).
+
+    Non-fatal: if Neo4j is unavailable this silently does nothing.
+    """
+    try:
+        store = await get_graph_store()
+    except (AuthError, ServiceUnavailable):
+        return
+
+    query = """
+    MATCH (c:Camera {camera_db_id: $old_id})
+    SET c.camera_db_id = $new_id, c.updated_at = datetime()
+    """
+    async with await store._session() as session:
+        await session.run(query, old_id=old_id, new_id=new_id)

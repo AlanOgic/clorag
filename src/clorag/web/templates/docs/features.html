@@ -105,9 +105,11 @@
                     <ul class="docs-nav__list">
                         <li><a href="#draft-system" class="docs-nav__link">Draft Auto-Reply</a></li>
                         <li><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
+                        <li><a href="#camera-merge" class="docs-nav__link">Camera Merge</a></li>
                         <li><a href="#support-cases" class="docs-nav__link">Support Cases</a></li>
                         <li><a href="#analytics" class="docs-nav__link">Analytics</a></li>
                         <li><a href="#performance" class="docs-nav__link">Performance Monitoring</a></li>
+                        <li><a href="#dark-mode" class="docs-nav__link">Dark Mode</a></li>
                     </ul>
                 </div>
             </nav>
@@ -288,6 +290,52 @@ uv run rebuild-fts
 # Check FTS index status
 uv run rebuild-fts --check</code></pre>
 
+                <h2 id="camera-merge">Camera Merge (Deduplication)</h2>
+
+                <h3>Overview</h3>
+                <p>The camera database accumulates duplicate entries from different sources where the same product has name variations: "C300 Mark II" vs "C300 MKII", "ILCE-FX6" vs "FX6", etc. The merge feature helps administrators find and consolidate these duplicates.</p>
+
+                <h3>Finding Duplicates</h3>
+                <p>Click <strong>"Find Duplicates"</strong> on <a href="/admin/cameras">/admin/cameras</a>. The algorithm:</p>
+                <ul>
+                    <li><strong>Name normalization</strong> &mdash; Lowercase, strip manufacturer prefix, replace synonyms (Mark II/MK2/MKII &rarr; mk2, Mark III/MK3 &rarr; mk3), strip " Head" suffix, remove spaces/hyphens/dots</li>
+                    <li><strong>Code model cross-reference</strong> &mdash; If camera A's <code>code_model</code> matches camera B's <code>name</code> (e.g., ILCE-FX6 &harr; FX6), they're grouped together</li>
+                    <li><strong>Union-find grouping</strong> &mdash; Overlapping groups are merged so transitive matches are caught</li>
+                </ul>
+                <p>Groups are highlighted with alternating background colors and all cameras are auto-selected.</p>
+
+                <h3>Merging Cameras</h3>
+                <p>Select 2+ cameras via checkboxes (or use "Find Duplicates"), then click <strong>"Merge Selected"</strong>:</p>
+                <ol>
+                    <li>Choose the <strong>primary camera</strong> to keep (radio buttons)</li>
+                    <li>Optionally enter a <strong>custom name</strong></li>
+                    <li>Review the <strong>merged preview</strong> (combined ports and protocols)</li>
+                    <li>Click <strong>"Merge"</strong> to execute</li>
+                </ol>
+
+                <h3>Merge Logic</h3>
+                <table>
+                    <tr><th>Field Type</th><th>Strategy</th></tr>
+                    <tr><td>Array fields (ports, protocols, controls, notes)</td><td>Set union &mdash; all unique values combined</td></tr>
+                    <tr><td>Scalar fields (manufacturer, code_model, device_type, URLs)</td><td>Keep primary's value, fall back to first non-null from merge targets</td></tr>
+                    <tr><td>Confidence</td><td>Maximum across all cameras</td></tr>
+                    <tr><td>Name</td><td>Custom name if provided, otherwise primary's name</td></tr>
+                </table>
+
+                <h3>API Endpoints</h3>
+                <table>
+                    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+                    <tr><td><code>GET</code></td><td><code>/api/admin/cameras/duplicates</code></td><td>Find groups of suspected duplicates</td></tr>
+                    <tr><td><code>POST</code></td><td><code>/api/admin/cameras/merge</code></td><td>Merge cameras (rate limited: 3/min)</td></tr>
+                </table>
+
+                <h3>Merge Request Body</h3>
+                <pre><code>{
+    "primary_id": 42,
+    "merge_ids": [87, 93],
+    "custom_name": "Canon C300 Mark II"  // optional
+}</code></pre>
+
                 <h2 id="support-cases">Support Cases Database</h2>
 
                 <h3>Overview</h3>
@@ -446,6 +494,34 @@ GET /api/admin/metrics/recent/{metric_name}?count=10</code></pre>
                     <div class="info-box__title">Automatic Slow Operation Logging</div>
                     <p>Operations exceeding warning thresholds are automatically logged with structured metadata for debugging. Check server logs for <code>Slow operation detected</code> warnings.</p>
                 </div>
+
+                <h2 id="dark-mode">Dark Mode</h2>
+
+                <h3>Overview</h3>
+                <p>All admin pages support a dark theme. Click the moon/sun icon in the navbar to toggle. The preference is saved in <code>localStorage</code> and persists across sessions.</p>
+
+                <h3>Behavior</h3>
+                <ul>
+                    <li><strong>First visit</strong> &mdash; Respects the OS-level <code>prefers-color-scheme</code> media query</li>
+                    <li><strong>Manual toggle</strong> &mdash; Overrides OS preference, saved in <code>localStorage</code> as <code>clorag-theme</code></li>
+                    <li><strong>No flash</strong> &mdash; Theme is applied before DOMContentLoaded to prevent a flash of the wrong theme</li>
+                    <li><strong>Smooth transition</strong> &mdash; 350ms ease on background, color, border, and box-shadow properties</li>
+                </ul>
+
+                <h3>Technical Details</h3>
+                <p>The dark mode is implemented via CSS custom properties on <code>[data-theme="dark"]</code>. All surface backgrounds, text colors, borders, shadows, tags, and alerts use semantic variables defined in <code>admin.css</code>. The <code>ThemeToggle</code> module in <code>admin.js</code> handles state management and injects the toggle button into the navbar dynamically (no template changes needed).</p>
+
+                <h3>Animations</h3>
+                <p>The admin UI includes subtle animations for a polished feel:</p>
+                <ul>
+                    <li><strong>Page entrance</strong> &mdash; Fade-in with upward slide</li>
+                    <li><strong>Card stagger</strong> &mdash; Dashboard cards appear with staggered delays</li>
+                    <li><strong>Stat counters</strong> &mdash; Numbers count up from zero on page load</li>
+                    <li><strong>Modals</strong> &mdash; Scale-in with spring curve, animated close</li>
+                    <li><strong>Alerts</strong> &mdash; Slide down on appear, slide up on dismiss</li>
+                    <li><strong>Running badges</strong> &mdash; Pulse animation for active ingestion jobs</li>
+                </ul>
+                <p>All animations are disabled when the user has <code>prefers-reduced-motion: reduce</code> set in their OS accessibility settings.</p>
 
                 <div class="page-nav">
                     <a href="/admin/docs/content" class="page-nav__link">

@@ -1,13 +1,14 @@
 """Admin camera management endpoints.
 
 Provides CRUD operations for camera database entries including
-review queue management and CSV import/export.
+review queue management, CSV import/export, and duplicate merging.
 """
 
 import csv
 import io
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, UploadFile
 
 from clorag.core.database import get_camera_database
@@ -20,11 +21,72 @@ from clorag.models.camera import (
 )
 from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.dependencies import limiter
+from clorag.web.schemas import CameraMergeRequest, CameraMergeResponse
+
+logger = structlog.get_logger()
 
 router = APIRouter(tags=["Cameras"])
 
 # Maximum CSV file upload size (5MB - CSV files are typically small)
 MAX_CSV_UPLOAD_BYTES = 5 * 1024 * 1024
+
+
+@router.get("/cameras/duplicates")
+async def api_cameras_duplicates(
+    request: Request,
+    _: bool = Depends(verify_admin),
+) -> list[list[Camera]]:
+    """Find groups of suspected duplicate cameras."""
+    db = get_camera_database()
+    return db.find_duplicate_candidates()
+
+
+@router.post("/cameras/merge", response_model=CameraMergeResponse)
+@limiter.limit("3/minute")
+async def api_cameras_merge(
+    request: Request,
+    body: Annotated[CameraMergeRequest, Body()],
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
+) -> CameraMergeResponse:
+    """Merge duplicate cameras into one primary camera."""
+    if body.primary_id in body.merge_ids:
+        raise HTTPException(status_code=400, detail="primary_id cannot be in merge_ids")
+
+    db = get_camera_database()
+
+    try:
+        merged, deleted_ids, deleted_names = db.merge_cameras(
+            primary_id=body.primary_id,
+            merge_ids=body.merge_ids,
+            custom_name=body.custom_name,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Try to reassign Neo4j graph references (non-fatal)
+    try:
+        from clorag.core.graph_store import reassign_camera_db_id
+
+        for old_id in deleted_ids:
+            try:
+                await reassign_camera_db_id(old_id, body.primary_id)
+            except Exception:
+                logger.warning(
+                    "Failed to reassign graph camera_db_id",
+                    old_id=old_id,
+                    new_id=body.primary_id,
+                )
+    except ImportError:
+        pass
+    except Exception:
+        logger.warning("Neo4j graph reassignment skipped")
+
+    return CameraMergeResponse(
+        merged_camera=merged.model_dump(mode="json"),
+        deleted_ids=deleted_ids,
+        deleted_names=deleted_names,
+    )
 
 
 @router.post("/cameras", response_model=Camera)

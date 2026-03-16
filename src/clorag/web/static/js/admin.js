@@ -1,7 +1,55 @@
 /**
  * Admin utilities for CLORAG
- * Provides CSRF protection and common admin functionality
+ * Provides CSRF protection, theme toggle, and common admin functionality
  */
+
+// Theme toggle - runs immediately to prevent flash of wrong theme
+const ThemeToggle = {
+    STORAGE_KEY: 'clorag-theme',
+
+    init() {
+        const saved = localStorage.getItem(this.STORAGE_KEY);
+        if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+    },
+
+    toggle() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const next = isDark ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem(this.STORAGE_KEY, next);
+        // Update button icon
+        const btn = document.querySelector('.btn-theme-toggle');
+        if (btn) btn.textContent = next === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    },
+
+    isDark() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    },
+
+    injectButton() {
+        const nav = document.querySelector('.navbar__links');
+        if (!nav) return;
+        const btn = document.createElement('button');
+        btn.className = 'btn-theme-toggle';
+        btn.title = 'Toggle dark mode';
+        btn.setAttribute('data-action', 'call');
+        btn.setAttribute('data-fn', 'toggleTheme');
+        btn.textContent = this.isDark() ? '\u2600\uFE0F' : '\uD83C\uDF19';
+        nav.insertBefore(btn, nav.firstChild);
+    }
+};
+
+// Apply theme immediately to prevent flash
+ThemeToggle.init();
+
+// Global function for data-action="call" dispatch
+function toggleTheme() {
+    ThemeToggle.toggle();
+}
 
 // CSRF token management
 const AdminUtils = {
@@ -170,11 +218,14 @@ const AdminActions = {
     },
 
     /**
-     * Close a modal
+     * Close a modal (with animation if available)
      */
     closeModal(modalId) {
         const modal = document.getElementById(modalId);
-        if (modal) {
+        if (!modal) return;
+        if (typeof AdminAnimations !== 'undefined') {
+            AdminAnimations.closeModalAnimated(modal);
+        } else {
             modal.classList.add('hidden');
         }
     },
@@ -346,17 +397,148 @@ const AdminActions = {
         // Also handle modal close on overlay click and Escape key
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal-overlay')) {
-                e.target.classList.add('hidden');
+                if (typeof AdminAnimations !== 'undefined') {
+                    AdminAnimations.closeModalAnimated(e.target);
+                } else {
+                    e.target.classList.add('hidden');
+                }
             }
         });
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(modal => {
-                    modal.classList.add('hidden');
+                    if (typeof AdminAnimations !== 'undefined') {
+                        AdminAnimations.closeModalAnimated(modal);
+                    } else {
+                        modal.classList.add('hidden');
+                    }
                 });
             }
         });
+    }
+};
+
+/**
+ * Animation helpers for admin UI
+ */
+const AdminAnimations = {
+    /**
+     * Apply staggered entrance delays to a set of elements.
+     * @param {string} selector - CSS selector for elements to stagger
+     * @param {number} baseDelay - Base delay in ms (default 40)
+     */
+    staggerEntrance(selector, baseDelay = 40) {
+        const items = document.querySelectorAll(selector);
+        items.forEach((el, i) => {
+            el.style.setProperty('--stagger-delay', `${i * baseDelay}ms`);
+        });
+    },
+
+    /**
+     * Animate a number counting up from 0 to its current text value.
+     * @param {HTMLElement} el - Element containing a numeric value
+     * @param {number} duration - Animation duration in ms (default 600)
+     */
+    countUp(el, duration = 600) {
+        const text = el.textContent.trim();
+        const target = parseFloat(text.replace(/,/g, ''));
+        if (isNaN(target) || target === 0) return;
+
+        const isInt = Number.isInteger(target);
+        const start = performance.now();
+
+        el.textContent = '0';
+
+        function tick(now) {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            // Ease-out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = target * eased;
+
+            el.textContent = isInt
+                ? Math.round(current).toLocaleString()
+                : current.toFixed(1);
+
+            if (progress < 1) {
+                requestAnimationFrame(tick);
+            } else {
+                el.textContent = text; // Restore exact original text
+                el.classList.add('counted');
+            }
+        }
+
+        requestAnimationFrame(tick);
+    },
+
+    /**
+     * Animate all stat counters on the page.
+     */
+    animateCounters() {
+        const selectors = [
+            '.stat__number',
+            '.stat-card__value',
+            '.status-card__value'
+        ];
+        selectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+                // Only animate if the content looks numeric
+                const text = el.textContent.trim();
+                if (/^\d[\d,.]*$/.test(text)) {
+                    this.countUp(el);
+                }
+            });
+        });
+    },
+
+    /**
+     * Enhanced alert with slide-in + auto-dismiss animation.
+     * @param {HTMLElement} container - Alert container
+     * @param {string} message - Alert message
+     * @param {string} type - 'success' or 'error'
+     * @param {number} dismissAfter - Auto dismiss ms (default 4000)
+     */
+    showAlert(container, message, type, dismissAfter = 4000) {
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} show`;
+        alert.textContent = message;
+        container.innerHTML = '';
+        container.appendChild(alert);
+
+        if (dismissAfter > 0) {
+            setTimeout(() => {
+                alert.classList.add('dismissing');
+                alert.addEventListener('animationend', () => alert.remove(), { once: true });
+            }, dismissAfter);
+        }
+    },
+
+    /**
+     * Close a modal with scale-out animation.
+     * @param {HTMLElement} overlay - Modal overlay element
+     */
+    closeModalAnimated(overlay) {
+        overlay.classList.add('closing');
+        overlay.addEventListener('animationend', () => {
+            overlay.classList.remove('closing');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('visible');
+        }, { once: true });
+    },
+
+    /**
+     * Initialize all page animations.
+     */
+    init() {
+        // Stagger cards and grid items
+        this.staggerEntrance('.admin-card');
+        this.staggerEntrance('.stat-card');
+        this.staggerEntrance('.job-card');
+        this.staggerEntrance('.status-card');
+
+        // Animate stat counters
+        this.animateCounters();
     }
 };
 
@@ -365,8 +547,12 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         AdminUtils.init();
         AdminActions.init();
+        ThemeToggle.injectButton();
+        AdminAnimations.init();
     });
 } else {
     AdminUtils.init();
     AdminActions.init();
+    ThemeToggle.injectButton();
+    AdminAnimations.init();
 }

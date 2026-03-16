@@ -21,19 +21,19 @@
         .cameras-table td {
             padding: 1rem;
             text-align: left;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .cameras-table th {
-            background: #f8f9fa;
+            background: var(--bg-surface-hover);
             font-weight: 600;
             font-size: 0.85rem;
             text-transform: uppercase;
-            color: #606770;
+            color: var(--text-secondary);
         }
 
         .cameras-table tr:hover {
-            background: #f8f9fa;
+            background: var(--bg-surface-hover);
         }
 
         .cameras-table tr:last-child td {
@@ -52,7 +52,7 @@
         }
 
         .camera-manufacturer {
-            color: #606770;
+            color: var(--text-secondary);
             font-size: 0.9rem;
         }
 
@@ -61,6 +61,97 @@
             display: flex;
             flex-wrap: wrap;
             gap: 0.3rem;
+        }
+
+        /* Merge: checkbox column */
+        .cameras-table th.cb-col,
+        .cameras-table td.cb-col {
+            width: 40px;
+            text-align: center;
+            padding: 0.5rem;
+        }
+
+        /* Merge: duplicate group highlights */
+        .duplicate-group-1 { background: var(--tag-bg) !important; }
+        .duplicate-group-2 { background: var(--tag-support-bg) !important; }
+        .duplicate-group-3 { background: var(--tag-source-bg) !important; }
+        .duplicate-group-4 { background: var(--tag-manual-bg) !important; }
+        .merge-selected { background: var(--tag-bg) !important; opacity: 0.9; }
+
+        /* Merge: floating toolbar */
+        .merge-toolbar {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1a1a2e;
+            color: white;
+            padding: 0.8rem 1.5rem;
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        }
+        .merge-toolbar.visible { display: flex; }
+        .merge-toolbar .merge-count { font-size: 0.95rem; }
+        .merge-toolbar .btn { margin: 0; }
+
+        /* Merge: modal */
+        .merge-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        .merge-modal-overlay.visible { display: flex; }
+        .merge-modal {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            max-width: 800px;
+            width: 95%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .merge-modal h2 { margin-top: 0; }
+        .merge-modal table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        .merge-modal table th,
+        .merge-modal table td {
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+        .merge-modal .merge-preview {
+            background: var(--tag-bg);
+            border-radius: 6px;
+            padding: 0.8rem;
+            margin: 1rem 0;
+        }
+        .merge-modal .merge-preview h4 { margin: 0 0 0.5rem; }
+        .merge-modal .custom-name-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-input);
+            border-radius: 4px;
+            margin: 0.5rem 0;
+            background: var(--bg-input);
+            color: var(--text-primary);
+        }
+        .merge-modal .btn-row {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            margin-top: 1rem;
         }
 
         /* Page-specific: Responsive table */
@@ -96,7 +187,10 @@
     <main class="main">
         <div class="page-header">
             <h1 class="page-title">Camera Management</h1>
-            <a href="/admin/cameras/new" class="btn btn-primary">+ Add Camera</a>
+            <div style="display:flex;gap:0.5rem">
+                <button class="btn" id="findDuplicatesBtn" data-action="call" data-fn="findDuplicates">Find Duplicates</button>
+                <a href="/admin/cameras/new" class="btn btn-primary">+ Add Camera</a>
+            </div>
         </div>
 
         <!-- Stats -->
@@ -134,6 +228,7 @@
             <table class="cameras-table" id="camerasTable">
                 <thead>
                     <tr>
+                        <th class="cb-col"><input type="checkbox" id="selectAllCb" title="Select all"></th>
                         <th>ID</th>
                         <th>Camera</th>
                         <th>Ports</th>
@@ -145,6 +240,7 @@
                 <tbody>
                     {% for camera in cameras %}
                     <tr data-id="{{ camera.id }}" data-name="{{ camera.name | lower }}" data-manufacturer="{{ camera.manufacturer | lower if camera.manufacturer else '' }}">
+                        <td class="cb-col"><input type="checkbox" class="camera-cb" value="{{ camera.id }}" data-camera-name="{{ camera.name }}"></td>
                         <td>{{ camera.id }}</td>
                         <td>
                             {% set display_name = camera.name %}
@@ -200,6 +296,37 @@
         {% endif %}
     </main>
 
+    <!-- Merge toolbar -->
+    <div class="merge-toolbar" id="mergeToolbar">
+        <span class="merge-count" id="mergeCount">0 selected</span>
+        <button class="btn btn-primary" id="mergeBtn" data-action="call" data-fn="openMergeModal">Merge Selected</button>
+        <button class="btn" data-action="call" data-fn="clearSelection">Clear</button>
+    </div>
+
+    <!-- Merge modal -->
+    <div class="merge-modal-overlay" id="mergeModalOverlay">
+        <div class="merge-modal" id="mergeModal">
+            <h2>Merge Cameras</h2>
+            <p>Select the primary camera to keep. Data from other cameras will be merged into it.</p>
+            <table id="mergeModalTable">
+                <thead><tr><th>Primary</th><th>ID</th><th>Name</th><th>Manufacturer</th><th>Ports</th><th>Protocols</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <div>
+                <label><strong>Custom name</strong> (optional):</label>
+                <input type="text" class="custom-name-input" id="mergeCustomName" placeholder="Leave blank to keep primary name">
+            </div>
+            <div class="merge-preview" id="mergePreview" style="display:none">
+                <h4>Merged result preview</h4>
+                <div id="mergePreviewContent"></div>
+            </div>
+            <div class="btn-row">
+                <button class="btn" data-action="call" data-fn="closeMergeModal">Cancel</button>
+                <button class="btn btn-primary" id="executeMergeBtn" data-action="call" data-fn="executeMerge">Merge</button>
+            </div>
+        </div>
+    </div>
+
     <script nonce="{{ request.state.csp_nonce }}">
         // Check authentication status on page load
         async function checkAuth() {
@@ -219,7 +346,6 @@
         function filterTable() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const rows = document.querySelectorAll('#camerasTable tbody tr');
-
             rows.forEach(row => {
                 const text = row.textContent.toLowerCase();
                 row.style.display = text.includes(searchTerm) ? '' : 'none';
@@ -237,22 +363,280 @@
 
         async function deleteCamera(id, name) {
             if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
-
             try {
-                const response = await fetch(`/api/admin/cameras/${id}`, {
-                    method: 'DELETE',
-                    credentials: 'include',
-                });
-
+                const response = await AdminUtils.delete(`/api/admin/cameras/${id}`);
                 if (response.ok) {
                     const row = document.querySelector(`tr[data-id="${id}"]`);
                     if (row) row.remove();
+                    updateMergeToolbar();
                 } else {
                     const err = await response.json();
                     alert(err.detail || 'Failed to delete camera');
                 }
             } catch (error) {
                 alert('Error: ' + error.message);
+            }
+        }
+
+        // ===== Merge Selection State =====
+        const selectedCameras = new Set();
+        // Camera data cache for merge modal
+        const cameraDataCache = {};
+
+        // Parse camera data from table rows
+        document.querySelectorAll('#camerasTable tbody tr').forEach(row => {
+            const id = parseInt(row.dataset.id);
+            const cells = row.querySelectorAll('td');
+            // cells: [checkbox, id, camera info, ports, protocols, source, actions]
+            const nameEl = cells[2].querySelector('.camera-name');
+            const mfrEl = cells[2].querySelector('.camera-manufacturer');
+            const ports = Array.from(cells[3].querySelectorAll('.tag')).map(t => t.textContent.trim());
+            const protocols = Array.from(cells[4].querySelectorAll('.tag')).map(t => t.textContent.trim());
+            cameraDataCache[id] = {
+                id,
+                name: row.dataset.name ? nameEl.textContent.trim() : '',
+                fullName: nameEl.textContent.trim(),
+                manufacturer: mfrEl ? mfrEl.textContent.trim() : '',
+                ports,
+                protocols,
+            };
+        });
+
+        // Checkbox event listeners
+        document.querySelectorAll('.camera-cb').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const id = parseInt(this.value);
+                if (this.checked) {
+                    selectedCameras.add(id);
+                    this.closest('tr').classList.add('merge-selected');
+                } else {
+                    selectedCameras.delete(id);
+                    this.closest('tr').classList.remove('merge-selected');
+                }
+                updateMergeToolbar();
+            });
+        });
+
+        const selectAllCb = document.getElementById('selectAllCb');
+        if (selectAllCb) {
+            selectAllCb.addEventListener('change', function() {
+                const visible = document.querySelectorAll('#camerasTable tbody tr:not([style*="display: none"]) .camera-cb');
+                visible.forEach(cb => {
+                    cb.checked = selectAllCb.checked;
+                    const id = parseInt(cb.value);
+                    if (selectAllCb.checked) {
+                        selectedCameras.add(id);
+                        cb.closest('tr').classList.add('merge-selected');
+                    } else {
+                        selectedCameras.delete(id);
+                        cb.closest('tr').classList.remove('merge-selected');
+                    }
+                });
+                updateMergeToolbar();
+            });
+        }
+
+        function updateMergeToolbar() {
+            const toolbar = document.getElementById('mergeToolbar');
+            const count = selectedCameras.size;
+            document.getElementById('mergeCount').textContent = count + ' selected';
+            if (count >= 2) {
+                toolbar.classList.remove('hiding');
+                toolbar.classList.add('visible');
+            } else if (toolbar.classList.contains('visible')) {
+                toolbar.classList.add('hiding');
+                toolbar.addEventListener('animationend', () => {
+                    toolbar.classList.remove('visible', 'hiding');
+                }, { once: true });
+            }
+        }
+
+        function clearSelection() {
+            selectedCameras.clear();
+            document.querySelectorAll('.camera-cb').forEach(cb => {
+                cb.checked = false;
+                cb.closest('tr').classList.remove('merge-selected');
+            });
+            if (selectAllCb) selectAllCb.checked = false;
+            // Clear duplicate highlights
+            document.querySelectorAll('#camerasTable tbody tr').forEach(row => {
+                row.className = row.className.replace(/duplicate-group-\d/g, '').trim();
+            });
+            updateMergeToolbar();
+        }
+
+        // ===== Find Duplicates =====
+        async function findDuplicates() {
+            const btn = document.getElementById('findDuplicatesBtn');
+            btn.textContent = 'Searching...';
+            btn.disabled = true;
+            try {
+                const resp = await fetch('/api/admin/cameras/duplicates', { credentials: 'include' });
+                if (!resp.ok) throw new Error('Failed to fetch duplicates');
+                const groups = await resp.json();
+
+                // Clear previous
+                clearSelection();
+
+                if (groups.length === 0) {
+                    alert('No duplicate candidates found.');
+                    return;
+                }
+
+                // Highlight groups and auto-select
+                let groupIndex = 0;
+                groups.forEach(group => {
+                    const colorClass = 'duplicate-group-' + ((groupIndex % 4) + 1);
+                    group.forEach(camera => {
+                        const row = document.querySelector(`tr[data-id="${camera.id}"]`);
+                        if (row) {
+                            row.classList.add(colorClass);
+                            const cb = row.querySelector('.camera-cb');
+                            if (cb) {
+                                cb.checked = true;
+                                selectedCameras.add(camera.id);
+                                row.classList.add('merge-selected');
+                            }
+                        }
+                    });
+                    groupIndex++;
+                });
+
+                updateMergeToolbar();
+                alert(`Found ${groups.length} group(s) of potential duplicates. ${selectedCameras.size} cameras selected.`);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                btn.textContent = 'Find Duplicates';
+                btn.disabled = false;
+            }
+        }
+
+        // ===== Merge Modal =====
+        let selectedPrimaryId = null;
+
+        function openMergeModal() {
+            if (selectedCameras.size < 2) {
+                alert('Select at least 2 cameras to merge.');
+                return;
+            }
+
+            const tbody = document.querySelector('#mergeModalTable tbody');
+            tbody.innerHTML = '';
+            selectedPrimaryId = null;
+            document.getElementById('mergeCustomName').value = '';
+
+            const ids = Array.from(selectedCameras);
+            ids.forEach((id, i) => {
+                const cam = cameraDataCache[id] || { id, fullName: 'Unknown', manufacturer: '', ports: [], protocols: [] };
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="radio" name="primaryCamera" value="${id}" ${i === 0 ? 'checked' : ''}></td>
+                    <td>${id}</td>
+                    <td><strong>${cam.fullName}</strong></td>
+                    <td>${cam.manufacturer}</td>
+                    <td>${cam.ports.join(', ') || '-'}</td>
+                    <td>${cam.protocols.join(', ') || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+                if (i === 0) selectedPrimaryId = id;
+            });
+
+            // Radio change handler
+            tbody.querySelectorAll('input[name="primaryCamera"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    selectedPrimaryId = parseInt(this.value);
+                    updateMergePreview();
+                });
+            });
+
+            updateMergePreview();
+            document.getElementById('mergeModalOverlay').classList.add('visible');
+        }
+
+        function updateMergePreview() {
+            if (!selectedPrimaryId) return;
+            const ids = Array.from(selectedCameras);
+            const allPorts = new Set();
+            const allProtocols = new Set();
+            ids.forEach(id => {
+                const cam = cameraDataCache[id];
+                if (cam) {
+                    cam.ports.forEach(p => allPorts.add(p));
+                    cam.protocols.forEach(p => allProtocols.add(p));
+                }
+            });
+            const preview = document.getElementById('mergePreview');
+            const content = document.getElementById('mergePreviewContent');
+            const primary = cameraDataCache[selectedPrimaryId];
+            content.innerHTML = `
+                <p><strong>Primary:</strong> ${primary ? primary.fullName : selectedPrimaryId} (ID ${selectedPrimaryId})</p>
+                <p><strong>Merged ports:</strong> ${Array.from(allPorts).sort().join(', ') || '-'}</p>
+                <p><strong>Merged protocols:</strong> ${Array.from(allProtocols).sort().join(', ') || '-'}</p>
+                <p><strong>Will delete:</strong> ${ids.filter(id => id !== selectedPrimaryId).map(id => {
+                    const c = cameraDataCache[id];
+                    return c ? c.fullName : id;
+                }).join(', ')}</p>
+            `;
+            preview.style.display = 'block';
+        }
+
+        function closeMergeModal() {
+            const overlay = document.getElementById('mergeModalOverlay');
+            if (typeof AdminAnimations !== 'undefined') {
+                AdminAnimations.closeModalAnimated(overlay);
+            } else {
+                overlay.classList.remove('visible');
+            }
+        }
+
+        async function executeMerge() {
+            if (!selectedPrimaryId) {
+                alert('Please select a primary camera.');
+                return;
+            }
+
+            const ids = Array.from(selectedCameras);
+            const mergeIds = ids.filter(id => id !== selectedPrimaryId);
+            if (mergeIds.length === 0) {
+                alert('No cameras to merge (need at least 1 besides primary).');
+                return;
+            }
+
+            const customName = document.getElementById('mergeCustomName').value.trim() || null;
+            const mergeNames = mergeIds.map(id => {
+                const c = cameraDataCache[id];
+                return c ? c.fullName : id;
+            }).join(', ');
+
+            if (!confirm(`Merge ${mergeIds.length} camera(s) into "${cameraDataCache[selectedPrimaryId]?.fullName || selectedPrimaryId}"?\n\nWill delete: ${mergeNames}`)) {
+                return;
+            }
+
+            const btn = document.getElementById('executeMergeBtn');
+            btn.textContent = 'Merging...';
+            btn.disabled = true;
+
+            try {
+                const resp = await AdminUtils.postJson('/api/admin/cameras/merge', {
+                    primary_id: selectedPrimaryId,
+                    merge_ids: mergeIds,
+                    custom_name: customName,
+                });
+
+                if (resp.ok) {
+                    const result = await resp.json();
+                    alert(`Merged successfully. Deleted: ${result.deleted_names.join(', ')}`);
+                    window.location.reload();
+                } else {
+                    const err = await resp.json();
+                    alert('Merge failed: ' + (err.detail || JSON.stringify(err)));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                btn.textContent = 'Merge';
+                btn.disabled = false;
             }
         }
     </script>

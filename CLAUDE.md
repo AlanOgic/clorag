@@ -9,7 +9,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 
 Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
-**Version**: 0.8.0 | **Python**: 3.10-3.13
+**Version**: 0.9.0 | **Python**: 3.10-3.13
 
 ## Commands
 
@@ -151,6 +151,8 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Comparison**: Side-by-side comparison of up to 5 cameras with highlighted common specs
 - **Related cameras**: Similarity scoring based on manufacturer, device_type, ports, protocols
 - **CSV import/export**: Bulk data management with upsert logic (name + manufacturer)
+- **Duplicate detection**: `find_duplicate_candidates()` normalizes names (Mark II→mk2, strips hyphens/spaces), cross-references code_model↔name, groups with union-find
+- **Camera merge**: `merge_cameras()` unions array fields, keeps primary scalars with fallback, max confidence. Neo4j `camera_db_id` reassigned via `reassign_camera_db_id()`
 
 ### Support Cases Database
 - **SQLite storage**: Full document storage with problem/solution summaries, keywords, categories
@@ -178,6 +180,8 @@ Settings via `clorag.config.get_settings()` (cached singleton).
   - Public pages: Strict nonce-only (`script-src 'nonce-...'`)
   - Admin pages: Allows inline handlers (`unsafe-inline`) while templates migrate to `data-action`
 - **Event Delegation**: `AdminActions` in `admin.js` handles `data-action` attributes globally
+- **Dark Mode**: `ThemeToggle` in `admin.js` with localStorage persistence, `prefers-color-scheme` detection, 30+ CSS variables
+- **Animations**: `AdminAnimations` in `admin.js` — stagger entrance, count-up, animated alerts/modals, `prefers-reduced-motion` respected
 
 ### GraphRAG
 Optional Neo4j knowledge graph with entities (Camera, Product, Protocol, Port, Issue, Solution, Firmware) and relationships (COMPATIBLE_WITH, USES_PROTOCOL, AFFECTS, RESOLVED_BY, etc.). Gracefully disabled if `NEO4J_PASSWORD` not set.
@@ -223,6 +227,16 @@ ssh root@cyanview.cloud "cd /opt/clorag && docker compose build && docker compos
 Production: https://cyanview.cloud/ (Docker maps 8085→8080)
 
 ## Recent Updates (2026-03-16)
+
+### v0.9.0: Camera Merge, Dark Mode, Animations
+
+- **Camera merge**: Find duplicates via name normalization + code_model cross-reference, merge with union of array fields. UI: checkboxes, "Find Duplicates" button, floating toolbar, merge modal with primary selection and preview
+- **Dark mode**: Toggle in navbar (persists in localStorage, respects `prefers-color-scheme`). 30+ semantic CSS variables for all admin pages
+- **Admin animations**: Page fade-in, card stagger entrance, modal scale-in/out, alert slide-in, stat count-up, button press feedback, running badge pulse. All disabled with `prefers-reduced-motion`
+- **Ingestion descriptions**: All 10 job types have detailed descriptions and expanded parameter help
+- **New endpoints**: `GET /api/admin/cameras/duplicates`, `POST /api/admin/cameras/merge`
+- **New DB methods**: `find_duplicate_candidates()`, `merge_cameras()`
+- **New schemas**: `CameraMergeRequest`, `CameraMergeResponse`
 
 ### v0.8.0: Retrieval Accuracy Improvements
 

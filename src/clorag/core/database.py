@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
+from collections import defaultdict
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime
@@ -1192,6 +1194,221 @@ class CameraDatabase:
                 )
 
         return deleted_count
+
+    def find_duplicate_candidates(self) -> list[list[Camera]]:
+        """Find groups of cameras that are likely duplicates.
+
+        Normalizes camera names and groups by similarity:
+        - Replaces known synonyms (Mark II → mk2, etc.)
+        - Strips spaces/hyphens/dots for comparison
+        - Cross-references code_model ↔ name matches
+
+        Returns:
+            List of camera groups (each group has 2+ cameras).
+        """
+        all_cameras = self.list_cameras()
+
+        # Normalize name for comparison
+        def _normalize(name: str, manufacturer: str | None) -> str:
+            n = name.lower()
+            # Strip manufacturer prefix if present
+            if manufacturer:
+                mfr_lower = manufacturer.lower()
+                if n.startswith(mfr_lower + " "):
+                    n = n[len(mfr_lower) + 1:]
+            # Replace known synonyms
+            n = re.sub(r"mk\s*iii|mark\s*iii|mark\s*3|mk\s*3", "mk3", n)
+            n = re.sub(r"mk\s*ii|mark\s*ii|mark\s*2|mk\s*2", "mk2", n)
+            n = re.sub(r"mk\s*i\b|mark\s*i\b|mk\s*1\b|mark\s*1\b", "mk1", n)
+            # Strip common suffixes
+            n = re.sub(r"\s+head$", "", n)
+            # Remove spaces, hyphens, dots for comparison
+            n = re.sub(r"[\s\-\.]", "", n)
+            return n
+
+        # Group by (normalized_name, manufacturer)
+        groups: dict[tuple[str, str], list[Camera]] = defaultdict(list)
+        for camera in all_cameras:
+            assert camera.id is not None
+            mfr_key = (camera.manufacturer or "").lower()
+            key = (_normalize(camera.name, camera.manufacturer), mfr_key)
+            groups[key].append(camera)
+
+        # Also cross-reference: code_model of A matches name of B
+        camera_by_name: dict[str, Camera] = {}
+        for camera in all_cameras:
+            camera_by_name[camera.name.lower()] = camera
+            # Also index without manufacturer prefix
+            if camera.manufacturer:
+                stripped = camera.name.lower()
+                mfr_lower = camera.manufacturer.lower()
+                if stripped.startswith(mfr_lower + " "):
+                    camera_by_name[stripped[len(mfr_lower) + 1:]] = camera
+
+        code_model_merges: list[tuple[Camera, Camera]] = []
+        for camera in all_cameras:
+            if camera.code_model:
+                match = camera_by_name.get(camera.code_model.lower())
+                if match and match.id != camera.id:
+                    code_model_merges.append((camera, match))
+
+        # Merge code_model cross-references into groups
+        # Build a union-find to merge groups that share cameras
+        camera_to_group: dict[int, int] = {}  # camera_id → group_id
+        result_groups: dict[int, set[int]] = {}  # group_id → set of camera_ids
+        next_group_id = 0
+
+        # First, add all normalized groups with 2+ cameras
+        for group_cameras in groups.values():
+            if len(group_cameras) >= 2:
+                gid = next_group_id
+                next_group_id += 1
+                ids = {c.id for c in group_cameras if c.id is not None}
+                result_groups[gid] = ids
+                for cid in ids:
+                    camera_to_group[cid] = gid
+
+        # Then merge code_model cross-references
+        for cam_a, cam_b in code_model_merges:
+            assert cam_a.id is not None and cam_b.id is not None
+            gid_a = camera_to_group.get(cam_a.id)
+            gid_b = camera_to_group.get(cam_b.id)
+
+            if gid_a is not None and gid_b is not None:
+                if gid_a != gid_b:
+                    # Merge groups
+                    result_groups[gid_a].update(result_groups[gid_b])
+                    for cid in result_groups[gid_b]:
+                        camera_to_group[cid] = gid_a
+                    del result_groups[gid_b]
+            elif gid_a is not None:
+                result_groups[gid_a].add(cam_b.id)
+                camera_to_group[cam_b.id] = gid_a
+            elif gid_b is not None:
+                result_groups[gid_b].add(cam_a.id)
+                camera_to_group[cam_a.id] = gid_b
+            else:
+                gid = next_group_id
+                next_group_id += 1
+                result_groups[gid] = {cam_a.id, cam_b.id}
+                camera_to_group[cam_a.id] = gid
+                camera_to_group[cam_b.id] = gid
+
+        # Convert to lists of Camera objects
+        camera_by_id = {c.id: c for c in all_cameras}
+        result: list[list[Camera]] = []
+        for ids in result_groups.values():
+            group = [camera_by_id[cid] for cid in sorted(ids) if cid in camera_by_id]
+            if len(group) >= 2:
+                result.append(group)
+
+        # Sort groups by first camera name for stable output
+        result.sort(key=lambda g: g[0].name.lower())
+        return result
+
+    def merge_cameras(
+        self,
+        primary_id: int,
+        merge_ids: list[int],
+        custom_name: str | None = None,
+    ) -> tuple[Camera, list[int], list[str]]:
+        """Merge multiple cameras into a single primary camera.
+
+        Union array fields, keep primary's scalars (fall back to merge targets),
+        take max confidence, optionally apply custom name.
+
+        Args:
+            primary_id: ID of the camera to keep.
+            merge_ids: IDs of cameras to merge into primary and then delete.
+            custom_name: Optional custom name for the merged camera.
+
+        Returns:
+            Tuple of (updated primary camera, deleted IDs, deleted names).
+
+        Raises:
+            ValueError: If primary_id is in merge_ids or cameras not found.
+        """
+        if primary_id in merge_ids:
+            raise ValueError("primary_id cannot be in merge_ids")
+
+        primary = self.get_camera(primary_id)
+        if not primary:
+            raise ValueError(f"Primary camera {primary_id} not found")
+
+        targets = self.get_cameras_by_ids(merge_ids)
+        found_ids = {c.id for c in targets}
+        missing = [mid for mid in merge_ids if mid not in found_ids]
+        if missing:
+            raise ValueError(f"Cameras not found: {missing}")
+
+        # Union array fields
+        all_ports: set[str] = set(primary.ports)
+        all_protocols: set[str] = set(primary.protocols)
+        all_controls: set[str] = set(primary.supported_controls)
+        all_notes: set[str] = set(primary.notes)
+        max_confidence = primary.confidence
+
+        for target in targets:
+            all_ports.update(target.ports)
+            all_protocols.update(target.protocols)
+            all_controls.update(target.supported_controls)
+            all_notes.update(target.notes)
+            max_confidence = max(max_confidence, target.confidence)
+
+        # Scalar fallbacks: primary first, then first non-null from targets
+        manufacturer = primary.manufacturer or next(
+            (t.manufacturer for t in targets if t.manufacturer), None
+        )
+        code_model = primary.code_model or next(
+            (t.code_model for t in targets if t.code_model), None
+        )
+        device_type = primary.device_type or next(
+            (t.device_type for t in targets if t.device_type), None
+        )
+        doc_url = primary.doc_url or next(
+            (t.doc_url for t in targets if t.doc_url), None
+        )
+        manufacturer_url = primary.manufacturer_url or next(
+            (t.manufacturer_url for t in targets if t.manufacturer_url), None
+        )
+
+        # Build update
+        updates = CameraUpdate(
+            name=custom_name if custom_name else None,
+            manufacturer=manufacturer,
+            code_model=code_model,
+            device_type=device_type,
+            ports=sorted(all_ports),
+            protocols=sorted(all_protocols),
+            supported_controls=sorted(all_controls),
+            notes=sorted(all_notes),
+            doc_url=doc_url,
+            manufacturer_url=manufacturer_url,
+            confidence=max_confidence,
+            needs_review=False,
+        )
+
+        self.update_camera(primary_id, updates)
+
+        # Delete merge targets
+        deleted_names: list[str] = []
+        deleted_ids: list[int] = []
+        for target in targets:
+            assert target.id is not None
+            deleted_names.append(target.name)
+            deleted_ids.append(target.id)
+            self.delete_camera(target.id)
+
+        logger.info(
+            "Merged cameras",
+            primary_id=primary_id,
+            deleted_ids=deleted_ids,
+            deleted_names=deleted_names,
+        )
+
+        merged = self.get_camera(primary_id)
+        assert merged is not None
+        return merged, deleted_ids, deleted_names
 
 
 @lru_cache(maxsize=1)

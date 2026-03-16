@@ -67,6 +67,8 @@ CLORAG is a production-ready Multi-RAG agent designed to power Cyanview's techni
 | **Camera Compatibility DB** | Structured camera info with FTS5 full-text search |
 | **Auto-Draft System** | AI-powered draft replies for unanswered support threads |
 | **Admin Dashboard** | Full CRUD for cameras, documents, chunks, and analytics |
+| **Camera Merge** | Find and merge duplicate cameras with intelligent name matching |
+| **Dark Mode** | Toggle dark theme with localStorage persistence |
 | **Token-Aware Chunking** | Configurable tiktoken-based chunking by content type |
 | **Performance Monitoring** | Real-time metrics with percentile stats and alerts |
 
@@ -618,6 +620,7 @@ SQLite database with:
 - **CSV import/export** with upsert logic
 - **Side-by-side comparison** (up to 5 cameras)
 - **Related cameras** based on similarity scoring
+- **Duplicate detection & merge** via name normalization and code_model cross-referencing
 
 ### Prompt Management
 

@@ -19,15 +19,15 @@
         .status-card {
             flex: 1;
             min-width: 150px;
-            background: #fff;
-            border: 1px solid #e0e0e0;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-input);
             border-radius: 8px;
             padding: 1rem 1.25rem;
         }
 
         .status-card__label {
             font-size: 0.8rem;
-            color: #666;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 0.25rem;
@@ -48,8 +48,8 @@
         }
 
         .job-card {
-            background: #fff;
-            border: 1px solid #e0e0e0;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-input);
             border-radius: 8px;
             padding: 1.25rem;
             transition: border-color 0.2s;
@@ -75,7 +75,7 @@
 
         .job-card__description {
             font-size: 0.85rem;
-            color: #666;
+            color: var(--text-muted);
             margin: 0 0 0.75rem 0;
         }
 
@@ -83,7 +83,7 @@
             display: none;
             margin-bottom: 0.75rem;
             padding-top: 0.75rem;
-            border-top: 1px solid #f0f0f0;
+            border-top: 1px solid var(--border-color);
         }
 
         .job-card__params.visible {
@@ -105,7 +105,7 @@
 
         .param-group label {
             font-size: 0.8rem;
-            color: #555;
+            color: var(--text-secondary);
             min-width: 120px;
         }
 
@@ -113,10 +113,12 @@
         .param-group input[type="text"],
         .param-group select {
             padding: 0.3rem 0.5rem;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-input);
             border-radius: 4px;
             font-size: 0.85rem;
             width: 160px;
+            background: var(--bg-input);
+            color: var(--text-primary);
         }
 
         .param-group input[type="checkbox"] {
@@ -212,21 +214,21 @@
         .history-table th {
             text-align: left;
             padding: 0.6rem 0.75rem;
-            background: #f8f9fa;
-            border-bottom: 2px solid #e0e0e0;
+            background: var(--bg-surface-hover);
+            border-bottom: 2px solid var(--border-input);
             font-weight: 600;
             font-size: 0.8rem;
             text-transform: uppercase;
-            color: #555;
+            color: var(--text-secondary);
         }
 
         .history-table td {
             padding: 0.6rem 0.75rem;
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .history-table tr:hover td {
-            background: #f8f9fa;
+            background: var(--bg-surface-hover);
         }
 
         .history-table tr {
@@ -257,7 +259,7 @@
             align-items: center;
             gap: 0.4rem;
             font-size: 0.8rem;
-            color: #666;
+            color: var(--text-muted);
         }
 
         .sse-dot {
@@ -273,11 +275,11 @@
         /* Toggle params button */
         .btn-toggle {
             background: none;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-input);
             border-radius: 4px;
             padding: 0.2rem 0.5rem;
             font-size: 0.75rem;
-            color: #666;
+            color: var(--text-muted);
             cursor: pointer;
         }
 
@@ -908,12 +910,16 @@
 
         function showAlert(message, type) {
             const container = document.getElementById('alertContainer');
-            const alert = document.createElement('div');
-            alert.className = `alert alert-${type}`;
-            alert.textContent = message;
-            container.innerHTML = '';
-            container.appendChild(alert);
-            setTimeout(() => alert.remove(), 5000);
+            if (typeof AdminAnimations !== 'undefined') {
+                AdminAnimations.showAlert(container, message, type, 5000);
+            } else {
+                const el = document.createElement('div');
+                el.className = `alert alert-${type} show`;
+                el.textContent = message;
+                container.innerHTML = '';
+                container.appendChild(el);
+                setTimeout(() => el.remove(), 5000);
+            }
         }
 
         // ================================================================

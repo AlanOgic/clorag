@@ -75,86 +75,246 @@ def _p(
 JOB_TYPES: dict[str, JobTypeInfo] = {
     "ingest_docs": JobTypeInfo(
         name="ingest_docs",
-        description="Ingest Docusaurus documentation",
+        description=(
+            "Crawl the Cyanview Docusaurus support site via sitemap. "
+            "Fetches pages with Jina Reader (BeautifulSoup fallback), "
+            "chunks with token-based splitter, generates Voyage "
+            "embeddings (dense + BM25 sparse), and upserts into the "
+            "docusaurus_docs Qdrant collection. Also extracts 5-10 "
+            "keywords per page via Sonnet and applies RIO terminology "
+            "fixes before embedding."
+        ),
         params={
-            "fresh": _p("bool", False, "Clear collection first"),
-            "extract_cameras": _p("bool", True, "Extract camera info"),
+            "fresh": _p(
+                "bool", False,
+                "Delete and recreate the docusaurus_docs collection "
+                "before ingesting. Use for full re-index.",
+            ),
+            "extract_cameras": _p(
+                "bool", True,
+                "Run Sonnet camera extraction on new/updated chunks "
+                "after ingestion to populate the camera database.",
+            ),
         },
     ),
     "ingest_curated": JobTypeInfo(
         name="ingest_curated",
-        description="Ingest curated Gmail support threads",
+        description=(
+            "Fetch curated Gmail support threads (label-filtered), "
+            "run the 7-step pipeline: Fetch, Anonymize, Sonnet "
+            "analysis (category/product/problem/solution), QC filter, "
+            "chunk, embed (Voyage dense + BM25), and store in the "
+            "gmail_cases Qdrant collection. Threads below the QC "
+            "confidence threshold are skipped."
+        ),
         params={
-            "max_threads": _p("int", 300, "Max threads to process"),
-            "offset": _p("int", 0, "Skip first N threads"),
-            "min_confidence": _p("float", 0.6, "Min QC confidence"),
-            "fresh": _p("bool", False, "Clear collection first"),
-            "extract_cameras": _p("bool", True, "Extract camera info"),
+            "max_threads": _p(
+                "int", 300,
+                "Maximum number of Gmail threads to process in this "
+                "run. Lower for faster test runs.",
+            ),
+            "offset": _p(
+                "int", 0,
+                "Skip the first N threads. Use for incremental "
+                "ingestion after a previous partial run.",
+            ),
+            "min_confidence": _p(
+                "float", 0.6,
+                "Minimum Sonnet QC confidence score (0.0-1.0). "
+                "Threads below this are skipped as low quality.",
+            ),
+            "fresh": _p(
+                "bool", False,
+                "Delete and recreate the gmail_cases collection "
+                "before ingesting. Use for full re-index.",
+            ),
+            "extract_cameras": _p(
+                "bool", True,
+                "Run Sonnet camera extraction on new/updated chunks "
+                "after ingestion to populate the camera database.",
+            ),
         },
     ),
     "import_docs": JobTypeInfo(
         name="import_docs",
-        description="Bulk import custom documents from a folder",
+        description=(
+            "Bulk import custom knowledge documents (.txt, .md, .pdf) "
+            "from a server folder into the custom_docs Qdrant "
+            "collection. Files are chunked, embedded, and enriched "
+            "with Sonnet-generated keywords. The folder is restricted "
+            "to IMPORT_DOCS_DIR for security."
+        ),
         params={
-            "folder": _p("str", "", "Folder path (IMPORT_DOCS_DIR)"),
-            "category": _p("str", "other", "Document category"),
-            "tags": _p("str", "", "Comma-separated tags"),
-            "dry_run": _p("bool", False, "Preview only"),
+            "folder": _p(
+                "str", "",
+                "Server folder path to import from. Must be within "
+                "IMPORT_DOCS_DIR (/opt/clorag/import/ by default). "
+                "Leave blank to use the default import directory.",
+            ),
+            "category": _p(
+                "str", "other",
+                "Document category: product_info, troubleshooting, "
+                "configuration, firmware, release_notes, faq, "
+                "best_practices, pre_sales, internal, or other.",
+            ),
+            "tags": _p(
+                "str", "",
+                "Comma-separated tags to apply to all imported "
+                "documents (e.g. 'rio,networking,v2').",
+            ),
+            "dry_run": _p(
+                "bool", False,
+                "Preview what would be imported without actually "
+                "creating documents or embeddings.",
+            ),
         },
     ),
     "enrich_cameras": JobTypeInfo(
         name="enrich_cameras",
-        description="Enrich cameras with model codes and URLs",
+        description=(
+            "Enrich existing camera database entries by looking up "
+            "manufacturer product pages via web search. Adds official "
+            "model codes (code_model), manufacturer URLs, and "
+            "doc URLs where missing."
+        ),
         params={
-            "manufacturers": _p("str", "", "Manufacturer filter (csv)"),
-            "limit": _p("int", 0, "Max cameras (0=all)"),
-            "dry_run": _p("bool", False, "Preview only"),
-            "enrich_urls": _p("bool", True, "Enrich product URLs"),
+            "manufacturers": _p(
+                "str", "",
+                "Comma-separated manufacturer filter (e.g. "
+                "'Sony,Canon'). Leave blank to process all.",
+            ),
+            "limit": _p(
+                "int", 0,
+                "Maximum cameras to process. 0 means all matching "
+                "cameras. Use a small number for testing.",
+            ),
+            "dry_run": _p(
+                "bool", False,
+                "Preview enrichment results without updating the "
+                "database.",
+            ),
+            "enrich_urls": _p(
+                "bool", True,
+                "Search for and add manufacturer product page URLs "
+                "for cameras missing them.",
+            ),
         },
     ),
     "extract_cameras": JobTypeInfo(
         name="extract_cameras",
-        description="Extract camera info from vector chunks",
+        description=(
+            "Scan vector store chunks with Sonnet to extract camera "
+            "compatibility info (model name, manufacturer, ports, "
+            "protocols, controls). Extracted cameras are validated, "
+            "normalized, and upserted into the SQLite camera database."
+        ),
         params={
-            "docs_only": _p("bool", False, "Docs chunks only"),
-            "cases_only": _p("bool", False, "Case chunks only"),
-            "limit": _p("int", 1000, "Max chunks to process"),
+            "docs_only": _p(
+                "bool", False,
+                "Only process chunks from the docusaurus_docs "
+                "collection (documentation pages).",
+            ),
+            "cases_only": _p(
+                "bool", False,
+                "Only process chunks from the gmail_cases "
+                "collection (support threads).",
+            ),
+            "limit": _p(
+                "int", 1000,
+                "Maximum number of chunks to process. Sonnet API "
+                "calls are made per chunk, so lower values are "
+                "faster and cheaper.",
+            ),
         },
     ),
     "populate_graph": JobTypeInfo(
         name="populate_graph",
-        description="Populate Neo4j knowledge graph",
+        description=(
+            "Build the Neo4j knowledge graph by extracting entities "
+            "(Camera, Product, Protocol, Port, Issue, Solution, "
+            "Firmware) and relationships from vector store chunks "
+            "using Sonnet. Requires Neo4j to be configured and "
+            "reachable (see NEO4J_* env vars)."
+        ),
         params={
             "collections": _p(
-                "str", "docusaurus_docs,gmail_cases", "Collections (csv)",
+                "str", "docusaurus_docs,gmail_cases",
+                "Comma-separated Qdrant collections to process. "
+                "Options: docusaurus_docs, gmail_cases, custom_docs.",
             ),
-            "batch_size": _p("int", 10, "Chunks per batch"),
-            "max_chunks": _p("int", 0, "Max chunks (0=all)"),
-            "concurrency": _p("int", 5, "Concurrent batches"),
+            "batch_size": _p(
+                "int", 10,
+                "Number of chunks per Sonnet entity extraction "
+                "batch. Higher values use more memory.",
+            ),
+            "max_chunks": _p(
+                "int", 0,
+                "Maximum total chunks to process across all "
+                "collections. 0 means process everything.",
+            ),
+            "concurrency": _p(
+                "int", 5,
+                "Number of concurrent Sonnet extraction batches. "
+                "Higher values are faster but use more API quota.",
+            ),
         },
     ),
     "rebuild_fts": JobTypeInfo(
         name="rebuild_fts",
-        description="Rebuild camera FTS5 search index",
+        description=(
+            "Drop and rebuild the SQLite FTS5 full-text search index "
+            "for the camera database. Run this after bulk camera "
+            "imports or if search results seem stale. Fast operation, "
+            "no external API calls."
+        ),
         params={},
     ),
     "fix_rio_preview": JobTypeInfo(
         name="fix_rio_preview",
-        description="Preview RIO terminology fixes",
+        description=(
+            "Scan all vector store chunks for incorrect RIO product "
+            "terminology (e.g. 'RIO-Live' should be 'RIO +LAN', "
+            "generic 'RIO' in WAN context should be 'RIO +WAN'). "
+            "Uses Sonnet to analyze context and suggest fixes. "
+            "Results are saved to the terminology fixes database "
+            "for review at /admin/terminology-fixes."
+        ),
         params={
-            "max_chunks": _p("int", 0, "Max chunks (0=all)"),
+            "max_chunks": _p(
+                "int", 0,
+                "Maximum chunks to scan. 0 means scan all chunks "
+                "across all collections. Use a smaller number for "
+                "faster preview runs.",
+            ),
         },
     ),
     "fix_rio_apply": JobTypeInfo(
         name="fix_rio_apply",
-        description="Apply approved RIO terminology fixes",
+        description=(
+            "Apply all 'approved' RIO terminology fixes from the "
+            "fixes database. Updates chunk text in Qdrant and "
+            "re-embeds affected chunks (all sibling chunks in the "
+            "same document are re-embedded together for context). "
+            "Only processes fixes with status='approved'."
+        ),
         params={},
     ),
     "init_prompts": JobTypeInfo(
         name="init_prompts",
-        description="Initialize prompt database with defaults",
+        description=(
+            "Populate the prompts SQLite database with default LLM "
+            "prompts from the hardcoded registry (11 prompts across "
+            "agent, analysis, synthesis, drafts, graph, scripts "
+            "categories). Skips prompts that already exist unless "
+            "'force' is enabled."
+        ),
         params={
-            "force": _p("bool", False, "Overwrite existing"),
+            "force": _p(
+                "bool", False,
+                "Overwrite existing prompts with the hardcoded "
+                "defaults. Warning: this discards any admin edits "
+                "made via /admin/prompts.",
+            ),
         },
     ),
 }

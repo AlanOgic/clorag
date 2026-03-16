@@ -2,6 +2,64 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.9.0] - 2026-03-16
+
+### Added
+
+- **Camera Merge Feature** (`/admin/cameras`)
+  - Find duplicate cameras with intelligent name normalization (Mark II/MK2/MKII synonyms, code_model cross-referencing)
+  - Merge 2+ cameras into one: union of ports/protocols/controls/notes, scalar fallbacks, max confidence
+  - Merge confirmation modal with primary selection, merged preview, optional custom name
+  - Floating toolbar appears when 2+ cameras are checkbox-selected
+  - "Find Duplicates" button highlights groups with alternating colors
+  - Neo4j `camera_db_id` reassignment on merge (non-fatal if unavailable)
+  - New endpoints: `GET /api/admin/cameras/duplicates`, `POST /api/admin/cameras/merge`
+  - New schemas: `CameraMergeRequest`, `CameraMergeResponse`
+  - New DB methods: `find_duplicate_candidates()`, `merge_cameras()`
+  - New graph function: `reassign_camera_db_id()`
+
+- **Dark Mode / Night Mode**
+  - Toggle button in navbar (moon/sun icon), persists in localStorage
+  - Respects `prefers-color-scheme: dark` on first visit
+  - 30+ semantic CSS variables for all surface, text, border, and shadow colors
+  - Smooth 350ms transition on theme switch
+  - All admin pages supported (shared `admin.css` + JS-injected toggle)
+
+- **Admin UI Animations**
+  - Page fade-in on load (fadeInUp)
+  - Card stagger entrance with JS-applied delays
+  - Enhanced card hover (scale + shadow lift)
+  - Alert slide-in/out with auto-dismiss
+  - Merge toolbar slide-up/down
+  - Modal scale-in with spring curve, animated close on Escape/overlay click
+  - Stat counter count-up animation with pulse on finish
+  - Button press feedback (scale 0.96)
+  - Tag pop-in animation
+  - Input focus ring glow
+  - Running badge pulse for ingestion jobs
+  - `@media (prefers-reduced-motion: reduce)` disables all animations
+
+- **Ingestion Job Descriptions**
+  - All 10 job types now have detailed multi-sentence descriptions explaining the full pipeline
+  - All parameters have expanded help text with valid values and side effects
+
+### Changed
+
+- `deleteCamera()` in admin template now uses `AdminUtils.delete()` for proper CSRF protection
+- Ingestion page inline styles updated to use CSS variables for dark mode compatibility
+
+### Files
+
+- `src/clorag/core/database.py` - Added `find_duplicate_candidates()`, `merge_cameras()`
+- `src/clorag/core/graph_store.py` - Added `reassign_camera_db_id()`
+- `src/clorag/web/routers/admin/cameras.py` - Added duplicates + merge endpoints
+- `src/clorag/web/schemas.py` - Added `CameraMergeRequest`, `CameraMergeResponse`
+- `src/clorag/web/templates/admin_cameras.html` - Merge UI (checkboxes, toolbar, modal)
+- `src/clorag/web/templates/admin_ingestion.html` - Dark mode CSS variable updates
+- `src/clorag/web/static/css/admin.css` - Dark mode variables, animations, theme toggle
+- `src/clorag/web/static/js/admin.js` - `ThemeToggle`, `AdminAnimations`, animated modals
+- `src/clorag/services/ingestion_runner.py` - Expanded job descriptions and parameter help
+
 ## [0.6.5] - 2026-02-09
 
 ### Changed

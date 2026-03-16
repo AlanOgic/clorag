@@ -211,6 +211,27 @@ class TerminologyBatchStatusUpdate(BaseModel):
 
 
 # =============================================================================
+# Camera Merge Models
+# =============================================================================
+
+
+class CameraMergeRequest(BaseModel):
+    """Request body for merging duplicate cameras."""
+
+    primary_id: int
+    merge_ids: list[int] = Field(..., min_length=1)
+    custom_name: str | None = None
+
+
+class CameraMergeResponse(BaseModel):
+    """Response for a camera merge operation."""
+
+    merged_camera: dict[str, Any]
+    deleted_ids: list[int]
+    deleted_names: list[str]
+
+
+# =============================================================================
 # Graph Models
 # =============================================================================
 
