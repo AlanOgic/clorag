@@ -35,7 +35,7 @@ class RerankResponse:
 
 
 class RerankCache:
-    """Wrapper around LRUCache for rerank results with document-order-independent keys."""
+    """Wrapper around LRUCache for rerank results with order-preserving keys."""
 
     def __init__(self, max_size: int = RERANK_CACHE_MAX_SIZE) -> None:
         self._cache: LRUCache[list[RerankResult]] = LRUCache(max_size=max_size)
@@ -43,11 +43,11 @@ class RerankCache:
     def _make_key(
         self, query: str, documents: list[str], model: str, top_k: int | None
     ) -> str:
-        """Create cache key from query and documents (order-independent)."""
-        # Hash each document and sort for order independence
-        doc_hashes = sorted(
+        """Create cache key from query and documents (order-sensitive)."""
+        # Preserve document order — rerank indices are relative to input
+        doc_hashes = [
             hashlib.sha256(d.encode()).hexdigest()[:16] for d in documents
-        )
+        ]
         key_str = f"{query}:{model}:{top_k}:{','.join(doc_hashes)}"
         return hashlib.sha256(key_str.encode()).hexdigest()[:32]
 

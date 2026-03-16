@@ -1120,9 +1120,8 @@ class CameraDatabase:
             code_model = row["code_model"]
             ids = [int(i) for i in row["ids"].split(",")]
 
-            # Get all cameras with this code_model
-            cameras = [self.get_camera(cid) for cid in ids]
-            cameras = [c for c in cameras if c is not None]
+            # Get all cameras with this code_model (batch query)
+            cameras = self.get_cameras_by_ids(ids)
 
             if len(cameras) < 2:
                 continue

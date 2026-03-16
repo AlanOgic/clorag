@@ -37,8 +37,10 @@ async def api_cameras_duplicates(
     _: bool = Depends(verify_admin),
 ) -> list[list[Camera]]:
     """Find groups of suspected duplicate cameras."""
+    import asyncio
+
     db = get_camera_database()
-    return db.find_duplicate_candidates()
+    return await asyncio.to_thread(db.find_duplicate_candidates)
 
 
 @router.post("/cameras/merge", response_model=CameraMergeResponse)
