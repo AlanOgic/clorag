@@ -724,8 +724,12 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         async def extract_one(doc: Document) -> None:
             async with semaphore:
                 title = doc.metadata.get("title", "Untitled")
-                # Truncate content to avoid exceeding token limits
-                content = doc.text[:4000]
+                # Sample content from beginning and end for full coverage
+                # (long pages lose keywords from later sections with simple truncation)
+                if len(doc.text) > 4000:
+                    content = doc.text[:2000] + "\n...\n" + doc.text[-2000:]
+                else:
+                    content = doc.text
                 try:
                     prompt = get_prompt(
                         "analysis.keyword_extractor",

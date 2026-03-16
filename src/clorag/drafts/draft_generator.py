@@ -225,10 +225,13 @@ Write a professional email reply addressing this customer's issue. Use the retri
         return response.content[0].text
 
     def _calculate_confidence(self, chunks: list[dict]) -> float:
-        """Calculate confidence score based on retrieved chunks.
+        """Calculate confidence score based on retrieved chunks and their scores.
+
+        Uses reranker scores (when available) as the primary signal, since they
+        measure actual relevance. Falls back to chunk count heuristic.
 
         Args:
-            chunks: Retrieved context chunks.
+            chunks: Retrieved context chunks (may include 'score' field from reranker).
 
         Returns:
             Confidence score between 0.0 and 1.0.
@@ -236,16 +239,34 @@ Write a professional email reply addressing this customer's issue. Use the retri
         if not chunks:
             return 0.0
 
-        # Base confidence on number and quality of results
-        num_chunks = len(chunks)
+        # Use reranker scores if available (calibrated 0-1 relevance)
+        scores: list[float] = [
+            float(c.get("score", 0)) for c in chunks if c.get("score")
+        ]
+        if scores:
+            # Average of top-3 reranker scores gives actual relevance-based confidence
+            top_scores = sorted(scores, reverse=True)[:3]
+            avg_score: float = sum(top_scores) / len(top_scores)
 
+            # Scale to confidence: reranker score 0.5+ is good, 0.8+ is excellent
+            if avg_score >= 0.7:
+                return float(min(0.95, avg_score))
+            elif avg_score >= 0.4:
+                return 0.6 + (avg_score - 0.4) * 0.5  # 0.6-0.75
+            elif avg_score >= 0.2:
+                return 0.3 + (avg_score - 0.2) * 1.5  # 0.3-0.6
+            else:
+                return float(max(0.1, avg_score))
+
+        # Fallback: chunk count heuristic (no reranker scores available)
+        num_chunks = len(chunks)
         if num_chunks >= 6:
-            return 0.9
+            return 0.8
         elif num_chunks >= 4:
-            return 0.75
+            return 0.65
         elif num_chunks >= 2:
-            return 0.6
+            return 0.5
         elif num_chunks >= 1:
-            return 0.4
+            return 0.35
         else:
             return 0.2

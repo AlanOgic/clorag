@@ -114,6 +114,7 @@
                         <li><a href="#retrieval-flow" class="docs-nav__link">Complete Flow</a></li>
                         <li><a href="#dense-sparse" class="docs-nav__link">Dense vs Sparse</a></li>
                         <li><a href="#dynamic-threshold" class="docs-nav__link">Dynamic Thresholds</a></li>
+                        <li><a href="#source-diversity" class="docs-nav__link">Source Diversity</a></li>
                         <li><a href="#reranking" class="docs-nav__link">Reranking</a></li>
                         <li><a href="#graphrag" class="docs-nav__link">GraphRAG</a></li>
                         <li><a href="#optimizations" class="docs-nav__link">Optimizations</a></li>
@@ -172,13 +173,11 @@
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       4. DYNAMIC THRESHOLD FILTER                           │
+│                    4. SOURCE DIVERSITY + MERGE                               │
 │                                                                             │
-│   Short query (≤2 words):  threshold 0.15 (permissive)                      │
-│   Medium query (3-5 words): threshold 0.20                                  │
-│   Long query (>5 words):    threshold 0.25 (strict)                         │
-│   Technical terms (rio, rcp): +0.05 boost                                   │
-│   Minimum 3 results always returned                                         │
+│   Merge results from all collections, sorted by RRF score                   │
+│   Ensure at least 1 result from each collection with relevant hits          │
+│   (score >= 50% of top result) to avoid source domination                   │
 │   Over-fetch 3x when reranking enabled                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -188,10 +187,23 @@
 │                                                                             │
 │   Cross-encoder model re-scores each candidate against the query            │
 │   +15-40% relevance improvement over RRF alone                              │
-│   Returns top-K results with reranker relevance scores (0-1)                │
+│   Returns top-K results with calibrated relevance scores (0-1)              │
 │   LRU cache (100 entries) for repeated query+doc combinations               │
 │                                                                             │
 │   Can be disabled per-query or globally via RERANK_ENABLED=false            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    5b. DYNAMIC THRESHOLD FILTER (post-rerank)                │
+│                                                                             │
+│   Applied AFTER reranking using calibrated reranker scores (0-1)            │
+│   Short query (≤2 words):  threshold 0.15 (permissive)                      │
+│   Medium query (3-5 words): threshold 0.20                                  │
+│   Long query (>5 words):    threshold 0.25 (strict)                         │
+│   Technical terms (30+ terms including rio, rcp, visca, sdi...): +0.05      │
+│   Minimum 3 results always returned                                         │
+│   Without reranking: RRF scores pass through unfiltered (uncalibrated)      │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -229,9 +241,11 @@
 │                         8. ANALYTICS LOGGING                                │
 │                                                                             │
 │   Stored in SQLite (analytics.db):                                          │
-│   • Query text, timestamp                                                   │
-│   • Sources used, chunk IDs                                                 │
-│   • Response time, token usage                                              │
+│   • Query text, timestamp, session ID                                       │
+│   • Sources used, chunk IDs, source types                                   │
+│   • Response time, result scores (reranker scores if reranked)              │
+│   • Full LLM response for replay                                            │
+│   • Search quality endpoint: /api/admin/search-quality                      │
 └─────────────────────────────────────────────────────────────────────────────┘</code></pre>
 
                 <h2 id="dense-sparse">Dense vs Sparse Embeddings</h2>
@@ -279,14 +293,22 @@
                 </ul>
 
                 <h2 id="dynamic-threshold">Dynamic Score Thresholds</h2>
-                <p>Search results are filtered using adaptive thresholds based on query characteristics:</p>
+                <p>Search results are filtered using adaptive thresholds <strong>after reranking</strong>, using calibrated reranker scores (0-1). This is critical because RRF scores from Qdrant are uncalibrated and can exceed 1.0, making pre-rerank filtering unreliable.</p>
                 <table>
                     <tr><th>Query Length</th><th>Base Threshold</th><th>Rationale</th></tr>
                     <tr><td>≤2 words</td><td>0.15</td><td>Short queries need permissive matching</td></tr>
                     <tr><td>3-5 words</td><td>0.20</td><td>Medium specificity</td></tr>
                     <tr><td>&gt;5 words</td><td>0.25</td><td>Specific queries can be strict</td></tr>
                 </table>
-                <p>Technical terms (rio, rcp, firmware, etc.) add +0.05 to the threshold. The system always returns at least 3 results regardless of threshold.</p>
+                <p>Technical terms (30+ terms including rio, rcp, visca, sdi, hdmi, ndi, srt, ptz, etc.) add +0.05 to the threshold. The system always returns at least 3 results regardless of threshold. A single shared implementation in <code>core/retriever.py</code> is used by both the CLI and web pipelines.</p>
+
+                <h2 id="source-diversity">Source Diversity</h2>
+                <p>When searching across all collections (hybrid mode), the top results can be dominated by a single collection (typically documentation). Source diversity enforcement ensures representation from each collection:</p>
+                <ul>
+                    <li>After merging and sorting by RRF score, the system checks if each collection is represented in the top results</li>
+                    <li>If a collection is missing, its best result is inserted (replacing the lowest-scoring result) provided the score is at least 50% of the top result's score</li>
+                    <li>This ensures support cases and custom docs appear alongside documentation when they have relevant content</li>
+                </ul>
 
                 <h2 id="reranking">Cross-Encoder Reranking</h2>
                 <p>After hybrid search returns candidates, a <strong>cross-encoder reranker</strong> refines the relevance ranking for significantly improved results:</p>

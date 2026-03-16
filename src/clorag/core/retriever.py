@@ -184,20 +184,25 @@ class MultiSourceRetriever:
                 include_custom_docs=True,
             )
 
-        # Apply threshold filtering (RRF scores are different from cosine similarity)
-        # RRF scores are typically lower, so we apply a scaled threshold
-        rrf_threshold = threshold * 0.5  # RRF scores are typically 0.0-0.1 range
-        filtered_results = [r for r in results if r.score >= rrf_threshold]
-
-        # Ensure minimum results (at least 3 if available)
-        if len(filtered_results) < 3 and len(results) >= 3:
-            filtered_results = results[:3]
-
         # Apply reranking if enabled and we have results
+        # NOTE: No pre-rerank threshold filtering — RRF scores are not calibrated
+        # (they can range well above 1.0), so we let the reranker decide relevance.
+        # Threshold filtering happens post-rerank using calibrated reranker scores.
         was_reranked = False
-        if should_rerank and filtered_results:
-            filtered_results = await self._apply_reranking(query, filtered_results, limit)
+        if should_rerank and results:
+            results = await self._apply_reranking(query, results, limit)
             was_reranked = True
+
+        # Apply threshold filtering post-rerank (reranker scores are calibrated 0-1)
+        if was_reranked:
+            filtered_results = [r for r in results if r.score >= threshold]
+            # Ensure minimum results (at least 3 if available)
+            if len(filtered_results) < 3 and len(results) >= 3:
+                filtered_results = results[:3]
+        else:
+            # Without reranking, skip threshold on RRF scores (uncalibrated)
+            # Just return all results up to limit
+            filtered_results = results
 
         # Limit results to requested amount
         final_results = filtered_results[:limit]

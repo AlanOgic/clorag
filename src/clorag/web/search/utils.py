@@ -7,6 +7,7 @@ source link extraction.
 
 from typing import Any
 
+from clorag.core.retriever import calculate_dynamic_threshold
 from clorag.web.schemas import SearchResult, SourceLink
 
 
@@ -17,51 +18,6 @@ def truncate(text: str, max_length: int) -> str:
     return text[: max_length - 3] + "..."
 
 
-def compute_dynamic_threshold(query: str, results: list[SearchResult]) -> float:
-    """Compute a dynamic score threshold based on query and result characteristics.
-
-    Short/vague queries get lower thresholds to avoid over-filtering.
-    Specific queries (with model numbers, technical terms) get higher thresholds.
-
-    Args:
-        query: The search query.
-        results: List of search results with scores.
-
-    Returns:
-        Dynamic threshold value (0.0-1.0 for RRF scores).
-    """
-    if not results:
-        return 0.0
-
-    # Base threshold varies by query length (short queries = lower threshold)
-    query_words = len(query.split())
-    if query_words <= 2:
-        base_threshold = 0.15  # Very short queries - be permissive
-    elif query_words <= 5:
-        base_threshold = 0.20  # Medium queries
-    else:
-        base_threshold = 0.25  # Longer, more specific queries
-
-    # Check for specific technical terms that indicate precise intent
-    technical_indicators = [
-        "rio", "rcp", "ci0", "vp4", "firmware", "ip", "port", "error", "protocol"
-    ]
-    has_technical = any(term in query.lower() for term in technical_indicators)
-    if has_technical:
-        base_threshold += 0.05
-
-    # Compute score distribution to set adaptive cutoff
-    scores = [r.score for r in results]
-    if len(scores) >= 3:
-        mean_score = sum(scores) / len(scores)
-        # Don't filter below mean if most results are relevant
-        threshold = min(base_threshold, mean_score * 0.6)
-    else:
-        threshold = base_threshold
-
-    return threshold
-
-
 def filter_by_dynamic_threshold(
     results: list[SearchResult],
     chunks: list[dict[str, Any]],
@@ -69,8 +25,11 @@ def filter_by_dynamic_threshold(
 ) -> tuple[list[SearchResult], list[dict[str, Any]]]:
     """Filter results using dynamic threshold based on query characteristics.
 
+    Uses reranker scores (calibrated 0-1) when available, otherwise falls back
+    to the shared dynamic threshold from core.retriever.
+
     Args:
-        results: Search results list.
+        results: Search results list (scores should be reranker scores post-reranking).
         chunks: Corresponding chunks for synthesis.
         query: Original search query.
 
@@ -80,7 +39,7 @@ def filter_by_dynamic_threshold(
     if not results:
         return results, chunks
 
-    threshold = compute_dynamic_threshold(query, results)
+    threshold = calculate_dynamic_threshold(query)
 
     filtered_results: list[SearchResult] = []
     filtered_chunks: list[dict[str, Any]] = []
@@ -111,6 +70,8 @@ def build_context(
     chunks: list[dict[str, Any]],
     max_chunks: int = 8,
     graph_context: str | None = None,
+    max_total_chars: int = 12000,
+    max_group_chars: int = 4000,
 ) -> str:
     """Build context string from chunks for Claude synthesis.
 
@@ -121,6 +82,8 @@ def build_context(
         chunks: Retrieved document chunks (with optional 'score' field).
         max_chunks: Maximum chunks to include.
         graph_context: Optional graph enrichment context string.
+        max_total_chars: Maximum total characters across all groups.
+        max_group_chars: Maximum characters per source group.
     """
     parts: list[str] = []
 
@@ -139,6 +102,7 @@ def build_context(
         groups[key].append(chunk)
 
     idx = 1
+    total_chars = 0
     for key in group_order:
         group = groups[key]
         # Use the best score in the group as the group relevance
@@ -157,9 +121,24 @@ def build_context(
                 f" (relevance: {best_score:.2f})"
             )
 
-        # Combine all chunks from this source
-        combined_text = "\n\n".join(c.get("text", "")[:2000] for c in group)
-        parts.append(f"{header}\n{combined_text}")
+        # Merge all chunks from this group first, then truncate the group
+        # to the group budget (instead of truncating each chunk independently)
+        combined_text = "\n\n".join(c.get("text", "") for c in group)
+        if len(combined_text) > max_group_chars:
+            combined_text = combined_text[:max_group_chars] + "..."
+
+        group_content = f"{header}\n{combined_text}"
+
+        # Check total budget
+        if total_chars + len(group_content) > max_total_chars:
+            remaining = max_total_chars - total_chars
+            if remaining > 200:  # Only add if we have meaningful space left
+                group_content = group_content[:remaining] + "..."
+                parts.append(group_content)
+            break
+
+        parts.append(group_content)
+        total_chars += len(group_content)
         idx += 1
 
     return "\n---\n".join(parts)

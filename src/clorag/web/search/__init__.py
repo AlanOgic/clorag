@@ -18,9 +18,9 @@ from clorag.web.search.synthesis import (
     synthesize_answer,
     synthesize_answer_stream,
 )
+from clorag.core.retriever import calculate_dynamic_threshold
 from clorag.web.search.utils import (
     build_context,
-    compute_dynamic_threshold,
     extract_source_links,
     filter_by_dynamic_threshold,
     truncate,
@@ -41,7 +41,7 @@ __all__ = [
     "synthesize_answer_stream",
     # Utils
     "build_context",
-    "compute_dynamic_threshold",
+    "calculate_dynamic_threshold",
     "extract_source_links",
     "filter_by_dynamic_threshold",
     "truncate",

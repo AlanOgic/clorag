@@ -602,6 +602,31 @@ class VectorStore:
         all_results = docs_results + cases_results + custom_results
         all_results.sort(key=lambda x: x.score, reverse=True)
 
+        # Source diversity: ensure at least 1 result from each collection
+        # that has relevant hits, to avoid top-N being dominated by one source
+        if limit >= 3 and len(all_results) > limit:
+            top_results = all_results[:limit]
+            sources_in_top = {r.payload.get("_source") for r in top_results}
+
+            # Check each collection for missing representation
+            source_pools = {
+                "documentation": docs_results,
+                "gmail_case": cases_results,
+                "custom_docs": custom_results,
+            }
+            for source_name, pool in source_pools.items():
+                if source_name not in sources_in_top and pool:
+                    # Insert the best result from this source, replacing the
+                    # lowest-scoring result in the top set
+                    best_from_source = pool[0]  # Already sorted by score
+                    # Only add if the source has a reasonable score
+                    # (at least 50% of the top result's score)
+                    if top_results and best_from_source.score >= top_results[0].score * 0.5:
+                        top_results[-1] = best_from_source
+                        top_results.sort(key=lambda x: x.score, reverse=True)
+
+            return top_results
+
         return all_results[:limit]
 
     async def create_snapshot(self, collection: str) -> str:

@@ -165,6 +165,30 @@ async def api_get_search(
     return search
 
 
+@router.get("/search-quality", tags=["Analytics"])
+async def api_search_quality(
+    limit: int = 50,
+    days: int = 30,
+    max_avg_score: float = 0.3,
+    _: bool = Depends(verify_admin),
+) -> dict[str, Any]:
+    """Get low-quality searches for review.
+
+    Returns searches with low average relevance scores, useful for
+    identifying queries that return poor results and tuning thresholds.
+    """
+    analytics = get_analytics_db()
+    low_quality = analytics.get_low_quality_searches(
+        limit=limit, days=days, max_avg_score=max_avg_score
+    )
+    return {
+        "count": len(low_quality),
+        "max_avg_score_threshold": max_avg_score,
+        "days": days,
+        "searches": low_quality,
+    }
+
+
 @router.get("/conversations", tags=["Analytics"])
 async def api_get_conversations(
     limit: int = 20,

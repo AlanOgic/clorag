@@ -9,7 +9,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 
 Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
-**Version**: 0.7.0 | **Python**: 3.10-3.13
+**Version**: 0.8.0 | **Python**: 3.10-3.13
 
 ## Commands
 
@@ -113,9 +113,14 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Hybrid search**: Dense + sparse vectors combined via RRF across all collections
 - **Reranking**: Voyage `rerank-2.5` cross-encoder refines top results (+15-40% relevance improvement)
 - **Over-fetch strategy**: Retrieves 3x limit, reranks, returns top-K for optimal quality
-- **Query cache**: LRU caches (200 entries) for embeddings + (100 entries) for reranking
+- **Threshold after reranking**: Dynamic thresholds applied AFTER reranking (calibrated 0-1 scores). RRF scores are uncalibrated and skip threshold filtering without reranking.
+- **Unified threshold logic**: Single `calculate_dynamic_threshold()` in `core/retriever.py` shared by CLI and web pipelines. 30+ technical terms (visca, sdi, hdmi, ndi, srt, ptz, etc.)
 - **Dynamic thresholds**: ≤2 words: 0.15, 3-5: 0.20, >5: 0.25; technical terms +0.05; minimum 3 results
+- **Source diversity**: Post-merge interleaving ensures at least 1 result from each collection with relevant hits (score ≥50% of top result)
+- **Query cache**: LRU caches (200 entries) for embeddings + (100 entries) for reranking
+- **Search quality logging**: Scores + source types logged per query; `/api/admin/search-quality` for low-score review
 - **Contextualized embeddings**: `voyage-context-3` uses `/v1/contextualizedembeddings` API (not `/v1/embeddings`) to encode chunks with full document context
+- **Synthesis grounding**: Prompt instructs "I don't know" on insufficient context; prefers docs over cases on conflicts
 
 ### Chunking
 - **Token-based sizing**: Uses `tiktoken` (cl100k_base) for 15-20% more consistent chunk sizes vs character-based
@@ -130,7 +135,7 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Jina noise reduction**: `X-Retain-Images: none`, `X-Target-Selector` for Docusaurus content, `X-Remove-Selector` for nav/sidebar/ToC
 - **BeautifulSoup fallback**: Automatic fallback on Jina 429/503 errors with retry logic (3 attempts)
 - **Table preservation**: HTML tables converted to markdown format before text extraction (BeautifulSoup fallback)
-- **Keyword extraction**: Sonnet extracts 5-10 technical keywords per page (parallel, 10 concurrent). Stored on all chunks
+- **Keyword extraction**: Sonnet extracts 5-10 technical keywords per page (parallel, 10 concurrent). Samples first 2000 + last 2000 chars for full page coverage. Stored on all chunks
 - **RIO terminology fixes**: High-confidence fixes auto-applied during ingestion before embedding
 - **Camera extraction**: Sonnet extracts camera compatibility info post-ingestion
 
@@ -217,7 +222,21 @@ ssh root@cyanview.cloud "cd /opt/clorag && docker compose build && docker compos
 
 Production: https://cyanview.cloud/ (Docker maps 8085→8080)
 
-## Recent Updates (2026-03-11)
+## Recent Updates (2026-03-16)
+
+### v0.8.0: Retrieval Accuracy Improvements
+
+- **Fix RRF threshold scaling** (BUG): Removed arbitrary `threshold * 0.5` pre-rerank filtering. RRF scores are uncalibrated and the old scaling caused unpredictable filtering masked by the "minimum 3 results" fallback
+- **Fix filtering order** (BUG): Dynamic threshold now applied AFTER reranking (calibrated 0-1 scores), not before. Documents previously filtered out by bad RRF thresholds can now be recovered by the reranker
+- **Unified threshold logic** (BUG): Web pipeline had only 9 technical terms vs CLI's 30+. Both now import shared `calculate_dynamic_threshold()` from `core/retriever.py`
+- **Source diversity**: Post-merge interleaving in `hybrid_search_rrf()` ensures representation from each collection (docs, cases, custom) in top results
+- **Synthesis grounding**: Added explicit "I don't know" instruction + source conflict handling (prefer docs over cases) to synthesis prompt
+- **Keyword extraction**: Now samples first 2000 + last 2000 chars instead of first 4000, covering full page content
+- **Smarter context truncation**: Groups merged before truncation (4K per group, 12K total budget) instead of per-chunk truncation
+- **Search quality logging**: Scores + source types per result logged to analytics DB. New `/api/admin/search-quality` endpoint for reviewing low-scoring queries
+- **Reranker-based confidence**: Draft generator confidence uses top-3 reranker scores instead of chunk-count heuristic
+- **Thread analyzer**: Increased `max_tokens` from 1024 to 2048 for complex multi-reply threads
+- **Eval scripts**: `scripts/generate_eval_dataset.py` (synthetic Q&A pairs from docs) and `scripts/eval_retrieval.py` (Recall@5, MRR, NDCG measurement)
 
 ### v0.7.0: Product Knowledge in Prompts + Unified Sonnet Model
 

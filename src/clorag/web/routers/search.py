@@ -110,6 +110,8 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
                     chunks=chunks_for_synthesis,
                     session_id=session.session_id,
                     reranked=was_reranked,
+                    scores=[c.get("score", 0) for c in chunks_for_synthesis],
+                    source_types=[c.get("source_type", "unknown") for c in chunks_for_synthesis],
                 )
             except Exception as e:
                 logger.warning("Failed to log search analytics", error=str(e))
@@ -171,6 +173,8 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
             chunks=chunks_for_synthesis,
             session_id=session.session_id,
             reranked=was_reranked,
+            scores=[r.score for r in results],
+            source_types=[r.source for r in results],
         )
     except Exception as e:
         logger.warning("Failed to log search analytics", error=str(e))

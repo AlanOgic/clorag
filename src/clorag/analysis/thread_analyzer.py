@@ -55,7 +55,7 @@ class ThreadAnalyzer:
         try:
             response = await self._client.messages.create(
                 model=self._model,
-                max_tokens=1024,
+                max_tokens=2048,
                 messages=[
                     {
                         "role": "user",

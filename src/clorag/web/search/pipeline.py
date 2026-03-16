@@ -263,12 +263,8 @@ async def perform_search(
                         "score": item.score,
                     })
 
-        # Apply dynamic threshold filtering based on query characteristics
-        results, chunks_for_synthesis = filter_by_dynamic_threshold(
-            results, chunks_for_synthesis, req.query
-        )
-
-        # Apply reranking if enabled and we have results
+        # Apply reranking BEFORE threshold filtering — reranker scores are
+        # calibrated 0-1, unlike RRF scores which are uncalibrated.
         was_reranked = False
         if rerank_enabled and results and chunks_for_synthesis:
             try:
@@ -317,8 +313,16 @@ async def perform_search(
                 # Fall back to original results, trim to limit
                 results = results[:req.limit]
                 chunks_for_synthesis = chunks_for_synthesis[:req.limit]
+
+        # Apply dynamic threshold filtering AFTER reranking (scores are now
+        # calibrated 0-1 from reranker, or uncalibrated RRF if reranking failed)
+        if was_reranked:
+            results, chunks_for_synthesis = filter_by_dynamic_threshold(
+                results, chunks_for_synthesis, req.query
+            )
         else:
-            # No reranking, just trim to limit
+            # Without reranking, skip threshold on uncalibrated RRF scores
+            # and just trim to limit
             results = results[:req.limit]
             chunks_for_synthesis = chunks_for_synthesis[:req.limit]
 

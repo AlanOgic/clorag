@@ -58,6 +58,14 @@ class AnalyticsDatabase:
                 conn.execute(
                     "ALTER TABLE search_queries ADD COLUMN reranked INTEGER DEFAULT 0"
                 )
+            if "scores" not in columns:
+                conn.execute(
+                    "ALTER TABLE search_queries ADD COLUMN scores TEXT"
+                )
+            if "source_types" not in columns:
+                conn.execute(
+                    "ALTER TABLE search_queries ADD COLUMN source_types TEXT"
+                )
             conn.commit()
 
     def log_search(
@@ -70,8 +78,10 @@ class AnalyticsDatabase:
         chunks: list[dict[str, Any]] | None = None,
         session_id: str | None = None,
         reranked: bool = False,
+        scores: list[float] | None = None,
+        source_types: list[str] | None = None,
     ) -> int:
-        """Log a search query with full response data.
+        """Log a search query with full response data and quality metrics.
 
         Args:
             query: The search query text.
@@ -82,21 +92,25 @@ class AnalyticsDatabase:
             chunks: List of retrieved chunks with metadata.
             session_id: Conversation session ID for grouping follow-ups.
             reranked: Whether reranking was applied to results.
+            scores: List of result scores (reranker scores if reranked).
+            source_types: List of source types for each result.
 
         Returns:
             The ID of the inserted record.
         """
         chunks_json = json.dumps(chunks) if chunks else None
+        scores_json = json.dumps(scores) if scores else None
+        source_types_json = json.dumps(source_types) if source_types else None
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO search_queries
                 (query, source, response_time_ms, results_count, response, chunks, session_id,
-                 reranked)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 reranked, scores, source_types)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (query, source, response_time_ms, results_count, response, chunks_json,
-                 session_id, 1 if reranked else 0),
+                 session_id, 1 if reranked else 0, scores_json, source_types_json),
             )
             conn.commit()
             return cursor.lastrowid or 0
@@ -233,7 +247,8 @@ class AnalyticsDatabase:
             cursor = conn.execute(
                 """
                 SELECT id, query, source, response_time_ms, results_count,
-                       response, chunks, session_id, reranked, created_at
+                       response, chunks, session_id, reranked, scores,
+                       source_types, created_at
                 FROM search_queries
                 WHERE id = ?
                 """,
@@ -243,12 +258,62 @@ class AnalyticsDatabase:
             if not row:
                 return None
             result = dict(row)
-            # Parse chunks JSON if present
+            # Parse JSON fields if present
             if result.get("chunks"):
                 result["chunks"] = json.loads(result["chunks"])
+            if result.get("scores"):
+                result["scores"] = json.loads(result["scores"])
+            if result.get("source_types"):
+                result["source_types"] = json.loads(result["source_types"])
             # Convert reranked to boolean
             result["reranked"] = bool(result.get("reranked", 0))
             return result
+
+    def get_low_quality_searches(
+        self, limit: int = 50, days: int = 30, max_avg_score: float = 0.3
+    ) -> list[dict[str, Any]]:
+        """Get searches with low relevance scores for quality review.
+
+        Args:
+            limit: Maximum number of results.
+            days: Number of days to look back.
+            max_avg_score: Maximum average score to consider "low quality".
+
+        Returns:
+            List of search records with low scores, sorted by score ascending.
+        """
+        since = datetime.now() - timedelta(days=days)
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT id, query, source, response_time_ms, results_count,
+                       reranked, scores, source_types, created_at
+                FROM search_queries
+                WHERE created_at >= ? AND scores IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (since.isoformat(), limit * 5),  # Over-fetch to filter
+            )
+            results = []
+            for row in cursor.fetchall():
+                r = dict(row)
+                r["reranked"] = bool(r.get("reranked", 0))
+                if r.get("scores"):
+                    scores = json.loads(r["scores"])
+                    r["scores"] = scores
+                    if scores:
+                        avg_score = sum(scores) / len(scores)
+                        r["avg_score"] = round(avg_score, 4)
+                        if avg_score <= max_avg_score:
+                            results.append(r)
+                if r.get("source_types"):
+                    r["source_types"] = json.loads(r["source_types"])
+
+            # Sort by avg_score ascending (worst first)
+            results.sort(key=lambda x: x.get("avg_score", 0))
+            return results[:limit]
 
     def get_recent_conversations(self, limit: int = 20) -> list[dict[str, Any]]:
         """Get recent conversations grouped by session_id.

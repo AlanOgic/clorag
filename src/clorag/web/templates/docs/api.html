@@ -386,7 +386,13 @@ curl https://cyanview.cloud/api/admin/search-stats \
                     <span class="endpoint__method endpoint__method--get">GET</span>
                     <span class="endpoint__path">/api/admin/search/{id}</span>
                 </div>
-                <p>Get stored search details including response and chunks.</p>
+                <p>Get stored search details including response, chunks, scores, and source types.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/search-quality?days=30&amp;max_avg_score=0.3&amp;limit=50</span>
+                </div>
+                <p>Get low-quality searches for review. Returns searches with low average relevance scores, sorted worst-first. Useful for identifying queries that return poor results and tuning retrieval thresholds.</p>
 
                 <h2 id="draft-api">Draft API</h2>
 
