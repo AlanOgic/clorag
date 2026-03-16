@@ -33,6 +33,10 @@ htmlcov/
 credentials.json
 token.json
 token.pickle
+token_drafts.json
+
+# Claude Code
+.claude/
 
 # Logs
 *.log
