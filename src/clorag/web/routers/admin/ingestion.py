@@ -4,8 +4,6 @@ Provides job management, log retrieval, and SSE streaming
 for ingestion processes.
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
 from collections.abc import AsyncGenerator
@@ -15,8 +13,17 @@ import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from starlette.responses import StreamingResponse
 
+from pydantic import BaseModel, Field
+
 from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.dependencies import limiter
+
+
+class IngestionJobRequest(BaseModel):
+    """Request body for starting an ingestion job."""
+
+    job_type: str = Field(..., description="Ingestion job type (e.g. 'ingest_docs')")
+    parameters: dict[str, Any] = Field(default_factory=dict, description="Job-specific parameters")
 
 router = APIRouter(tags=["Ingestion"])
 logger = structlog.get_logger(__name__)
@@ -113,21 +120,13 @@ async def api_ingestion_job_get(
 @limiter.limit("10/minute")
 async def api_ingestion_job_start(
     request: Request,
-    body: Annotated[dict[str, Any], Body()],
+    body: IngestionJobRequest,
     _admin: bool = Depends(verify_admin),
     _csrf: bool = Depends(verify_csrf),
 ) -> dict[str, Any]:
-    """Start a new ingestion job.
-
-    Body: {"job_type": "ingest_docs", "parameters": {"fresh": false}}
-    """
-    job_type = body.get("job_type")
-    if not job_type or not isinstance(job_type, str):
-        raise HTTPException(status_code=400, detail="job_type is required")
-
-    parameters = body.get("parameters", {})
-    if not isinstance(parameters, dict):
-        raise HTTPException(status_code=400, detail="parameters must be a dict")
+    """Start a new ingestion job."""
+    job_type = body.job_type
+    parameters = body.parameters
 
     runner = _get_runner()
     try:

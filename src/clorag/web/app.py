@@ -239,7 +239,13 @@ async def lifespan(app: FastAPI):
 
 
 # Initialize FastAPI app with lifespan
-app = FastAPI(title="Cyanview AI Search", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="Cyanview AI Search",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+)
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
