@@ -81,7 +81,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
         SSE streaming endpoints are exempt from timeout.
         """
         # Skip timeout for SSE log streaming endpoints
-        if "/logs/stream" in request.url.path:
+        if "/logs/stream" in request.url.path or "/v1/chat/completions" in request.url.path:
             return await call_next(request)
 
         try:
@@ -291,6 +291,7 @@ app.add_middleware(
         "X-Admin-Password",
         "X-CSRF-Token",
         "X-Requested-With",
+        "Authorization",
     ],
 )
 

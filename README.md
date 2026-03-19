@@ -71,19 +71,21 @@ CLORAG is a production-ready Multi-RAG agent designed to power Cyanview's techni
 | **Dark Mode** | Toggle dark theme with localStorage persistence |
 | **Token-Aware Chunking** | Configurable tiktoken-based chunking by content type |
 | **Performance Monitoring** | Real-time metrics with percentile stats and alerts |
+| **RAG Settings** | 20 tuning parameters editable at runtime via admin UI |
+| **OpenAI-Compatible API** | `/v1/chat/completions` endpoint for any OpenAI SDK client |
 
 ### Technology Stack
 
 | Component | Technology |
 |-----------|------------|
 | **Orchestration** | Claude Agent SDK 0.1.9+ |
-| **LLM Synthesis** | Claude Sonnet 4.5 (streaming) |
+| **LLM Synthesis** | Claude Sonnet 4.6 (streaming) |
 | **Dense Embeddings** | Voyage AI (voyage-context-3, 1024-dim) |
 | **Sparse Embeddings** | FastEmbed BM25 |
 | **Reranking** | Voyage AI (rerank-2.5) |
 | **Vector Database** | Qdrant (hybrid search) |
 | **Graph Database** | Neo4j (optional GraphRAG) |
-| **Relational Database** | SQLite (cameras, analytics, support cases, prompts) |
+| **Relational Database** | SQLite (cameras, analytics, support cases, prompts, settings) |
 | **Web Framework** | FastAPI + Jinja2 |
 | **Web Scraping** | Jina Reader (BeautifulSoup fallback) |
 | **Package Manager** | uv |
@@ -155,7 +157,7 @@ The RAG system processes queries through a multi-stage pipeline optimized for ac
                                     ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                         ANSWER SYNTHESIS                                     │
-│                    Claude Sonnet 4.5 (streaming)                             │
+│                    Claude Sonnet 4.6 (streaming)                             │
 │          • Warm, professional Cyanview support tone                          │
 │          • Conversation context (last 3 Q&A)                                 │
 │          • Related documentation links                                       │
@@ -293,7 +295,7 @@ Fetches and processes Docusaurus documentation pages:
 - BeautifulSoup fallback on 429/503 errors
 - Token-based chunking (450 tokens for docs)
 - RIO terminology auto-correction before embedding
-- Camera extraction post-ingestion via Claude Haiku
+- Camera extraction post-ingestion via Claude Sonnet
 
 ```bash
 uv run ingest-docs                    # Full ingestion
@@ -324,7 +326,7 @@ A 7-step pipeline processes Gmail threads into high-quality knowledge:
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  STEP 3: HAIKU ANALYSIS (parallel processing)                               │
+│  STEP 3: SONNET ANALYSIS (parallel processing)                               │
 │  Extract: problem summary, solution steps, keywords, confidence, status     │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -337,7 +339,7 @@ A 7-step pipeline processes Gmail threads into high-quality knowledge:
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  STEP 5: SONNET QC (quality control)                                        │
-│  Refine and validate Haiku extractions                                      │
+│  Refine and validate Sonnet extractions                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -474,6 +476,7 @@ CHUNK_ADAPTIVE_THRESHOLD=200                  # Single-chunk threshold
 SEARXNG_URL=https://search.sapti.me           # Web search augmentation
 SECURE_COOKIES=true                           # Set false for local dev
 PROMPTS_CACHE_TTL=300                         # Prompt cache TTL (seconds)
+OPENAI_COMPAT_API_KEY=your_api_key           # OpenAI-compatible API Bearer token
 ```
 
 ---
@@ -526,6 +529,14 @@ uv run init-prompts --list                    # List all prompts
 uv run init-prompts --stats                   # Show statistics
 ```
 
+#### RAG Settings Management
+```bash
+uv run init-settings                          # Initialize settings database
+uv run init-settings --list                   # List all settings by category
+uv run init-settings --stats                  # Show statistics
+uv run init-settings --force                  # Reset all to defaults
+```
+
 #### Quality Checks
 ```bash
 uv run ruff check src/                        # Linting
@@ -556,6 +567,9 @@ uv run pytest                                 # Tests
 | `/admin/chunks` | Vector chunk browser/editor |
 | `/admin/graph` | Knowledge Graph Explorer |
 | `/admin/prompts` | LLM prompt editor with version history |
+| `/admin/settings` | RAG tuning parameters (thresholds, caches, etc.) |
+| `/admin/ingestion` | Start, monitor, and review ingestion jobs |
+| `/admin/metrics` | Performance metrics with percentile stats |
 | `/admin/terminology-fixes` | RIO terminology review |
 | `/admin/search-debug` | Debug RAG: chunks, prompts, timing |
 | `/admin/docs` | Technical documentation |
@@ -577,6 +591,32 @@ uv run pytest                                 # Tests
   "session_id": "uuid-from-previous-response"
 }
 ```
+
+#### OpenAI-Compatible API
+
+Any OpenAI SDK client can query CLORAG by setting `OPENAI_COMPAT_API_KEY`:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/v1/chat/completions` | Chat completions (streaming + non-streaming) |
+| `GET` | `/v1/models` | List available models |
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://cyanview.cloud",
+    api_key="your_openai_compat_api_key",
+)
+
+response = client.chat.completions.create(
+    model="clorag",
+    messages=[{"role": "user", "content": "How to configure RIO?"}],
+)
+print(response.choices[0].message.content)
+```
+
+The last user message becomes the RAG search query. Prior messages are forwarded as conversation history. Sources are appended as markdown links.
 
 #### Camera Endpoints (Public)
 
@@ -600,6 +640,7 @@ See the [API documentation](/admin/docs) for complete admin endpoint reference i
 - Draft management
 - Support cases
 - Prompt management
+- RAG settings management
 
 ---
 
@@ -640,6 +681,31 @@ All 11 LLM prompts are stored in SQLite and editable via admin UI:
 - Variable substitution with `{placeholder}` syntax
 - In-memory caching with configurable TTL
 - Fallback to hardcoded defaults
+
+### RAG Settings
+
+20 fine-tuning parameters configurable at runtime via `/admin/settings`:
+
+| Category | Parameters | Examples |
+|----------|-----------|----------|
+| `retrieval` | 7 | Score thresholds (short/medium/long query), technical term bonus, overfetch multiplier, min guaranteed results |
+| `reranking` | 2 | Top-K, source diversity threshold |
+| `synthesis` | 4 | Max tokens, context total/group budget, max chunks |
+| `caches` | 5 | Query embedding, sparse, reranker, camera DB cache sizes and TTL (require restart) |
+| `prefetch` | 2 | Prefetch multiplier and max limit |
+
+**Features:**
+- Version history for every change with rollback
+- Type validation (int/float/bool) with min/max bounds
+- In-memory caching with TTL, hot reload via API
+- Fallback to hardcoded defaults if DB unavailable
+- "Requires restart" badge on cache size parameters
+
+**API usage:**
+```python
+from clorag.services.settings_manager import get_setting
+threshold = get_setting("retrieval.short_query_threshold")  # returns 0.15
+```
 
 ---
 
@@ -725,6 +791,7 @@ clorag/
 │   │   ├── analytics_db.py        # Analytics SQLite
 │   │   ├── support_case_db.py     # Support cases SQLite
 │   │   ├── prompt_db.py           # Prompts SQLite
+│   │   ├── settings_db.py         # RAG settings SQLite
 │   │   ├── terminology_db.py      # RIO terminology fixes SQLite
 │   │   ├── cache.py               # Generic LRU cache with TTL
 │   │   └── metrics.py             # Performance instrumentation
@@ -734,7 +801,7 @@ clorag/
 │   │   └── prompts.py             # System prompts
 │   │
 │   ├── analysis/                  # LLM analysis
-│   │   ├── thread_analyzer.py     # Haiku classification
+│   │   ├── thread_analyzer.py     # Sonnet classification
 │   │   ├── quality_controller.py  # Sonnet QC
 │   │   ├── camera_extractor.py    # Camera info extraction
 │   │   └── rio_analyzer.py        # RIO terminology analysis
@@ -752,7 +819,9 @@ clorag/
 │   ├── services/                  # Business logic
 │   │   ├── custom_docs.py         # Document CRUD
 │   │   ├── prompt_manager.py      # Prompt management
-│   │   └── default_prompts.py     # Hardcoded defaults
+│   │   ├── default_prompts.py     # Hardcoded prompt defaults
+│   │   ├── settings_manager.py    # RAG settings management
+│   │   └── default_settings.py    # Hardcoded settings defaults
 │   │
 │   ├── drafts/                    # Auto-reply system
 │   │   ├── gmail_service.py       # Gmail API
@@ -775,15 +844,16 @@ clorag/
 │   ├── web/                       # FastAPI application
 │   │   ├── app.py                 # Middleware and app init
 │   │   ├── routers/               # API routes by domain
-│   │   │   ├── admin/             # Admin endpoints (12 files)
+│   │   │   ├── admin/             # Admin endpoints (13 files)
 │   │   │   ├── cameras.py         # Camera API
+│   │   │   ├── openai_compat.py   # OpenAI-compatible API
 │   │   │   ├── pages.py           # Page routes
 │   │   │   └── search.py          # Search API
 │   │   ├── auth/                  # Authentication module
 │   │   ├── schemas.py             # Request/response models
 │   │   ├── search/                # Search pipeline
 │   │   ├── dependencies.py        # FastAPI dependencies
-│   │   ├── templates/             # Jinja2 templates (29 files)
+│   │   ├── templates/             # Jinja2 templates (34 files)
 │   │   └── static/                # CSS, JS assets
 │   │
 │   └── scripts/                   # CLI scripts
@@ -792,6 +862,7 @@ clorag/
 │       ├── populate_graph.py
 │       ├── draft_support.py
 │       ├── fix_rio_terminology.py
+│       ├── init_settings.py
 │       └── run_web.py
 │
 ├── tests/                         # Test suite

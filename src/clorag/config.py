@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # API Keys
     anthropic_api_key: SecretStr = Field(..., description="Anthropic API key")
     voyage_api_key: SecretStr = Field(..., description="Voyage AI API key")
+    openai_compat_api_key: SecretStr | None = Field(
+        default=None, description="API key for OpenAI-compatible endpoint (Bearer token)"
+    )
 
     # Qdrant
     qdrant_url: str = Field(default="http://localhost:6333", description="Qdrant server URL")

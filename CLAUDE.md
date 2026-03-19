@@ -17,7 +17,6 @@ Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion
 uv sync                                    # Install dependencies
 uv run rag-web                             # Web server (port 8080)
 uv run clorag "query"                      # CLI agent
-uv run clorag-mcp                          # MCP server for Claude Desktop
 
 # Ingestion
 uv run ingest-docs                         # Docusaurus documentation
@@ -34,6 +33,14 @@ uv run fix-rio-terminology --apply         # Apply approved fixes
 uv run init-prompts                        # Initialize prompt database with defaults
 uv run init-prompts --list                 # List all prompts
 uv run init-prompts --stats                # Show prompt database stats
+uv run init-settings                       # Initialize RAG settings with defaults
+uv run init-settings --list                # List all settings by category
+uv run init-settings --stats               # Show settings database stats
+uv run archive-collection                  # Archive a Qdrant collection
+
+# MCP Server
+uv run clorag-mcp                          # MCP server (stdio transport)
+uv run clorag-mcp-http                     # MCP server (HTTP transport, port 8080)
 
 # Quality
 uv run ruff check src/ && uv run mypy src/clorag --strict
@@ -50,7 +57,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 ### Source Layout
 
-**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Sonnet), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool), `prompt_db.py` (LLM prompts SQLite with version history), `terminology_db.py` (RIO terminology fixes SQLite storage), `cache.py` (generic thread-safe LRU cache with TTL)
+**Core** (`core/`): `vectorstore.py` (AsyncQdrantClient, RRF fusion, dynamic prefetch, document-context operations via `get_chunks_by_field()`), `embeddings.py` (voyage-context-3 with contextualized_embed API), `sparse_embeddings.py` (BM25 with cache), `reranker.py` (Voyage rerank-2.5 cross-encoder), `metrics.py` (performance instrumentation), `retriever.py` (MultiSourceRetriever with reranking), `graph_store.py` (Neo4j), `entity_extractor.py` (Sonnet), `database.py` (camera SQLite with connection pool), `analytics_db.py`, `support_case_db.py` (support cases SQLite with FTS5 and connection pool), `prompt_db.py` (LLM prompts SQLite with version history), `settings_db.py` (RAG settings SQLite with version history), `ingestion_db.py` (ingestion job history SQLite), `terminology_db.py` (RIO terminology fixes SQLite storage), `cache.py` (generic thread-safe LRU cache with TTL)
 
 **Ingestion** (`ingestion/`): `curated_gmail.py` (7-step: Fetch→Anonymize→Sonnet→Filter→Sonnet QC→Embed→Store), `docusaurus.py` (sitemap crawler with Jina Reader + BeautifulSoup fallback), `chunker.py`, `base.py`
 
@@ -62,19 +69,19 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Graph** (`graph/`): `schema.py` (Camera, Product, Protocol, Issue, Solution entities), `enrichment.py`
 
-**Services** (`services/`): `custom_docs.py` (CustomDocumentService CRUD), `prompt_manager.py` (LLM prompt management with caching), `default_prompts.py` (hardcoded prompt registry)
+**Services** (`services/`): `custom_docs.py` (CustomDocumentService CRUD), `prompt_manager.py` (LLM prompt management with caching), `default_prompts.py` (hardcoded prompt registry), `settings_manager.py` (RAG settings management with caching), `default_settings.py` (hardcoded settings registry)
 
 **Drafts** (`drafts/`): `gmail_service.py`, `draft_generator.py`, `draft_pipeline.py`
 
 **Web** (`web/`): FastAPI application with modular router architecture
 - `app.py` - Middleware, lifespan, app initialization
-- `routers/` - API routes by domain: `cameras.py`, `pages.py`, `search.py`, `admin/` (12 routers: analytics, auth, cameras, chunks, debug, documents, drafts, graph, prompts, support, terminology)
+- `routers/` - API routes by domain: `cameras.py`, `pages.py`, `search.py`, `admin/` (13 routers: analytics, auth, cameras, chunks, debug, documents, drafts, graph, prompts, settings, support, terminology)
 - `auth/` - Authentication: `admin.py`, `csrf.py`, `sessions.py`
 - `schemas.py` - Request/response Pydantic models
 - `search/` - Search pipeline: `pipeline.py`, `synthesis.py`, `utils.py`
 - `dependencies.py` - FastAPI dependency injection
-- `templates/` - 30 Jinja2 templates including `/admin/docs` (10 doc pages)
-- Admin UI at `/admin/{cameras,cameras-list,knowledge,analytics,drafts,chunks,graph,support-cases,prompts,terminology-fixes}`, REST APIs at `/api/`
+- `templates/` - 34 Jinja2 templates including `/admin/docs` (11 doc pages)
+- Admin UI at `/admin/{cameras,cameras-list,knowledge,analytics,metrics,drafts,chunks,graph,support-cases,prompts,settings,ingestion,terminology-fixes}`, REST APIs at `/api/`
 
 **Models** (`models/`): `camera.py`, `custom_document.py` (10 categories), `support_case.py`
 
@@ -105,6 +112,7 @@ Environment variables (see `.env.example`):
 - `CHUNK_SIZE_DEFAULT` (default: `400`) - Default chunk size (tokens)
 - `CHUNK_OVERLAP` (default: `50`) - Chunk overlap (~12.5%)
 - `CHUNK_ADAPTIVE_THRESHOLD` (default: `200`) - Single-chunk threshold (tokens)
+- `OPENAI_COMPAT_API_KEY` - Optional, enables `/v1/chat/completions` OpenAI-compatible API
 Settings via `clorag.config.get_settings()` (cached singleton).
 
 ## Key Patterns
@@ -112,12 +120,12 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 ### Search & Retrieval
 - **Hybrid search**: Dense + sparse vectors combined via RRF across all collections
 - **Reranking**: Voyage `rerank-2.5` cross-encoder refines top results (+15-40% relevance improvement)
-- **Over-fetch strategy**: Retrieves 3x limit, reranks, returns top-K for optimal quality
+- **Over-fetch strategy**: Retrieves N×limit (configurable, default 3x), reranks, returns top-K for optimal quality
 - **Threshold after reranking**: Dynamic thresholds applied AFTER reranking (calibrated 0-1 scores). RRF scores are uncalibrated and skip threshold filtering without reranking.
 - **Unified threshold logic**: Single `calculate_dynamic_threshold()` in `core/retriever.py` shared by CLI and web pipelines. 30+ technical terms (visca, sdi, hdmi, ndi, srt, ptz, etc.)
-- **Dynamic thresholds**: ≤2 words: 0.15, 3-5: 0.20, >5: 0.25; technical terms +0.05; minimum 3 results
-- **Source diversity**: Post-merge interleaving ensures at least 1 result from each collection with relevant hits (score ≥50% of top result)
-- **Query cache**: LRU caches (200 entries) for embeddings + (100 entries) for reranking
+- **Dynamic thresholds**: ≤2 words: 0.15, 3-5: 0.20, >5: 0.25; technical terms +0.05; minimum 3 results. All values configurable via `/admin/settings`
+- **Source diversity**: Post-merge interleaving ensures at least 1 result from each collection with relevant hits (score ≥ configurable % of top result, default 50%)
+- **Query cache**: LRU caches for embeddings, sparse vectors, and reranking (sizes configurable via admin settings, require restart)
 - **Search quality logging**: Scores + source types logged per query; `/api/admin/search-quality` for low-score review
 - **Contextualized embeddings**: `voyage-context-3` uses `/v1/contextualizedembeddings` API (not `/v1/embeddings`) to encode chunks with full document context
 - **Synthesis grounding**: Prompt instructs "I don't know" on insufficient context; prefers docs over cases on conflicts
@@ -167,7 +175,7 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Parallel embeddings**: Dense + sparse generated concurrently via `asyncio.gather()`
 - **Sparse model preload**: BM25 model loaded at startup to eliminate cold start latency
 - **Async Voyage client**: Non-blocking API calls with `voyageai.AsyncClient`
-- **Dynamic prefetch**: Scales with limit (3x, max 50) for better RRF fusion quality
+- **Dynamic prefetch**: Scales with limit (configurable multiplier and max, default 3x/50) for better RRF fusion quality
 - **Cache stats endpoint**: `/api/admin/cache-stats` for hit/miss rates with recommendations
 - **Metrics endpoint**: `/api/admin/metrics` with thresholds, alerts, and percentile breakdowns
 
@@ -191,6 +199,15 @@ Optional Neo4j knowledge graph with entities (Camera, Product, Protocol, Port, I
 ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 ```
 
+### OpenAI-Compatible API
+- **Endpoint**: `POST /v1/chat/completions` — accepts standard OpenAI `ChatCompletion` request format
+- **Auth**: Bearer token via `OPENAI_COMPAT_API_KEY` env var
+- **Models endpoint**: `GET /v1/models` — returns `clorag` model
+- **Query routing**: Last user message → RAG search query, prior messages → conversation history
+- **Streaming**: `stream: true` returns SSE in OpenAI chunk format (`chat.completion.chunk`)
+- **Sources**: Appended as markdown links at the end of the response
+- **Usage**: Any OpenAI SDK client can connect with `base_url="https://cyanview.cloud"` and `api_key="<OPENAI_COMPAT_API_KEY>"`
+
 ### Custom Documents
 10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search. Sonnet-generated keywords auto-enriched alongside user-provided tags.
 
@@ -203,6 +220,17 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 - **Categories**: agent, analysis, synthesis, drafts, graph, scripts
 - **Configuration**: `PROMPTS_CACHE_TTL` (default: 300 seconds)
 - **API usage**: `pm = get_prompt_manager(); prompt = pm.get_prompt("analysis.thread_analyzer", thread_content="...")`
+
+### RAG Settings
+- **Admin-editable settings**: 20 RAG tuning parameters stored in SQLite, editable via `/admin/settings` without code changes
+- **Version history**: Every value change creates a new version for audit and rollback
+- **Fallback to defaults**: If DB setting not found, falls back to hardcoded defaults in `default_settings.py`
+- **Caching**: In-memory cache with TTL (default: 300s) for performance, hot reload via API
+- **Type-safe getters**: `get_setting(key)` returns typed values (int/float/bool) with validation
+- **Categories**: retrieval (7), reranking (2), synthesis (4), caches (5), prefetch (2)
+- **Restart-required settings**: Cache sizes (query embedding, sparse, reranker, camera DB) read at init time, marked with badge in UI
+- **API usage**: `from clorag.services.settings_manager import get_setting; threshold = get_setting("retrieval.short_query_threshold")`
+- **Integration**: Wired into `retriever.py` (thresholds, overfetch, min results), `vectorstore.py` (prefetch, source diversity), `synthesis.py` (max_tokens), `utils.py` (context budgets), `pipeline.py` (overfetch), cache modules (sizes at init)
 
 ### RIO Product Terminology
 - **RIO**: Generic RIO hardware reference. Use when license is NOT relevant: physical dimensions, ports, grounding, power, wiring, mounting, weight
@@ -226,7 +254,21 @@ ssh root@cyanview.cloud "cd /opt/clorag && docker compose build && docker compos
 
 Production: https://cyanview.cloud/ (Docker maps 8085→8080)
 
-## Recent Updates (2026-03-16)
+## Recent Updates (2026-03-18)
+
+### v0.10.0: Admin UI for RAG Settings
+
+- **RAG settings admin**: 20 tuning parameters configurable at runtime via `/admin/settings` without code changes or redeployment
+- **5 parameter categories**: Retrieval (thresholds, overfetch, min results), Reranking (top_k, source diversity), Synthesis (max_tokens, context budgets), Caches (embedding/reranker/camera sizes), Prefetch (multiplier, max limit)
+- **Database layer**: `settings_db.py` with `settings` + `setting_versions` tables, mirrors `prompt_db.py` pattern
+- **Service layer**: `settings_manager.py` with TTL cache, typed getters (`get_setting(key)`), fallback to defaults
+- **Admin UI**: Category filter tabs, inline edit per setting, version history modal, rollback, "Requires restart" badges
+- **Integration**: All 20 parameters wired into existing code with try/except fallbacks for graceful degradation
+- **New endpoints**: `GET/PUT /api/admin/settings/*`, `POST initialize/reload/rollback`
+- **New CLI**: `uv run init-settings` (--list, --stats, --force, --export)
+- **New schemas**: `SettingUpdateRequest`, `SettingRollbackRequest`
+- **Navbar**: Settings link added to all 16 admin templates
+- **Dashboard**: Settings card added to admin index
 
 ### v0.9.0: Camera Merge, Dark Mode, Animations
 
@@ -287,10 +329,11 @@ web/
     ├── cameras.py      # Public camera API (/api/cameras)
     ├── pages.py        # Page routes (/, /cameras, /help, /admin/*)
     ├── search.py       # Search API (/api/search, /api/search/stream)
-    └── admin/          # 11 admin routers under /api/admin
+    └── admin/          # 13 admin routers under /api/admin
         ├── analytics.py, auth.py, cameras.py, chunks.py
         ├── debug.py, documents.py, drafts.py, graph.py
-        ├── prompts.py, support.py, terminology.py
+        ├── ingestion.py, prompts.py, settings.py
+        ├── support.py, terminology.py
 ```
 
 ### New Core Module: Generic Cache

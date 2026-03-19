@@ -102,6 +102,7 @@
                         <li><a href="/admin/docs/content" class="docs-nav__link docs-nav__link--page">Content Management</a></li>
                         <li><a href="/admin/docs/features" class="docs-nav__link docs-nav__link--page">Features</a></li>
                         <li><a href="/admin/docs/api" class="docs-nav__link docs-nav__link--page docs-nav__link--active">API Reference</a></li>
+                        <li><a href="/admin/docs/mcp" class="docs-nav__link docs-nav__link--page">MCP Server</a></li>
                         <li><a href="/admin/docs/security" class="docs-nav__link docs-nav__link--page">Security</a></li>
                         <li><a href="/admin/docs/operations" class="docs-nav__link docs-nav__link--page">Operations</a></li>
                         <li><a href="/admin/docs/commands" class="docs-nav__link docs-nav__link--page">CLI Commands</a></li>
@@ -119,6 +120,7 @@
                         <li><a href="#support-cases-api" class="docs-nav__link">Support Cases API</a></li>
                         <li><a href="#analytics-api" class="docs-nav__link">Analytics API</a></li>
                         <li><a href="#draft-api" class="docs-nav__link">Draft API</a></li>
+                        <li><a href="#openai-api" class="docs-nav__link">OpenAI-Compatible API</a></li>
                         <li><a href="#errors" class="docs-nav__link">Error Handling</a></li>
                     </ul>
                 </div>
@@ -425,6 +427,69 @@ curl https://cyanview.cloud/api/admin/search-stats \
                     <span class="endpoint__path">/api/admin/drafts/run</span>
                 </div>
                 <p>Run the full draft pipeline for all pending threads.</p>
+
+                <h2 id="openai-api">OpenAI-Compatible API</h2>
+
+                <p>CLORAG exposes an OpenAI-compatible API that allows any OpenAI SDK client to query the RAG system. Requires <code>OPENAI_COMPAT_API_KEY</code> environment variable to be set.</p>
+
+                <h3>Authentication</h3>
+                <p>All requests require a Bearer token matching the configured <code>OPENAI_COMPAT_API_KEY</code>:</p>
+                <pre><code>Authorization: Bearer your_api_key_here</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/v1/chat/completions</span>
+                </div>
+                <p>OpenAI-compatible chat completions. The last user message becomes the RAG search query. Prior user/assistant pairs are forwarded as conversation history. System messages are accepted but ignored.</p>
+                <pre><code>{
+  "model": "clorag",
+  "messages": [
+    {"role": "user", "content": "How to configure RIO IP address?"}
+  ],
+  "stream": false
+}</code></pre>
+                <p>Response follows the standard OpenAI <code>ChatCompletion</code> format with sources appended as markdown links:</p>
+                <pre><code>{
+  "id": "chatcmpl-abc123...",
+  "object": "chat.completion",
+  "created": 1714000000,
+  "model": "clorag",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "Here is how to configure...\n\n---\n**Sources:**\n- [RIO Guide](https://...)"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+}</code></pre>
+                <p>Set <code>"stream": true</code> for SSE streaming in OpenAI chunk format (<code>chat.completion.chunk</code>).</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/v1/models</span>
+                </div>
+                <p>List available models. Returns the <code>clorag</code> model.</p>
+
+                <h3>Python SDK Example</h3>
+                <pre><code>from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://cyanview.cloud",
+    api_key="your_openai_compat_api_key",
+)
+
+response = client.chat.completions.create(
+    model="clorag",
+    messages=[{"role": "user", "content": "How to configure RIO?"}],
+)
+print(response.choices[0].message.content)</code></pre>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Accepted but Ignored Parameters</div>
+                    <p><code>temperature</code>, <code>top_p</code>, <code>max_tokens</code>, <code>max_completion_tokens</code>, <code>frequency_penalty</code>, <code>presence_penalty</code>, <code>n</code>, and <code>user</code> are accepted without error but have no effect — CLORAG controls its own RAG synthesis parameters.</p>
+                </div>
 
                 <h2 id="errors">Error Handling</h2>
                 <table>
