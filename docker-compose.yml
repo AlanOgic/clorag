@@ -4,7 +4,7 @@ services:
     container_name: clorag-web
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8085:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - QDRANT_URL=${QDRANT_URL}
       - QDRANT_API_KEY=${QDRANT_API_KEY}
@@ -26,6 +26,35 @@ services:
       - ./credentials.json:/app/credentials.json:ro
       - ./token.json:/app/token.json
       - ./token_drafts.json:/app/token_drafts.json
+    networks:
+      - clorag-network
+    depends_on:
+      - neo4j
+
+  clorag-mcp:
+    build: .
+    container_name: clorag-mcp
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8086:8080"
+    command: ["python", "-m", "clorag.mcp.server", "--http"]
+    environment:
+      - QDRANT_URL=${QDRANT_URL}
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - QDRANT_DOCS_COLLECTION=${QDRANT_DOCS_COLLECTION:-docusaurus_docs}
+      - QDRANT_CASES_COLLECTION=${QDRANT_CASES_COLLECTION:-gmail_cases}
+      - VOYAGE_DIMENSIONS=${VOYAGE_DIMENSIONS:-1024}
+      - DATABASE_PATH=${DATABASE_PATH:-data/clorag.db}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ANALYTICS_DATABASE_PATH=${ANALYTICS_DATABASE_PATH:-data/analytics.db}
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
+    volumes:
+      - ./data:/app/data
     networks:
       - clorag-network
     depends_on:

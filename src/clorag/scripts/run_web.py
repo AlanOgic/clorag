@@ -1,14 +1,18 @@
 """Run the RAG search web server."""
 
+import os
+
 import uvicorn
 
 
 def main() -> None:
     """Run the FastAPI web server."""
+    host = os.environ.get("WEB_HOST", "127.0.0.1")
+    port = int(os.environ.get("WEB_PORT", "8080"))
     uvicorn.run(
         "clorag.web:app",
-        host="0.0.0.0",
-        port=8080,
+        host=host,
+        port=port,
         reload=True,
         log_level="info",
     )

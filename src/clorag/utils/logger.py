@@ -15,7 +15,7 @@ def setup_logging(level: str = "INFO") -> None:
     # Configure standard logging
     logging.basicConfig(
         format="%(message)s",
-        stream=sys.stdout,
+        stream=sys.stderr,
         level=getattr(logging, level.upper()),
     )
 
