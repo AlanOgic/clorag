@@ -36,7 +36,10 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="retrieval.short_query_threshold",
         name="Short Query Threshold",
-        description="Score threshold for queries with ≤2 words",
+        description=(
+            "Minimum relevance score for short queries (1–2 words like"
+            " 'RIO' or 'tally'). Lower = more results, higher = stricter."
+        ),
         category="retrieval",
         value_type="float",
         default_value="0.15",
@@ -47,7 +50,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="retrieval.medium_query_threshold",
         name="Medium Query Threshold",
-        description="Score threshold for queries with 3-5 words",
+        description=(
+            "Minimum relevance score for medium queries (3–5 words like"
+            " 'RIO firmware update'). Higher because more words give"
+            " better signal."
+        ),
         category="retrieval",
         value_type="float",
         default_value="0.20",
@@ -58,7 +65,10 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="retrieval.long_query_threshold",
         name="Long Query Threshold",
-        description="Score threshold for queries with >5 words",
+        description=(
+            "Minimum relevance score for detailed queries (6+ words)."
+            " Strictest threshold — long queries should match precisely."
+        ),
         category="retrieval",
         value_type="float",
         default_value="0.25",
@@ -69,7 +79,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="retrieval.technical_term_bonus",
         name="Technical Term Bonus",
-        description="Score bonus added when query contains technical terms",
+        description=(
+            "Extra score added to threshold when the query contains"
+            " technical terms (VISCA, SDI, HDMI, NDI…). Makes filtering"
+            " stricter for specific technical questions."
+        ),
         category="retrieval",
         value_type="float",
         default_value="0.05",
@@ -80,7 +94,10 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="retrieval.max_threshold_cap",
         name="Max Threshold Cap",
-        description="Maximum allowed threshold value after bonuses",
+        description=(
+            "Upper limit for the threshold after all bonuses. Prevents"
+            " over-filtering that would return too few results."
+        ),
         category="retrieval",
         value_type="float",
         default_value="0.30",
@@ -91,7 +108,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="retrieval.min_guaranteed_results",
         name="Min Guaranteed Results",
-        description="Minimum results returned even below threshold",
+        description=(
+            "Always return at least this many results, even if scores"
+            " fall below the threshold. Safety net so users never get"
+            " an empty answer."
+        ),
         category="retrieval",
         value_type="int",
         default_value="3",
@@ -102,7 +123,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="retrieval.overfetch_multiplier",
         name="Overfetch Multiplier",
-        description="Multiplier for over-fetching before reranking (e.g. 3 = fetch 3x limit)",
+        description=(
+            "How many extra results to fetch before reranking trims them."
+            " 3× means fetch 30 to pick the best 10. Higher = better"
+            " quality but slower."
+        ),
         category="retrieval",
         value_type="int",
         default_value="3",
@@ -116,7 +141,10 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="reranking.top_k",
         name="Rerank Top-K",
-        description="Number of top results to return after reranking",
+        description=(
+            "How many results to keep after the reranker scores them."
+            " These are the chunks sent to Claude for answer synthesis."
+        ),
         category="reranking",
         value_type="int",
         default_value="5",
@@ -127,7 +155,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="reranking.source_diversity_threshold",
         name="Source Diversity Threshold",
-        description="Minimum score ratio (vs top result) for source diversity injection",
+        description=(
+            "Ensures results include docs, cases, and custom docs — not"
+            " just one source. A result qualifies if its score is at"
+            " least this fraction of the top result (0.5 = 50%)."
+        ),
         category="reranking",
         value_type="float",
         default_value="0.5",
@@ -141,7 +173,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="synthesis.max_tokens",
         name="Max Tokens",
-        description="Maximum tokens for Claude synthesis response",
+        description=(
+            "Maximum length of Claude's answer (~750 words at 1500"
+            " tokens). Increase for complex answers, decrease for"
+            " snappier replies."
+        ),
         category="synthesis",
         value_type="int",
         default_value="1500",
@@ -152,7 +188,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="synthesis.context_total_budget",
         name="Context Total Budget",
-        description="Maximum total characters across all context groups",
+        description=(
+            "Total character budget for all context sent to Claude."
+            " Shared across docs, cases, and custom docs. Larger = more"
+            " context but higher cost and latency."
+        ),
         category="synthesis",
         value_type="int",
         default_value="12000",
@@ -163,7 +203,10 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="synthesis.context_group_budget",
         name="Context Group Budget",
-        description="Maximum characters per source group in context",
+        description=(
+            "Character budget per source type (docs, cases, custom)."
+            " Prevents one source from dominating the context window."
+        ),
         category="synthesis",
         value_type="int",
         default_value="4000",
@@ -174,7 +217,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="synthesis.max_chunks",
         name="Max Chunks",
-        description="Maximum chunks included in synthesis context",
+        description=(
+            "Maximum text chunks passed to Claude. Each chunk is a"
+            " section of a document or support case. Diminishing returns"
+            " past 8–10."
+        ),
         category="synthesis",
         value_type="int",
         default_value="8",
@@ -188,7 +235,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="caches.query_embedding_size",
         name="Query Embedding Cache Size",
-        description="Max entries in query embedding LRU cache",
+        description=(
+            "Recent query embeddings kept in memory. Cache hits skip the"
+            " Voyage API call, saving ~200ms per search. Increase for"
+            " high traffic."
+        ),
         category="caches",
         value_type="int",
         default_value="200",
@@ -199,7 +250,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="caches.sparse_embedding_size",
         name="Sparse Embedding Cache Size",
-        description="Max entries in sparse (BM25) embedding LRU cache",
+        description=(
+            "Recent BM25 sparse vectors kept in memory. Used alongside"
+            " dense embeddings for hybrid search. Cache hits save ~50ms"
+            " per search."
+        ),
         category="caches",
         value_type="int",
         default_value="200",
@@ -210,7 +265,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="caches.reranker_size",
         name="Reranker Cache Size",
-        description="Max entries in reranker result LRU cache",
+        description=(
+            "Recent reranker results kept in memory. Cache hits skip"
+            " the Voyage rerank API, saving ~300ms. Same query + same"
+            " docs = cache hit."
+        ),
         category="caches",
         value_type="int",
         default_value="100",
@@ -221,7 +280,10 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="caches.camera_db_size",
         name="Camera DB Cache Size",
-        description="Max entries in camera database LRU cache",
+        description=(
+            "Camera database query results kept in memory. Speeds up"
+            " the /cameras page and camera search API."
+        ),
         category="caches",
         value_type="int",
         default_value="200",
@@ -232,7 +294,10 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="caches.camera_db_ttl",
         name="Camera DB Cache TTL",
-        description="Time-to-live in seconds for camera database cache",
+        description=(
+            "How long camera data stays cached before refresh (seconds)."
+            " 300s = 5 min. Lower if camera data changes frequently."
+        ),
         category="caches",
         value_type="int",
         default_value="300",
@@ -246,7 +311,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="prefetch.multiplier",
         name="Prefetch Multiplier",
-        description="Multiplier for Qdrant prefetch candidate count (limit × multiplier)",
+        description=(
+            "Candidates Qdrant fetches per vector type before RRF merge."
+            " 3× with limit 10 = 30 candidates per collection. Higher ="
+            " better fusion quality."
+        ),
         category="prefetch",
         value_type="int",
         default_value="3",
@@ -257,7 +326,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
     SettingDefinition(
         key="prefetch.max_limit",
         name="Prefetch Max Limit",
-        description="Maximum prefetch limit cap to avoid excessive retrieval",
+        description=(
+            "Hard cap on prefetch candidates regardless of multiplier."
+            " Prevents excessive memory usage. 50 is safe for most"
+            " deployments."
+        ),
         category="prefetch",
         value_type="int",
         default_value="50",
