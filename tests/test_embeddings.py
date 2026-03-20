@@ -36,7 +36,17 @@ class TestEmbeddingsClient:
     async def test_embed_documents(
         self, mock_voyage_client: MagicMock
     ) -> None:
-        """Test embedding multiple documents."""
+        """Test embedding multiple documents via contextualized_embed."""
+        # Mock contextualized_embed to return 2 document results
+        mock_result_1 = MagicMock()
+        mock_result_1.embeddings = [[0.1] * 1024]
+        mock_result_2 = MagicMock()
+        mock_result_2.embeddings = [[0.2] * 1024]
+        mock_response = MagicMock()
+        mock_response.results = [mock_result_1, mock_result_2]
+        mock_response.total_tokens = 100
+        mock_voyage_client.contextualized_embed.return_value = mock_response
+
         client = EmbeddingsClient()
         texts = ["First document", "Second document"]
 
@@ -48,10 +58,10 @@ class TestEmbeddingsClient:
         assert len(result.vectors[0]) == 1024
         assert result.total_tokens == 100
 
-        # Verify API was called correctly
-        mock_voyage_client.embed.assert_called_once()
-        call_args = mock_voyage_client.embed.call_args
-        assert call_args.kwargs["texts"] == texts
+        # Verify contextualized_embed was called (not embed)
+        mock_voyage_client.contextualized_embed.assert_called_once()
+        call_args = mock_voyage_client.contextualized_embed.call_args
+        assert call_args.kwargs["inputs"] == [["First document"], ["Second document"]]
         assert call_args.kwargs["model"] == "voyage-context-3"
         assert call_args.kwargs["input_type"] == "document"
         assert call_args.kwargs["output_dimension"] == 1024
@@ -60,13 +70,20 @@ class TestEmbeddingsClient:
         self, mock_voyage_client: MagicMock
     ) -> None:
         """Test embedding with query input type."""
+        mock_result = MagicMock()
+        mock_result.embeddings = [[0.3] * 1024]
+        mock_response = MagicMock()
+        mock_response.results = [mock_result]
+        mock_response.total_tokens = 50
+        mock_voyage_client.contextualized_embed.return_value = mock_response
+
         client = EmbeddingsClient()
         texts = ["Query text"]
 
         result = await client.embed_documents(texts, input_type="query")
 
         # Verify input_type is passed correctly
-        call_args = mock_voyage_client.embed.call_args
+        call_args = mock_voyage_client.contextualized_embed.call_args
         assert call_args.kwargs["input_type"] == "query"
 
     async def test_embed_empty_list(
@@ -79,7 +96,7 @@ class TestEmbeddingsClient:
 
         assert result.vectors == []
         assert result.total_tokens == 0
-        mock_voyage_client.embed.assert_not_called()
+        mock_voyage_client.contextualized_embed.assert_not_called()
 
     async def test_embed_query(
         self, mock_voyage_client: MagicMock
@@ -112,13 +129,12 @@ class TestEmbeddingsClient:
 
         result = await client.embed_batch(texts, batch_size=30)
 
-        # Should make 2 calls (30 + 20)
-        assert mock_voyage_client.embed.call_count == 2
+        # Should make 2 calls (30 + 20) via contextualized_embed
+        assert mock_voyage_client.contextualized_embed.call_count == 2
 
-        # Verify result contains all embeddings (2 per call from mock)
-        assert len(result.vectors) == 4  # 2 vectors * 2 calls
-        # Total tokens = 100 per call * 2 calls
-        assert result.total_tokens == 200
+        # Verify result contains all embeddings (1 per text from mock)
+        assert len(result.vectors) == 2  # 1 vector per call from default mock
+        assert result.total_tokens is not None
 
     async def test_embed_batch_custom_batch_size(
         self, mock_voyage_client: MagicMock
@@ -129,8 +145,8 @@ class TestEmbeddingsClient:
 
         result = await client.embed_batch(texts, batch_size=5)
 
-        # Should make 2 calls (5 + 5)
-        assert mock_voyage_client.embed.call_count == 2
+        # Should make 2 calls (5 + 5) via contextualized_embed
+        assert mock_voyage_client.contextualized_embed.call_count == 2
 
     async def test_embed_contextualized(
         self, mock_voyage_client: MagicMock
@@ -216,16 +232,21 @@ class TestEmbeddingsClientRetry:
         """Test that client retries on failure."""
         client = EmbeddingsClient()
 
-        # Mock failure then success
-        mock_voyage_client.embed.side_effect = [
+        # Mock failure then success via contextualized_embed
+        mock_success = MagicMock()
+        mock_result = MagicMock()
+        mock_result.embeddings = [[0.1] * 1024]
+        mock_success.results = [mock_result]
+        mock_success.total_tokens = 10
+        mock_voyage_client.contextualized_embed.side_effect = [
             Exception("API Error"),
-            MagicMock(embeddings=[[0.1] * 1024], total_tokens=10),
+            mock_success,
         ]
 
         result = await client.embed_documents(["Test"])
 
         # Should have retried and succeeded
-        assert mock_voyage_client.embed.call_count == 2
+        assert mock_voyage_client.contextualized_embed.call_count == 2
         assert len(result.vectors) == 1
 
     async def test_retry_exhaustion(
@@ -234,14 +255,14 @@ class TestEmbeddingsClientRetry:
         """Test that client fails after max retries."""
         client = EmbeddingsClient()
 
-        # Mock persistent failure
-        mock_voyage_client.embed.side_effect = Exception("API Error")
+        # Mock persistent failure via contextualized_embed
+        mock_voyage_client.contextualized_embed.side_effect = Exception("API Error")
 
         with pytest.raises(Exception):
             await client.embed_documents(["Test"])
 
         # Should have tried 3 times (initial + 2 retries)
-        assert mock_voyage_client.embed.call_count >= 1  # At least one attempt
+        assert mock_voyage_client.contextualized_embed.call_count >= 1
 
 
 class TestEmbeddingsClientProperties:

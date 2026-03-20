@@ -51,6 +51,25 @@ def mock_services() -> MagicMock:
     services.document_service.get_document = AsyncMock()
     services.document_service.get_categories = AsyncMock()
 
+    # Vectorstore (async)
+    services.vectorstore = MagicMock()
+    services.vectorstore.get_chunk = AsyncMock()
+    services.vectorstore.delete_chunk = AsyncMock()
+
+    # Embeddings (async)
+    services.embeddings = MagicMock()
+    services.embeddings.embed = AsyncMock()
+
+    # Sparse embeddings (async)
+    services.sparse_embeddings = MagicMock()
+    services.sparse_embeddings.embed = AsyncMock()
+
+    # Prompt manager (sync)
+    services.prompt_manager = MagicMock()
+
+    # Analytics DB (sync)
+    services.analytics_db = MagicMock()
+
     return services
 
 
@@ -162,10 +181,14 @@ class TestServerCreation:
     @patch("clorag.mcp.server.register_camera_tools")
     @patch("clorag.mcp.server.register_document_tools")
     @patch("clorag.mcp.server.register_support_tools")
+    @patch("clorag.mcp.server.register_chunk_tools")
+    @patch("clorag.mcp.server.register_prompt_tools")
+    @patch("clorag.mcp.server.register_ingestion_tools")
     def test_create_mcp_server_registers_all_tools(
-        self, mock_support, mock_docs, mock_cameras, mock_search
+        self, mock_ingestion, mock_prompts, mock_chunks,
+        mock_support, mock_docs, mock_cameras, mock_search,
     ) -> None:
-        """Server creation registers all four tool groups."""
+        """Server creation registers all tool groups."""
         from clorag.mcp.server import create_mcp_server
 
         mcp = create_mcp_server()
@@ -175,11 +198,17 @@ class TestServerCreation:
         mock_cameras.assert_called_once_with(mcp)
         mock_docs.assert_called_once_with(mcp)
         mock_support.assert_called_once_with(mcp)
+        mock_chunks.assert_called_once_with(mcp)
+        mock_prompts.assert_called_once_with(mcp)
+        mock_ingestion.assert_called_once_with(mcp)
 
     @patch("clorag.mcp.server.register_search_tools")
     @patch("clorag.mcp.server.register_camera_tools")
     @patch("clorag.mcp.server.register_document_tools")
     @patch("clorag.mcp.server.register_support_tools")
+    @patch("clorag.mcp.server.register_chunk_tools")
+    @patch("clorag.mcp.server.register_prompt_tools")
+    @patch("clorag.mcp.server.register_ingestion_tools")
     def test_server_has_correct_name(self, *_mocks: Any) -> None:
         """Server is named 'clorag'."""
         from clorag.mcp.server import create_mcp_server
@@ -923,3 +952,194 @@ class TestSupportCaseSerialization:
         )
         d = _case_to_dict(case)
         assert d["resolution_quality"] is None
+
+
+# ===========================================================================
+# Chunk Tools (delete_chunk)
+# ===========================================================================
+
+
+class TestChunkTools:
+    """Tests for chunk management MCP tools."""
+
+    def _register(self, mock_services: MagicMock) -> dict[str, Any]:
+        tools: dict[str, Any] = {}
+
+        def capture_tool():
+            def decorator(fn: Any) -> Any:
+                tools[fn.__name__] = fn
+                return fn
+            return decorator
+
+        mcp = MagicMock()
+        mcp.tool = capture_tool
+
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            from clorag.mcp.tools.chunks import register_chunk_tools
+            register_chunk_tools(mcp)
+
+        return tools
+
+    @pytest.mark.asyncio
+    async def test_delete_chunk_success(self, mock_services: MagicMock) -> None:
+        """delete_chunk() deletes and returns confirmation."""
+        mock_services.vectorstore.get_chunk.return_value = {
+            "id": "chunk-123",
+            "payload": {"text": "some text"},
+        }
+        mock_services.vectorstore.delete_chunk.return_value = True
+
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            tools = self._register(mock_services)
+            result = await tools["delete_chunk"](
+                collection="docs", chunk_id="chunk-123",
+            )
+
+        assert result["status"] == "deleted"
+        assert result["chunk_id"] == "chunk-123"
+        assert result["collection"] == "docusaurus_docs"
+
+    @pytest.mark.asyncio
+    async def test_delete_chunk_not_found(self, mock_services: MagicMock) -> None:
+        """delete_chunk() returns error when chunk doesn't exist."""
+        mock_services.vectorstore.get_chunk.return_value = None
+
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            tools = self._register(mock_services)
+            result = await tools["delete_chunk"](
+                collection="docs", chunk_id="nonexistent",
+            )
+
+        assert "error" in result
+        assert "not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_delete_chunk_invalid_collection(self, mock_services: MagicMock) -> None:
+        """delete_chunk() returns error for invalid collection."""
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            tools = self._register(mock_services)
+            result = await tools["delete_chunk"](
+                collection="invalid", chunk_id="chunk-123",
+            )
+
+        assert "error" in result
+        assert "Invalid collection" in result["error"]
+
+
+# ===========================================================================
+# Prompt Tools
+# ===========================================================================
+
+
+class TestPromptTools:
+    """Tests for prompt management MCP tools."""
+
+    def _register(self, mock_services: MagicMock) -> dict[str, Any]:
+        tools: dict[str, Any] = {}
+
+        def capture_tool():
+            def decorator(fn: Any) -> Any:
+                tools[fn.__name__] = fn
+                return fn
+            return decorator
+
+        mcp = MagicMock()
+        mcp.tool = capture_tool
+
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            from clorag.mcp.tools.prompts import register_prompt_tools
+            register_prompt_tools(mcp)
+
+        return tools
+
+    def test_update_prompt_content(self, mock_services: MagicMock) -> None:
+        """update_prompt() updates content and creates version."""
+        mock_prompt = MagicMock()
+        mock_prompt.to_dict.return_value = {
+            "id": "p-001",
+            "key": "synthesis.web_answer",
+            "name": "Web Answer",
+            "content": "New content with {query}",
+        }
+        mock_services.prompt_manager.update_prompt.return_value = mock_prompt
+        mock_services.prompt_manager.detect_variables.return_value = ["query"]
+
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            tools = self._register(mock_services)
+            result = tools["update_prompt"](
+                prompt_id="p-001",
+                content="New content with {query}",
+                change_note="Updated via MCP",
+            )
+
+        assert result["status"] == "updated"
+        assert result["version_created"] is True
+        mock_services.prompt_manager.update_prompt.assert_called_once()
+        call_kwargs = mock_services.prompt_manager.update_prompt.call_args.kwargs
+        assert call_kwargs["content"] == "New content with {query}"
+        assert call_kwargs["variables"] == ["query"]
+        assert call_kwargs["updated_by"] == "mcp"
+
+    def test_update_prompt_metadata_only(self, mock_services: MagicMock) -> None:
+        """update_prompt() with name only doesn't create version."""
+        mock_prompt = MagicMock()
+        mock_prompt.to_dict.return_value = {"id": "p-001", "name": "New Name"}
+        mock_services.prompt_manager.update_prompt.return_value = mock_prompt
+
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            tools = self._register(mock_services)
+            result = tools["update_prompt"](prompt_id="p-001", name="New Name")
+
+        assert result["status"] == "updated"
+        assert result["version_created"] is False
+
+    def test_update_prompt_no_fields(self, mock_services: MagicMock) -> None:
+        """update_prompt() with no fields returns error."""
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            tools = self._register(mock_services)
+            result = tools["update_prompt"](prompt_id="p-001")
+
+        assert "error" in result
+
+    def test_update_prompt_not_found(self, mock_services: MagicMock) -> None:
+        """update_prompt() returns error when prompt doesn't exist."""
+        mock_services.prompt_manager.update_prompt.return_value = None
+        mock_services.prompt_manager.detect_variables.return_value = []
+
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            tools = self._register(mock_services)
+            result = tools["update_prompt"](
+                prompt_id="nonexistent", content="test",
+            )
+
+        assert "error" in result
+
+    def test_rollback_prompt_success(self, mock_services: MagicMock) -> None:
+        """rollback_prompt() restores previous version."""
+        mock_prompt = MagicMock()
+        mock_prompt.to_dict.return_value = {
+            "id": "p-001",
+            "key": "synthesis.web_answer",
+            "content": "Old content",
+        }
+        mock_services.prompt_manager.rollback_prompt.return_value = mock_prompt
+
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            tools = self._register(mock_services)
+            result = tools["rollback_prompt"](prompt_id="p-001", version=2)
+
+        assert result["status"] == "rolled_back"
+        assert result["to_version"] == 2
+        mock_services.prompt_manager.rollback_prompt.assert_called_once_with(
+            prompt_id="p-001", version=2, rolled_back_by="mcp",
+        )
+
+    def test_rollback_prompt_not_found(self, mock_services: MagicMock) -> None:
+        """rollback_prompt() returns error when prompt/version not found."""
+        mock_services.prompt_manager.rollback_prompt.return_value = None
+
+        with patch("clorag.mcp.server.get_services", return_value=mock_services):
+            tools = self._register(mock_services)
+            result = tools["rollback_prompt"](prompt_id="p-001", version=999)
+
+        assert "error" in result
