@@ -19,6 +19,7 @@ env/
 # IDE
 .idea/
 .vscode/
+.zed/
 *.swp
 *.swo
 .DS_Store
