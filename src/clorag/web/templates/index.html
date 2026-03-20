@@ -125,12 +125,19 @@
         /* Search Container - positioned in lower part */
         .search-container {
             position: absolute;
-            bottom: 4.5rem;
+            bottom: 3rem;
             left: 50%;
             transform: translateX(-50%);
             max-width: 700px;
             width: calc(100% - 2rem);
             z-index: 1;
+        }
+
+        .search-disclaimer {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
         }
 
         .search-box {
@@ -174,70 +181,6 @@
         }
 
         /* Info Section */
-        .info-section {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 2rem 1rem 1rem;
-        }
-
-        .info-card {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 12px;
-            padding: 1.5rem 2rem;
-        }
-
-        .info-card h3 {
-            font-size: 1rem;
-            color: var(--cyanview-navy);
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .info-card h3 svg {
-            width: 20px;
-            height: 20px;
-            color: var(--cyan-dark);
-        }
-
-        .info-card p {
-            font-size: 0.9rem;
-            color: #555;
-            line-height: 1.6;
-            margin-bottom: 0.75rem;
-        }
-
-        .info-card p:last-child {
-            margin-bottom: 0;
-        }
-
-        .info-disclaimer {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            border-radius: 8px;
-            padding: 0.75rem 1rem;
-            margin-top: 1rem;
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-        }
-
-        .info-disclaimer svg {
-            width: 20px;
-            height: 20px;
-            color: #856404;
-            flex-shrink: 0;
-            margin-top: 0.1rem;
-        }
-
-        .info-disclaimer p {
-            font-size: 0.85rem;
-            color: #856404;
-            margin: 0;
-        }
-
         /* Results Section */
         .results-section {
             max-width: 900px;
@@ -1119,7 +1062,7 @@
         </a>
         <div class="navbar__links">
             <a href="#" class="navbar__link" id="help-link">Help</a>
-<a href="https://support.cyanview.com/docs/" class="navbar__link" target="_blank">Docs & Manuals</a>
+<a href="https://support.cyanview.cloud" class="navbar__link" target="_blank">Docs & Manuals</a>
             <a href="https://cyanview.com" class="navbar__link" target="_blank">Cyanview.com</a>
         </div>
     </nav>
@@ -1140,6 +1083,7 @@
                     Ask
                 </button>
             </form>
+            <p class="search-disclaimer">AI-generated answers — always verify critical configurations against <a href="https://support.cyanview.cloud" target="_blank" style="color: rgba(255,255,255,0.8); text-decoration: underline;">official documentation</a>.</p>
         </div>
     </section>
 
@@ -1165,32 +1109,6 @@
             <div class="quick-action-btn__description">Diagnose and resolve common issues with guided troubleshooting steps.</div>
         </a>
     </div>
-
-    <!-- Info Section -->
-    <section class="info-section" id="info-section">
-        <div class="info-card">
-            <h3>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                How does this work?
-            </h3>
-            <p>
-                This AI search uses <strong>RAG (Retrieval-Augmented Generation)</strong> technology. When you ask a question, the system searches through Cyanview's official documentation and anonymized support cases to find relevant information, then uses AI to synthesize a helpful answer based on those sources.
-            </p>
-            <p>
-                The knowledge base includes product manuals, configuration guides, and real-world troubleshooting solutions from our support team's experience with broadcast and production environments.
-            </p>
-            <div class="info-disclaimer">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <p>
-                    <strong>Disclaimer:</strong> Answers are AI-generated and may contain inaccuracies. Always verify critical information against official documentation or contact Cyanview support for production-critical configurations.
-                </p>
-            </div>
-        </div>
-    </section>
 
     <!-- Results Section - Chat Flow -->
     <section class="results-section" id="results-section" style="display: none;">
@@ -1235,29 +1153,37 @@
                 <button class="modal-close" id="help-close">&times;</button>
             </div>
             <div class="modal-body">
-                <h3>What You Can Ask</h3>
-                <p>
-                    Configuration, troubleshooting, camera compatibility, protocols, firmware updates,
-                    network setup, tally integration, color correction workflows - anything about
-                    Cyanview products in your broadcast environment.
-                </p>
-
-                <h3>Example Queries</h3>
+                <h3>Configuration & Setup</h3>
                 <ul class="example-queries">
-                    <li><a href="#" class="example-query">"TSL 5.0 tally setup with RIO"</a></li>
-                    <li><a href="#" class="example-query">"VISCA over IP configuration"</a></li>
-                    <li><a href="#" class="example-query">"Sony FX6 LANC connection"</a></li>
-                    <li><a href="#" class="example-query">"RCP not detecting camera"</a></li>
-                    <li><a href="#" class="example-query">"How to update CI0 firmware"</a></li>
+                    <li><a href="#" class="example-query">"How to connect a Sony FX6 to RIO via USB?"</a></li>
+                    <li><a href="#" class="example-query">"VISCA over IP setup with Panasonic PTZ"</a></li>
+                    <li><a href="#" class="example-query">"TSL 5.0 tally configuration with NIO"</a></li>
+                    <li><a href="#" class="example-query">"How to set up REMI with RIO +WAN?"</a></li>
                 </ul>
 
-                <h3>Pro Tips</h3>
+                <h3>Troubleshooting</h3>
+                <ul class="example-queries">
+                    <li><a href="#" class="example-query">"RCP shows camera offline after network switch"</a></li>
+                    <li><a href="#" class="example-query">"CI0 loses connection intermittently"</a></li>
+                    <li><a href="#" class="example-query">"Lens motor not responding through RIO"</a></li>
+                    <li><a href="#" class="example-query">"VP4 color correction not applied on SDI output"</a></li>
+                </ul>
+
+                <h3>Product Guidance</h3>
+                <ul class="example-queries">
+                    <li><a href="#" class="example-query">"CI0 vs RIO — which one for a live OB van?"</a></li>
+                    <li><a href="#" class="example-query">"What license do I need for 8 cameras?"</a></li>
+                    <li><a href="#" class="example-query">"Can I control Blackmagic cameras over SDI?"</a></li>
+                    <li><a href="#" class="example-query">"Which cameras support direct IP control?"</a></li>
+                </ul>
+
+                <h3>Tips</h3>
                 <ul>
-                    <li>Include camera model and Cyanview product (RCP, RIO, CI0, VP4)</li>
-                    <li>Describe the symptom: "no tally", "offline", "latency"</li>
-                    <li>Ask follow-up questions to dig deeper - conversations are preserved</li>
-                    <li>Export answers using the download button (Markdown, PDF, HTML)</li>
-                    <li>Ask in any language - multilingual support</li>
+                    <li>Include your camera model and Cyanview product (RCP, RIO, CI0, VP4)</li>
+                    <li>Describe symptoms: "no tally", "camera offline", "high latency"</li>
+                    <li>Ask follow-ups — conversation context is preserved</li>
+                    <li>Export answers with the download button (Markdown, PDF, HTML)</li>
+                    <li>Works in English, French, and other languages</li>
                 </ul>
 
             </div>
