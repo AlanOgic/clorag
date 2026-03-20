@@ -170,10 +170,34 @@ def main_http() -> None:
     """Entry point for the MCP server (streamable-http transport for Docker/remote)."""
     import os
 
+    import anyio
+    import structlog
+    import uvicorn
+
+    from clorag.config import get_settings
+
+    settings = get_settings()
     host = os.getenv("MCP_HOST", "0.0.0.0")
     port = int(os.getenv("MCP_PORT", "8080"))
     mcp = create_mcp_server(host=host, port=port)
-    mcp.run(transport="streamable-http")
+
+    # Get the Starlette app, wrap with auth if configured
+    app = mcp.streamable_http_app()
+
+    if settings.mcp_api_key:
+        from clorag.mcp.auth import apply_bearer_auth
+
+        app = apply_bearer_auth(app, settings.mcp_api_key.get_secret_value())
+        structlog.get_logger().info("mcp_http_auth_enabled")
+    else:
+        structlog.get_logger().warning(
+            "mcp_http_no_auth",
+            msg="MCP HTTP running without authentication. Set MCP_API_KEY.",
+        )
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    server = uvicorn.Server(config)
+    anyio.run(server.serve)
 
 
 if __name__ == "__main__":

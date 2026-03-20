@@ -113,6 +113,10 @@ class Settings(BaseSettings):
         default=True,
         description="Use secure cookies (HTTPS only). Set to False for local development.",
     )
+    mcp_api_key: SecretStr | None = Field(
+        default=None,
+        description="API key for MCP HTTP transport (Bearer token). Not required for stdio.",
+    )
 
     # Neo4j Graph Database (GraphRAG)
     neo4j_uri: str = Field(

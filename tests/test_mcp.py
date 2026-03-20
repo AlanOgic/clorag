@@ -15,6 +15,11 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
+from starlette.routing import Route
+from starlette.testclient import TestClient as StarletteTestClient
 
 from clorag.models.camera import Camera, CameraSource, DeviceType
 from clorag.models.custom_document import CustomDocument, DocumentCategory
@@ -1206,3 +1211,56 @@ async def test_search_hybrid_rrf_without_filters(mock_settings):
 
         for prefetch in call_kwargs["prefetch"]:
             assert prefetch.filter is None
+
+
+# ---------------------------------------------------------------------------
+# Bearer Auth Middleware Tests
+# ---------------------------------------------------------------------------
+
+
+def _make_test_app(api_key: str):
+    """Create a minimal Starlette app wrapped with BearerAuthMiddleware."""
+    from clorag.mcp.auth import apply_bearer_auth
+
+    async def homepage(request: Request) -> PlainTextResponse:
+        return PlainTextResponse("ok")
+
+    app = Starlette(routes=[Route("/", homepage)])
+    return apply_bearer_auth(app, api_key)
+
+
+class TestBearerAuthMiddleware:
+    """Tests for BearerAuthMiddleware."""
+
+    def test_valid_token(self):
+        app = _make_test_app("test-secret-key")
+        client = StarletteTestClient(app)
+        resp = client.get("/", headers={"Authorization": "Bearer test-secret-key"})
+        assert resp.status_code == 200
+        assert resp.text == "ok"
+
+    def test_missing_auth_header(self):
+        app = _make_test_app("test-secret-key")
+        client = StarletteTestClient(app)
+        resp = client.get("/")
+        assert resp.status_code == 401
+        assert "Missing Bearer token" in resp.json()["error"]
+
+    def test_invalid_token(self):
+        app = _make_test_app("test-secret-key")
+        client = StarletteTestClient(app)
+        resp = client.get("/", headers={"Authorization": "Bearer wrong-key"})
+        assert resp.status_code == 401
+        assert "Invalid API key" in resp.json()["error"]
+
+    def test_malformed_auth_header(self):
+        app = _make_test_app("test-secret-key")
+        client = StarletteTestClient(app)
+        resp = client.get("/", headers={"Authorization": "Basic dXNlcjpwYXNz"})
+        assert resp.status_code == 401
+
+    def test_bearer_with_extra_whitespace(self):
+        app = _make_test_app("test-secret-key")
+        client = StarletteTestClient(app)
+        resp = client.get("/", headers={"Authorization": "Bearer  test-secret-key  "})
+        assert resp.status_code == 200
