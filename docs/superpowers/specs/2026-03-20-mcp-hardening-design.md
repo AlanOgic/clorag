@@ -54,7 +54,7 @@ sparse_task = asyncio.to_thread(services.sparse_embeddings.embed_query, query)
 
 **Problem:** `search_chunks` in `chunks.py` accesses `services.vectorstore._client.query_points()` directly because the public `search_hybrid_rrf()` method doesn't support passing a Qdrant filter. This bypasses abstractions (no metrics, no cache, no logging).
 
-**Change:** Add an optional `match_filters` parameter to `search_hybrid_rrf()` in `vectorstore.py`. Named `match_filters` (not `match_filters`) to clearly indicate it supports exact-match filters only — not range, list, or complex conditions:
+**Change:** Add an optional `match_filters` parameter to `search_hybrid_rrf()` in `vectorstore.py`. Named `match_filters` (not `filter_conditions`) to clearly indicate it supports exact-match filters only — not range, list, or complex conditions:
 
 ```python
 async def search_hybrid_rrf(
