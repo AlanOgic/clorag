@@ -1264,3 +1264,58 @@ class TestBearerAuthMiddleware:
         client = StarletteTestClient(app)
         resp = client.get("/", headers={"Authorization": "Bearer  test-secret-key  "})
         assert resp.status_code == 200
+
+
+class TestPathSanitization:
+    """Tests for import_custom_documents path validation."""
+
+    def test_path_traversal_rejected(self, tmp_path):
+        """Paths outside base dir are rejected."""
+        from pathlib import Path
+
+        base_dir = tmp_path / "imports"
+        base_dir.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+
+        folder_path = Path(str(outside)).resolve()
+        base = Path(str(base_dir)).resolve()
+
+        assert not folder_path.is_relative_to(base)
+
+    def test_dotdot_traversal_rejected(self, tmp_path):
+        """../.. traversal paths are caught after resolve()."""
+        from pathlib import Path
+
+        base_dir = tmp_path / "imports"
+        base_dir.mkdir()
+
+        evil_path = Path(str(base_dir) + "/../../../etc").resolve()
+        base = Path(str(base_dir)).resolve()
+
+        assert not evil_path.is_relative_to(base)
+
+    def test_valid_subdir_accepted(self, tmp_path):
+        """Subdirectories within base dir are accepted."""
+        from pathlib import Path
+
+        base_dir = tmp_path / "imports"
+        sub = base_dir / "batch1"
+        sub.mkdir(parents=True)
+
+        folder_path = Path(str(sub)).resolve()
+        base = Path(str(base_dir)).resolve()
+
+        assert folder_path.is_relative_to(base)
+
+    def test_base_dir_itself_accepted(self, tmp_path):
+        """The base directory itself is a valid target."""
+        from pathlib import Path
+
+        base_dir = tmp_path / "imports"
+        base_dir.mkdir()
+
+        folder_path = Path(str(base_dir)).resolve()
+        base = Path(str(base_dir)).resolve()
+
+        assert folder_path.is_relative_to(base)

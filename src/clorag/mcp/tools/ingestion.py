@@ -134,14 +134,23 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
         """
         from pathlib import Path
 
+        from clorag.config import get_settings
         from clorag.models.custom_document import DocumentCategory
         from clorag.scripts.import_documents import import_documents
 
-        folder_path = Path(folder)
+        settings = get_settings()
+        base_dir = Path(settings.mcp_import_base_dir).resolve()
+        folder_path = Path(folder).resolve()
+
+        if not folder_path.is_relative_to(base_dir):
+            return {
+                "status": "error",
+                "error": f"Path must be under {base_dir}. Got: {folder_path}",
+            }
         if not folder_path.exists():
-            return {"status": "error", "error": f"Folder not found: {folder}"}
+            return {"status": "error", "error": f"Folder not found: {folder_path}"}
         if not folder_path.is_dir():
-            return {"status": "error", "error": f"Not a directory: {folder}"}
+            return {"status": "error", "error": f"Not a directory: {folder_path}"}
 
         try:
             doc_category = DocumentCategory(category)

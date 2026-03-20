@@ -117,6 +117,13 @@ class Settings(BaseSettings):
         default=None,
         description="API key for MCP HTTP transport (Bearer token). Not required for stdio.",
     )
+    mcp_import_base_dir: str = Field(
+        default="data/imports",
+        description=(
+            "Base directory for MCP document imports."
+            " Paths must resolve under this directory."
+        ),
+    )
 
     # Neo4j Graph Database (GraphRAG)
     neo4j_uri: str = Field(
