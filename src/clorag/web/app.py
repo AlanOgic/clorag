@@ -26,8 +26,6 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import JSONResponse
 
 from clorag.config import get_settings
-from clorag.core.analytics_db import AnalyticsDatabase
-from clorag.services.custom_docs import CustomDocumentService
 
 # Import auth module
 # Import routers
@@ -311,27 +309,6 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 # Include routers
 app.include_router(admin_router)
 app.include_router(public_router)
-
-# Initialize clients (lazy loading)
-_analytics_db: AnalyticsDatabase | None = None
-_custom_docs_service: CustomDocumentService | None = None
-
-
-def get_analytics_db() -> AnalyticsDatabase:
-    """Get or create AnalyticsDatabase instance (separate from camera DB)."""
-    global _analytics_db
-    if _analytics_db is None:
-        settings = get_settings()
-        _analytics_db = AnalyticsDatabase(settings.analytics_database_path)
-    return _analytics_db
-
-
-def get_custom_docs_service() -> CustomDocumentService:
-    """Get or create CustomDocumentService instance."""
-    global _custom_docs_service
-    if _custom_docs_service is None:
-        _custom_docs_service = CustomDocumentService()
-    return _custom_docs_service
 
 
 def create_app() -> FastAPI:

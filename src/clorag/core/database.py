@@ -559,23 +559,29 @@ class CameraDatabase:
                 for row in cursor.fetchall():
                     scores[row["id"]] = scores.get(row["id"], 0) + 3
 
-            # Shared ports (medium weight)
-            for port in camera.ports:
+            # Shared ports (medium weight) — single query instead of N+1
+            if camera.ports:
+                port_likes = [f'%"{p}"%' for p in camera.ports]
+                match_expr = " + ".join(["(ports LIKE ?)"] * len(port_likes))
+                where_expr = " OR ".join(["ports LIKE ?"] * len(port_likes))
                 cursor = conn.execute(
-                    "SELECT id FROM cameras WHERE ports LIKE ? AND id != ?",
-                    (f'%"{port}"%', camera_id),
+                    f"SELECT id, ({match_expr}) as match_count FROM cameras WHERE ({where_expr}) AND id != ?",
+                    port_likes + port_likes + [camera_id],
                 )
                 for row in cursor.fetchall():
-                    scores[row["id"]] = scores.get(row["id"], 0) + 1
+                    scores[row["id"]] = scores.get(row["id"], 0) + row["match_count"]
 
-            # Shared protocols (medium weight)
-            for protocol in camera.protocols:
+            # Shared protocols (medium weight) — single query instead of N+1
+            if camera.protocols:
+                proto_likes = [f'%"{p}"%' for p in camera.protocols]
+                match_expr = " + ".join(["(protocols LIKE ?)"] * len(proto_likes))
+                where_expr = " OR ".join(["protocols LIKE ?"] * len(proto_likes))
                 cursor = conn.execute(
-                    "SELECT id FROM cameras WHERE protocols LIKE ? AND id != ?",
-                    (f'%"{protocol}"%', camera_id),
+                    f"SELECT id, ({match_expr}) as match_count FROM cameras WHERE ({where_expr}) AND id != ?",
+                    proto_likes + proto_likes + [camera_id],
                 )
                 for row in cursor.fetchall():
-                    scores[row["id"]] = scores.get(row["id"], 0) + 1
+                    scores[row["id"]] = scores.get(row["id"], 0) + row["match_count"]
 
             if not scores:
                 return []

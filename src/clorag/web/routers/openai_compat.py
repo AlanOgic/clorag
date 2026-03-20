@@ -8,6 +8,7 @@ Auth: Bearer token via OPENAI_COMPAT_API_KEY environment variable.
 """
 
 import json
+import secrets
 import time
 import uuid
 from collections.abc import AsyncGenerator
@@ -102,7 +103,7 @@ def _verify_api_key(authorization: str | None) -> JSONResponse | None:
     provided_key = authorization.removeprefix("Bearer ").strip()
     expected_key = settings.openai_compat_api_key.get_secret_value()
 
-    if provided_key != expected_key:
+    if not secrets.compare_digest(provided_key.encode("utf-8"), expected_key.encode("utf-8")):
         return JSONResponse(
             status_code=401,
             content={

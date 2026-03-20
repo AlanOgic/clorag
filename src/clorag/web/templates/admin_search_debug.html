@@ -619,7 +619,7 @@
                             </div>
                             <div class="chunk__body">
                                 <div class="chunk__text">${escapeHtml(chunk.text)}</div>
-                                ${chunk.url ? `<div class="chunk__url"><a href="${chunk.url}" target="_blank">${chunk.url}</a></div>` : ''}
+                                ${chunk.url && isSafeUrl(chunk.url) ? `<div class="chunk__url"><a href="${escapeHtml(chunk.url)}" target="_blank" rel="noopener">${escapeHtml(chunk.url)}</a></div>` : ''}
                             </div>
                         </div>
                     `;
@@ -686,6 +686,16 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function isSafeUrl(url) {
+            if (!url) return false;
+            try {
+                const parsed = new URL(url);
+                return ['http:', 'https:'].includes(parsed.protocol);
+            } catch {
+                return false;
+            }
         }
 
         // Allow Enter key for search
