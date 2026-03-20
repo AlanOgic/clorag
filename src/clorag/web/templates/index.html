@@ -1806,14 +1806,12 @@ ${bodyContent}
                                     // Store session_id for follow-up questions
                                     currentSessionId = data.session_id;
                                 } else if (data.type === 'text') {
-                                    // Hide info section when streaming begins
-                                    if (fullText === '' && infoSection) {
-                                        infoSection.style.display = 'none';
-                                        // Fade out quick action buttons
+                                    // First text chunk: initialize store and hide landing elements
+                                    if (fullText === '') {
+                                        answerStore[exchangeId] = { markdown: '', sources: [], query: query };
+                                        if (infoSection) infoSection.style.display = 'none';
                                         const quickActions = document.getElementById('quick-actions');
                                         if (quickActions) quickActions.classList.add('fade-out');
-                                        // Initialize answerStore for this exchange
-                                        answerStore[exchangeId] = { markdown: '', sources: [], query: query };
                                     }
                                     fullText += data.text;
                                     // Store raw markdown for export
