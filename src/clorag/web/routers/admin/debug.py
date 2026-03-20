@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from clorag.config import get_settings
-from clorag.services.prompt_manager import get_prompt
+from clorag.services.prompt_manager import get_composed_prompt
 from clorag.web.auth import verify_admin
 from clorag.web.schemas import DebugSearchResponse, SearchRequest
 from clorag.web.search import (
@@ -47,7 +47,7 @@ async def api_search_debug(
         response = await get_anthropic().messages.create(
             model=settings.sonnet_model,
             max_tokens=1500,
-            system=get_prompt("synthesis.web_answer"),
+            system=get_composed_prompt("base.system_prompt", "synthesis.web_layer"),
             messages=[{"role": "user", "content": user_prompt}],
         )
         content_block = response.content[0]
@@ -83,7 +83,7 @@ async def api_search_debug(
         total_time_ms=total_time_ms,
         chunks=detailed_chunks,
         llm_prompt=user_prompt,
-        system_prompt=get_prompt("synthesis.web_answer"),
+        system_prompt=get_composed_prompt("base.system_prompt", "synthesis.web_layer"),
         llm_response=llm_response,
         model=settings.sonnet_model,
     )

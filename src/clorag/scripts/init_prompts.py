@@ -95,6 +95,8 @@ def initialize_prompts(force: bool = False) -> None:
     print(f"  Created: {result['created']}")
     print(f"  Updated: {result['updated']}")
     print(f"  Skipped: {result['skipped']}")
+    if result.get('removed', 0) > 0:
+        print(f"  Removed: {result['removed']}")
 
     if result['created'] > 0 or result['updated'] > 0:
         print("\nPrompts initialized successfully!")

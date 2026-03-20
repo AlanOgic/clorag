@@ -10,7 +10,7 @@ from typing import Any
 import anthropic
 
 from clorag.config import get_settings
-from clorag.services.prompt_manager import get_prompt
+from clorag.services.prompt_manager import get_composed_prompt
 from clorag.services.settings_manager import get_setting
 from clorag.web.search.utils import build_context
 
@@ -66,7 +66,7 @@ async def synthesize_answer(
     response = await get_anthropic().messages.create(
         model=settings.sonnet_model,
         max_tokens=max_tokens,
-        system=get_prompt("synthesis.web_answer"),
+        system=get_composed_prompt("base.system_prompt", "synthesis.web_layer"),
         messages=messages,
     )
     # Extract text from response
@@ -114,7 +114,7 @@ async def synthesize_answer_stream(
     async with get_anthropic().messages.stream(
         model=settings.sonnet_model,
         max_tokens=max_tokens,
-        system=get_prompt("synthesis.web_answer"),
+        system=get_composed_prompt("base.system_prompt", "synthesis.web_layer"),
         messages=messages,
     ) as stream:
         async for text in stream.text_stream:

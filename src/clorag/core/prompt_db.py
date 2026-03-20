@@ -120,7 +120,9 @@ class PromptVersion:
 
 
 # Valid categories for prompts
-PROMPT_CATEGORIES = frozenset({"agent", "analysis", "synthesis", "drafts", "graph", "scripts"})
+PROMPT_CATEGORIES = frozenset(
+    {"base", "agent", "analysis", "synthesis", "drafts", "graph", "scripts"}
+)
 
 
 class PromptDatabase:

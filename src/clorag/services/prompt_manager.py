@@ -144,6 +144,31 @@ class PromptManager:
         # Not found anywhere
         raise KeyError(f"Prompt not found: {key}")
 
+    def get_composed_prompt(self, *keys: str) -> str:
+        """Compose a prompt from multiple prompt keys.
+
+        Concatenates prompts in order, separated by double newlines.
+        Guards against duplicate keys in the composition.
+
+        Args:
+            *keys: Prompt keys to compose (e.g., "base.system_prompt", "synthesis.web_layer").
+
+        Returns:
+            The composed prompt text.
+
+        Raises:
+            ValueError: If a duplicate key is found.
+            KeyError: If any prompt key is not found.
+        """
+        seen: set[str] = set()
+        parts: list[str] = []
+        for key in keys:
+            if key in seen:
+                raise ValueError(f"Duplicate key in composition: {key}")
+            seen.add(key)
+            parts.append(self.get_prompt(key))
+        return "\n\n".join(parts)
+
     def get_prompt_content(self, key: str) -> str:
         """Get raw prompt content without variable substitution.
 
@@ -380,6 +405,17 @@ class PromptManager:
                 )
                 created += 1
 
+        # Remove DB prompts no longer in the default registry
+        removed = 0
+        if force:
+            default_keys = {d.key for d in DEFAULT_PROMPTS}
+            db_prompts = self._db.list_prompts()
+            for db_prompt in db_prompts:
+                if db_prompt.key not in default_keys:
+                    self._db.delete_prompt(db_prompt.id)
+                    removed += 1
+                    logger.info("Removed orphan prompt", key=db_prompt.key)
+
         # Clear entire cache after initialization
         self.reload_all()
 
@@ -388,10 +424,11 @@ class PromptManager:
             created=created,
             updated=updated,
             skipped=skipped,
+            removed=removed,
             force=force,
         )
 
-        return {"created": created, "updated": updated, "skipped": skipped}
+        return {"created": created, "updated": updated, "skipped": skipped, "removed": removed}
 
     def reload_cache(self, key: str) -> None:
         """Reload a specific prompt in the cache.
@@ -532,3 +569,15 @@ def get_prompt(key: str, **variables: Any) -> str:
         The prompt text.
     """
     return _get_manager().get_prompt(key, **variables)
+
+
+def get_composed_prompt(*keys: str) -> str:
+    """Convenience function for prompt composition.
+
+    Args:
+        *keys: Prompt keys to compose.
+
+    Returns:
+        The composed prompt text.
+    """
+    return _get_manager().get_composed_prompt(*keys)
