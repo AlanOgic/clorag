@@ -113,6 +113,8 @@ Environment variables (see `.env.example`):
 - `CHUNK_OVERLAP` (default: `50`) - Chunk overlap (~12.5%)
 - `CHUNK_ADAPTIVE_THRESHOLD` (default: `200`) - Single-chunk threshold (tokens)
 - `OPENAI_COMPAT_API_KEY` - Optional, enables `/v1/chat/completions` OpenAI-compatible API
+- `MCP_API_KEY` - Bearer token for MCP HTTP transport auth (optional, stdio needs no auth)
+- `MCP_IMPORT_BASE_DIR` (default: `data/imports`) - Base directory for MCP document imports (path containment)
 Settings via `clorag.config.get_settings()` (cached singleton).
 
 ## Key Patterns
