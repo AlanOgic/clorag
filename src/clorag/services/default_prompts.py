@@ -226,10 +226,12 @@ These placeholders are intentional for anonymization. Do NOT try to reveal or gu
 
 Product Reference (for accurate classification):
 - Controllers: RCP (compact, aka "RCP Compact"), RCP-J (with iris joystick, standard OB van rack size). Both need DUO/QUATTRO/OCTO/MSU license
-- Interfaces: CI0 (serial, stateless), CI0BM (CI0 + Blackmagic SDI), RIO (maintains camera/lens connection, USB+serial)
-- RIO licenses: RIO +WAN (REMI/cloud), RIO +LAN (local only, formerly "RIO-Live")
-- Other: VP4 (color corrector), NIO (tally GPIO), RSBM (SDI board, used with CI0 or RIO)
-- Connection types: IP (direct to RCP), Serial (needs CI0/RIO), USB (needs RIO), SDI (needs CI0BM or CI0/RIO+RSBM)
+- Interfaces: CI0 (serial-to-IP, 2 ports, stateless), CI0BM (CI0 + Blackmagic SDI board), RIO (autonomous, 2 serial + USB, maintains camera/lens connection independently of network)
+- RIO licenses: RIO +WAN (REMI/cloud/remote, WAN/4G, 1–128 cameras), RIO +LAN (LAN-only, max 2 cameras, formerly "RIO-Live")
+- Other: VP4 (4-ch color corrector/CCU), NIO (16 GPIO tally over Ethernet/WiFi/4G), RSBM (SDI control board for Blackmagic, used with CI0 or RIO)
+- Connection types: IP cameras (Sony CGI/SDK, Canon XC, Panasonic PTZ, BirdDog, ARRI CAP, VISCA IP) → direct to RCP. Serial (Sony 8-pin, LANC, VISCA RS-232/422) → needs CI0/RIO. USB (Sony Alpha, Canon R5) → needs RIO. SDI (Blackmagic) → needs CI0BM or CI0/RIO + RSBM
+- Adapters: Sony FX6 requires USB-C to Ethernet adapter. Sony FX9 needs XDCA-FX9 extension unit
+- Lens motors (Canon Cine-Servo, Fujinon Cabrio): CI0 or RIO, but RIO recommended (maintains lens connection on network drop)
 
 Analyze the thread and respond with a JSON object containing:
 
@@ -293,12 +295,15 @@ Review this analyzed support case and:
 5. Validate the category assignment
 6. Validate product identification:
    - "RIO-Live" or "RIO Live" in thread → product should be "RIO +LAN"
-   - REMI/cloud/remote mentions → product should include "RIO +WAN"
-   - USB camera control → product should include "RIO"
+   - REMI/cloud/remote/WAN/4G mentions → product should be "RIO +WAN"
+   - LAN-only/local/max 2 cameras → product should be "RIO +LAN"
+   - USB camera control (Sony Alpha, Canon R5) → product should include "RIO" (only RIO has USB)
    - Serial-only conversion → product could be "CI0" or "RIO"
-   - SDI control → product should be "CI0BM" or "CI0/RIO + RSBM"
+   - SDI control (Blackmagic) → product should be "CI0BM" or "CI0/RIO + RSBM"
+   - IP cameras (Sony CGI, Canon XC, Panasonic PTZ, VISCA IP) → direct to RCP, no CI0/RIO needed
    - License mentions (DUO/QUATTRO/OCTO/MSU) → category should be "RCP"
-   - Lens motor control → could be CI0 or RIO, but RIO preferred for reliability
+   - Lens motor control (Cine-Servo, Cabrio) → CI0 or RIO, but RIO preferred for reliability
+   - Adapter notes: FX6 needs USB-C to Ethernet, FX9 needs XDCA-FX9 extension
 7. Generate a final structured document for the knowledge base
 
 <original_thread>
@@ -605,14 +610,18 @@ FORMAT RULES:
 - Total length: 150-400 words (adapt to complexity)
 
 PRODUCT KNOWLEDGE:
-- Network drops losing camera/lens control → likely CI0 (stateless). Suggest RIO — it maintains camera+lens connections independently, even when network is unstable
-- REMI/remote/cloud → requires RIO +WAN. CI0 alone is NOT sufficient for remote production
-- USB camera issues → only RIO supports USB (not CI0)
-- SDI camera control → requires CI0BM or CI0/RIO + RSBM board
-- Lens motor control (Cine-Servo, Cabrio) → works with CI0 or RIO, but RIO recommended for reliability
-- "RIO-Live" / "RIO Live" → old name for RIO +LAN
+- CI0: serial-to-IP (2 ports), stateless — network drop = lost camera AND lens control
+- RIO: autonomous (2 serial + USB) — maintains camera+lens connections independently of network
+- CI0 vs RIO: network drops losing control → likely CI0. Suggest RIO for broadcast/mission-critical
+- REMI/remote/cloud → ALWAYS requires RIO +WAN as cloud gateway, even for IP-only setups
+- RIO +WAN: REMI/cloud/remote, WAN/4G, 1–128 cameras
+- RIO +LAN: LAN-only, max 2 cameras, formerly "RIO-Live" / "RIO Live"
+- USB cameras (Sony Alpha, Canon R5) → only RIO supports USB
+- SDI camera control (Blackmagic) → requires CI0BM or CI0/RIO + RSBM board
+- IP cameras (Sony CGI/SDK, Canon XC, Panasonic PTZ, BirdDog, ARRI CAP, VISCA IP) → direct to RCP, no CI0/RIO needed
+- Lens motors (Cine-Servo, Cabrio) → CI0 or RIO, but RIO recommended for reliability
 - RCP / RCP-J licenses: DUO (2 cam), QUATTRO (4), OCTO (8), MSU (128)
-- Some cameras need adapters: FX6 needs USB-C to Ethernet, FX9 needs XDCA extension
+- Adapters: FX6 needs USB-C to Ethernet, FX9 needs XDCA-FX9 extension
 
 CONTENT RULES:
 - Use ONLY information from the provided context - never invent details

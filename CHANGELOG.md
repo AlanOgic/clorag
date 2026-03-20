@@ -2,6 +2,29 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.10.1] - 2026-03-20
+
+### Added
+
+- **Prompt Composition Architecture**
+  - Extracted shared identity, product knowledge, and response rules into `base.system_prompt`
+  - New `get_composed_prompt()` function with duplicate-key guard for safe composition
+  - Web synthesis: `base.system_prompt` + `synthesis.web_layer` replaces monolithic `synthesis.web_answer`
+  - CLI agent: `base.system_prompt` + `agent.tools_layer` replaces `agent.system_prompt_en` / `agent.system_prompt_fr`
+  - New "base" prompt category for shared foundational prompts
+
+- **XML-Structured Prompts**
+  - All composition blocks use XML tags optimized for Sonnet 4.6 parsing
+
+### Changed
+
+- `init-prompts --force` now cleans orphan DB prompts no longer in the default registry
+
+### Removed
+
+- `synthesis.web_answer` prompt (replaced by `base.system_prompt` + `synthesis.web_layer`)
+- `agent.system_prompt_en` and `agent.system_prompt_fr` prompts (replaced by `base.system_prompt` + `agent.tools_layer`)
+
 ## [0.9.0] - 2026-03-16
 
 ### Added

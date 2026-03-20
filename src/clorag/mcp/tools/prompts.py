@@ -43,7 +43,7 @@ def register_prompt_tools(mcp: FastMCP[MCPServices]) -> None:
         """Get full LLM prompt content and metadata by key.
 
         Args:
-            key: Prompt key (e.g. 'synthesis.web_answer', 'analysis.thread_analyzer').
+            key: Prompt key (e.g. 'base.system_prompt', 'analysis.thread_analyzer').
                 Use list_llm_prompts to discover available keys.
 
         Returns:

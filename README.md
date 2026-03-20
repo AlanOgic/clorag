@@ -665,18 +665,20 @@ SQLite database with:
 
 ### Prompt Management
 
-All 11 LLM prompts are stored in SQLite and editable via admin UI:
+LLM prompts are stored in SQLite and editable via admin UI:
 
 | Category | Prompts |
 |----------|---------|
-| `agent` | System prompt, tool descriptions |
+| `base` | Shared identity, product knowledge, response rules |
+| `agent` | Tools layer, search strategy |
 | `analysis` | Thread analyzer, quality controller |
-| `synthesis` | Answer generation, Mermaid diagrams |
+| `synthesis` | Web layer, chunk handling |
 | `drafts` | Auto-reply generation |
 | `graph` | Entity extraction |
 | `scripts` | Camera extraction, RIO analysis |
 
 **Features:**
+- Prompt composition via `get_composed_prompt()` (base + layer)
 - Version history for audit and rollback
 - Variable substitution with `{placeholder}` syntax
 - In-memory caching with configurable TTL

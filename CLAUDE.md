@@ -212,14 +212,16 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search. Sonnet-generated keywords auto-enriched alongside user-provided tags.
 
 ### Prompt Management
-- **Admin-editable prompts**: 11 LLM prompts stored in SQLite, editable via `/admin/prompts` without code changes
+- **Admin-editable prompts**: 12 LLM prompts stored in SQLite, editable via `/admin/prompts` without code changes
+- **Prompt composition**: `get_composed_prompt()` concatenates multiple prompt keys at runtime. Web = `base.system_prompt` + `synthesis.web_layer`, CLI = `base.system_prompt` + `agent.tools_layer`
 - **Version history**: Every content change creates a new version for audit and rollback
 - **Fallback to defaults**: If DB prompt not found, falls back to hardcoded defaults in `default_prompts.py`
 - **Caching**: In-memory cache with TTL (default: 300s) for performance, hot reload via API
 - **Variable substitution**: `{variable}` placeholders auto-detected and substituted at runtime
-- **Categories**: agent, analysis, synthesis, drafts, graph, scripts
+- **Categories**: agent, analysis, base, synthesis, drafts, graph, scripts
 - **Configuration**: `PROMPTS_CACHE_TTL` (default: 300 seconds)
 - **API usage**: `pm = get_prompt_manager(); prompt = pm.get_prompt("analysis.thread_analyzer", thread_content="...")`
+- **Composed prompts**: `from clorag.services.prompt_manager import get_composed_prompt; system = get_composed_prompt("base.system_prompt", "synthesis.web_layer")`
 
 ### RAG Settings
 - **Admin-editable settings**: 20 RAG tuning parameters stored in SQLite, editable via `/admin/settings` without code changes
@@ -254,7 +256,18 @@ ssh root@cyanview.cloud "cd /opt/clorag && docker compose build && docker compos
 
 Production: https://cyanview.cloud/ (Docker maps 8085→8080)
 
-## Recent Updates (2026-03-18)
+## Recent Updates (2026-03-20)
+
+### v0.10.1: Prompt Composition (base + layer)
+
+- **Prompt composition**: Extracted shared identity, product knowledge, and response rules into `base.system_prompt`. Web and CLI compose thin layers on top via `get_composed_prompt()`
+- **Web pipeline**: `base.system_prompt` + `synthesis.web_layer` (replaces monolithic `synthesis.web_answer`)
+- **CLI agent**: `base.system_prompt` + `agent.tools_layer` (replaces `agent.system_prompt_en/fr`, adds product knowledge)
+- **XML-structured prompts**: All 3 composition blocks use XML tags optimized for Sonnet 4.6
+- **Orphan cleanup**: `init-prompts --force` now removes DB prompts no longer in the default registry
+- **New prompt category**: "base" added for shared foundation prompts
+- **Removed keys**: `agent.system_prompt_en`, `agent.system_prompt_fr`, `synthesis.web_answer`
+- **New keys**: `base.system_prompt`, `synthesis.web_layer`, `agent.tools_layer`
 
 ### v0.10.0: Admin UI for RAG Settings
 
