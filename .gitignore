@@ -37,6 +37,13 @@ token_drafts.json
 
 # Claude Code
 .claude/
+.mcp.json
+
+# Scraped site data
+cyanview-web/
+
+# Superpowers plans/specs (local working docs)
+docs/superpowers/
 
 # Logs
 *.log
