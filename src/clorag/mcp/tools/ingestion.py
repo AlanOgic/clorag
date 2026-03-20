@@ -6,6 +6,7 @@ Most are long-running (minutes to hours) depending on data volume.
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -43,20 +44,25 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
         """
         from clorag.scripts.ingest_docs import run_ingestion
 
+        start = time.monotonic()
         try:
             count = await run_ingestion(
                 url=None,
                 fresh=fresh,
                 extract_cameras=extract_cameras,
             )
+            duration = round(time.monotonic() - start, 1)
             return {
                 "status": "success",
                 "documents_ingested": count,
                 "fresh": fresh,
                 "cameras_extracted": extract_cameras,
+                "duration_seconds": duration,
+                "summary": f"Ingested {count} documentation pages in {duration}s.",
             }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            duration = round(time.monotonic() - start, 1)
+            return {"status": "error", "error": str(e), "duration_seconds": duration}
 
     @mcp.tool()
     async def ingest_curated(
@@ -87,6 +93,7 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
         """
         from clorag.scripts.ingest_curated import run_ingestion
 
+        start = time.monotonic()
         try:
             count = await run_ingestion(
                 max_threads=max_threads,
@@ -97,6 +104,13 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
                 since_days=since_days,
                 snapshot=True,
             )
+            duration = round(time.monotonic() - start, 1)
+            summary = f"Ingested {count} support cases in {duration}s"
+            if offset:
+                summary += f" (offset {offset})"
+            if since_days is not None:
+                summary += f" (last {since_days} days)"
+            summary += "."
             return {
                 "status": "success",
                 "cases_ingested": count,
@@ -105,9 +119,12 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
                 "min_confidence": min_confidence,
                 "fresh": fresh,
                 "since_days": since_days,
+                "duration_seconds": duration,
+                "summary": summary,
             }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            duration = round(time.monotonic() - start, 1)
+            return {"status": "error", "error": str(e), "duration_seconds": duration}
 
     @mcp.tool()
     async def import_custom_documents(
@@ -160,6 +177,7 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
 
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 
+        start = time.monotonic()
         try:
             imported, skipped = await import_documents(
                 folder=folder_path,
@@ -167,6 +185,8 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
                 tags=tag_list,
                 dry_run=dry_run,
             )
+            duration = round(time.monotonic() - start, 1)
+            action = "[DRY RUN] Would import" if dry_run else "Imported"
             return {
                 "status": "success",
                 "imported": imported,
@@ -175,9 +195,14 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
                 "category": category,
                 "tags": tag_list,
                 "dry_run": dry_run,
+                "duration_seconds": duration,
+                "summary": (
+                    f"{action} {imported} documents, skipped {skipped} in {duration}s."
+                ),
             }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            duration = round(time.monotonic() - start, 1)
+            return {"status": "error", "error": str(e), "duration_seconds": duration}
 
     @mcp.tool()
     async def enrich_cameras(
@@ -206,6 +231,7 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
 
         manufacturers = [manufacturer] if manufacturer else None
 
+        start = time.monotonic()
         try:
             count = await _enrich(
                 manufacturers=manufacturers,
@@ -213,15 +239,19 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
                 dry_run=dry_run,
                 enrich_urls=enrich_urls,
             )
+            duration = round(time.monotonic() - start, 1)
             return {
                 "status": "success",
                 "cameras_enriched": count,
                 "manufacturer": manufacturer,
                 "limit": limit,
                 "dry_run": dry_run,
+                "duration_seconds": duration,
+                "summary": f"Enriched {count} cameras in {duration}s.",
             }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            duration = round(time.monotonic() - start, 1)
+            return {"status": "error", "error": str(e), "duration_seconds": duration}
 
     @mcp.tool()
     async def populate_graph(
@@ -257,6 +287,7 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
             "custom_docs",
         ]
 
+        start = time.monotonic()
         try:
             counts = await run_population(
                 collections=target_collections,
@@ -264,13 +295,26 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
                 max_chunks=max_chunks,
                 concurrency=concurrency,
             )
+            duration = round(time.monotonic() - start, 1)
+            formatted = (
+                ", ".join(f"{k}: {v}" for k, v in counts.items())
+                if isinstance(counts, dict)
+                else str(counts)
+            )
+            n = len(target_collections)
             return {
                 "status": "success",
                 "collections": target_collections,
                 "entity_counts": counts,
+                "duration_seconds": duration,
+                "summary": (
+                    f"Extracted entities from {n} collections:"
+                    f" {formatted} in {duration}s."
+                ),
             }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            duration = round(time.monotonic() - start, 1)
+            return {"status": "error", "error": str(e), "duration_seconds": duration}
 
     @mcp.tool()
     def rebuild_fts_index() -> dict[str, Any]:
@@ -284,15 +328,20 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
         """
         from clorag.core.database import get_camera_database
 
+        start = time.monotonic()
         try:
             db = get_camera_database()
             count = db.rebuild_fts_index()
+            duration = round(time.monotonic() - start, 1)
             return {
                 "status": "success",
                 "cameras_indexed": count,
+                "duration_seconds": duration,
+                "summary": f"Rebuilt FTS5 index for {count} cameras in {duration}s.",
             }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            duration = round(time.monotonic() - start, 1)
+            return {"status": "error", "error": str(e), "duration_seconds": duration}
 
     @mcp.tool()
     async def fix_rio_preview(
@@ -317,6 +366,7 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
         from clorag.core.vectorstore import VectorStore
         from clorag.scripts.fix_rio_terminology import scan_for_rio_mentions
 
+        start = time.monotonic()
         try:
             vectorstore = VectorStore()
             analyzer = RIOTerminologyAnalyzer()
@@ -337,6 +387,7 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
                 except Exception:
                     pass  # Skip duplicates
 
+            duration = round(time.monotonic() - start, 1)
             return {
                 "status": "success",
                 "fixes_found": len(fixes),
@@ -347,9 +398,14 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
                     " approve via /admin/terminology-fixes"
                     " before applying."
                 ),
+                "duration_seconds": duration,
+                "summary": (
+                    f"Found {len(fixes)} fixes, saved {saved} suggestions in {duration}s."
+                ),
             }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            duration = round(time.monotonic() - start, 1)
+            return {"status": "error", "error": str(e), "duration_seconds": duration}
 
     @mcp.tool()
     async def fix_rio_apply() -> dict[str, Any]:
@@ -372,6 +428,7 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
         from clorag.core.vectorstore import VectorStore
         from clorag.scripts.fix_rio_terminology import apply_approved_fixes
 
+        start = time.monotonic()
         try:
             vectorstore = VectorStore()
             embeddings = EmbeddingsClient()
@@ -382,12 +439,16 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
                 embeddings=embeddings,
                 sparse_embeddings=sparse_embeddings,
             )
+            duration = round(time.monotonic() - start, 1)
             return {
                 "status": "success",
                 "fixes_applied": count,
+                "duration_seconds": duration,
+                "summary": f"Applied {count} terminology fixes in {duration}s.",
             }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            duration = round(time.monotonic() - start, 1)
+            return {"status": "error", "error": str(e), "duration_seconds": duration}
 
     @mcp.tool()
     def init_prompts_db(force: bool = False) -> dict[str, Any]:
@@ -404,13 +465,18 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
         """
         from clorag.services.prompt_manager import get_prompt_manager
 
+        start = time.monotonic()
         try:
             pm = get_prompt_manager()
             result = pm.initialize_defaults(force=force)
+            duration = round(time.monotonic() - start, 1)
             return {
                 "status": "success",
                 "force": force,
                 **result,
+                "duration_seconds": duration,
+                "summary": f"Initialized prompts in {duration}s.",
             }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            duration = round(time.monotonic() - start, 1)
+            return {"status": "error", "error": str(e), "duration_seconds": duration}
