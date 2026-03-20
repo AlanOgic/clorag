@@ -9,7 +9,7 @@
 | # | Change | Files | Lines |
 |---|---|---|---|
 | 1 | Replace deprecated `get_event_loop()` with `asyncio.to_thread()` | `mcp/tools/chunks.py` | ~4 |
-| 2 | Add `filter_conditions` param to `search_hybrid_rrf()` | `core/vectorstore.py` | ~10 |
+| 2 | Add `match_filters` param to `search_hybrid_rrf()` | `core/vectorstore.py` | ~10 |
 | 3 | `search_chunks` uses public VectorStore API | `mcp/tools/chunks.py` | ~30 replaced |
 | 4 | HTTP Bearer auth via `MCP_API_KEY` | `config.py`, `mcp/server.py`, new `mcp/auth.py` | ~40 new |
 | 5 | Path sanitization with `MCP_IMPORT_BASE_DIR` | `config.py`, `mcp/tools/ingestion.py` | ~10 |
@@ -24,21 +24,27 @@
 
 **Problem:** `chunks.py` uses `asyncio.get_event_loop().run_in_executor()` at two locations (lines 251, 389). This is deprecated in Python 3.10+, raises `DeprecationWarning` in 3.12, and will error in a future version. The web pipeline already uses `asyncio.to_thread()` correctly.
 
-**Change:** Replace both occurrences:
+**Change:** Replace both occurrences. Note the two calls have different signatures:
 
+In `edit_chunk` (line 251) — batch embed for document text:
 ```python
-# Before (deprecated)
+# Before
 sparse_task = asyncio.get_event_loop().run_in_executor(
     None, services.sparse_embeddings.embed_texts, [text],
 )
-
 # After
-sparse_task = asyncio.to_thread(
-    services.sparse_embeddings.embed_texts, [text],
-)
+sparse_task = asyncio.to_thread(services.sparse_embeddings.embed_texts, [text])
 ```
 
-Same change for `embed_query` call at line 389.
+In `search_chunks` (line 389) — single query embed:
+```python
+# Before
+sparse_task = asyncio.get_event_loop().run_in_executor(
+    None, services.sparse_embeddings.embed_query, query,
+)
+# After
+sparse_task = asyncio.to_thread(services.sparse_embeddings.embed_query, query)
+```
 
 **Files:** `src/clorag/mcp/tools/chunks.py`
 
@@ -48,7 +54,7 @@ Same change for `embed_query` call at line 389.
 
 **Problem:** `search_chunks` in `chunks.py` accesses `services.vectorstore._client.query_points()` directly because the public `search_hybrid_rrf()` method doesn't support passing a Qdrant filter. This bypasses abstractions (no metrics, no cache, no logging).
 
-**Change:** Add an optional `filter_conditions` parameter to `search_hybrid_rrf()` in `vectorstore.py`:
+**Change:** Add an optional `match_filters` parameter to `search_hybrid_rrf()` in `vectorstore.py`. Named `match_filters` (not `match_filters`) to clearly indicate it supports exact-match filters only — not range, list, or complex conditions:
 
 ```python
 async def search_hybrid_rrf(
@@ -57,7 +63,7 @@ async def search_hybrid_rrf(
     dense_vector: list[float],
     sparse_vector: SparseVector,
     limit: int = 10,
-    filter_conditions: dict[str, Any] | None = None,  # NEW
+    match_filters: dict[str, Any] | None = None,  # NEW — exact match only
 ) -> list[SearchResult]:
 ```
 
@@ -65,13 +71,13 @@ Inside the method, build a Qdrant filter from the dict (reusing the same pattern
 
 ```python
 query_filter = None
-if filter_conditions:
+if match_filters:
     must_conditions = [
         models.FieldCondition(
             key=key,
             match=models.MatchValue(value=value),
         )
-        for key, value in filter_conditions.items()
+        for key, value in match_filters.items()
     ]
     query_filter = models.Filter(must=must_conditions)
 ```
@@ -106,7 +112,7 @@ results = await services.vectorstore.search_hybrid_rrf(
     dense_vector=dense_vector,
     sparse_vector=sparse_vector,
     limit=over_fetch,
-    filter_conditions=filter_dict,
+    match_filters=filter_dict,
 )
 ```
 
@@ -114,7 +120,8 @@ This removes:
 - Direct `_client` access
 - Manual `qmodels.Prefetch` / `qmodels.FusionQuery` construction
 - `from qdrant_client import models as qmodels` import
-- `from clorag.core.vectorstore import SearchResult` import
+
+**Note:** The `from clorag.core.vectorstore import SearchResult` import is no longer needed at runtime (duck typing), but keep it if `mypy --strict` requires the type. Verify during implementation.
 
 The existing reranking logic (lines 447-467) stays unchanged — it operates on the results list regardless of how they were fetched.
 
@@ -224,6 +231,10 @@ def main_http() -> None:
     anyio.run(server.serve)
 ```
 
+**Lifespan safety:** Verified that `streamable_http_app()` returns a Starlette app with `lifespan=lambda app: self.session_manager.run()` wired in (FastMCP server.py line 1019). Wrapping with ASGI middleware preserves the lifespan chain — `MCPServices` init/cleanup still runs correctly.
+
+**Transport note:** Streamable-http is pure HTTP (POST + SSE). No WebSocket. The middleware only checks `scope["type"] == "http"` which covers all MCP traffic.
+
 **Behavior matrix:**
 
 | `MCP_API_KEY` | Transport | Auth enforced? |
@@ -279,7 +290,7 @@ Key details:
 - `resolve()` collapses `..`, symlinks, and relative paths to absolute
 - `is_relative_to()` (Python 3.9+) is the standard containment check
 - Validation before `exists()` — even non-existent paths outside the base dir are rejected
-- Default `data/imports/` works out of the box; override via `MCP_IMPORT_BASE_DIR` env var
+- Default `data/imports/` is relative — resolves from CWD at runtime. In Docker this is `/opt/clorag/data/imports`. For production, set an absolute path via `MCP_IMPORT_BASE_DIR`
 
 **Files:** `src/clorag/config.py`, `src/clorag/mcp/tools/ingestion.py`
 
@@ -325,6 +336,18 @@ except Exception as e:
 
 **The `summary` field** gives the LLM client a ready-to-display message without interpreting raw numbers.
 
+**Summary templates per tool:**
+
+| Tool | Summary template |
+|---|---|
+| `ingest_docs` | `"Ingested {count} documentation pages in {duration}s."` |
+| `ingest_curated` | `"Ingested {count} support cases in {duration}s (offset {offset})."` |
+| `import_custom_documents` | `"Imported {imported} documents, skipped {skipped} in {duration}s."` (prefixed with `[DRY RUN]` if applicable) |
+| `enrich_cameras` | `"Enriched {count} cameras in {duration}s."` |
+| `populate_graph` | `"Extracted entities from {collections}: {formatted_counts} in {duration}s."` (format entity_counts dict as `"Camera: 12, Protocol: 8, ..."`) |
+| `fix_rio_preview` | `"Found {found} fixes, saved {saved} suggestions in {duration}s."` |
+| `fix_rio_apply` | `"Applied {count} terminology fixes in {duration}s."` |
+
 **Files:** `src/clorag/mcp/tools/ingestion.py`
 
 ---
@@ -343,8 +366,10 @@ except Exception as e:
 | File | Action | Changes |
 |---|---|---|
 | `src/clorag/config.py` | Modified | Add `mcp_api_key`, `mcp_import_base_dir` fields |
-| `src/clorag/core/vectorstore.py` | Modified | Add `filter_conditions` param to `search_hybrid_rrf()` |
+| `src/clorag/core/vectorstore.py` | Modified | Add `match_filters` param to `search_hybrid_rrf()` |
 | `src/clorag/mcp/auth.py` | **New** | Bearer token ASGI middleware (~30 lines) |
 | `src/clorag/mcp/server.py` | Modified | Rewrite `main_http()` with auth wrapping |
 | `src/clorag/mcp/tools/chunks.py` | Modified | Fix `asyncio.to_thread()`, use public API for search |
 | `src/clorag/mcp/tools/ingestion.py` | Modified | Path sanitization, enriched responses |
+| `.env.example` | Modified | Add `MCP_API_KEY`, `MCP_IMPORT_BASE_DIR` |
+| `CLAUDE.md` | Modified | Document new env vars in Configuration section |
