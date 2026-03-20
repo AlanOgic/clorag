@@ -248,8 +248,8 @@ def register_chunk_tools(mcp: FastMCP[MCPServices]) -> None:
             dense_task = services.embeddings.embed_documents(
                 [text],
             )
-            sparse_task = asyncio.get_event_loop().run_in_executor(
-                None, services.sparse_embeddings.embed_texts, [text],
+            sparse_task = asyncio.to_thread(
+                services.sparse_embeddings.embed_texts, [text],
             )
 
             dense_results, sparse_results = await asyncio.gather(
@@ -386,8 +386,8 @@ def register_chunk_tools(mcp: FastMCP[MCPServices]) -> None:
         from clorag.core.vectorstore import SearchResult
 
         dense_task = services.embeddings.embed_query(query)
-        sparse_task = asyncio.get_event_loop().run_in_executor(
-            None, services.sparse_embeddings.embed_query, query,
+        sparse_task = asyncio.to_thread(
+            services.sparse_embeddings.embed_query, query,
         )
 
         dense_vector, sparse_vector = await asyncio.gather(
