@@ -975,6 +975,115 @@
             display: none;
         }
 
+        /* Quick Action Cards (admin-card style) */
+        .quick-actions {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            padding: 1.5rem 1rem 0;
+            max-width: 700px;
+            margin: 0 auto;
+            animation: fadeInUp 0.6s ease-out;
+            transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+        }
+
+        .quick-actions.fade-out {
+            opacity: 0;
+            transform: translateY(-10px);
+            pointer-events: none;
+            max-height: 0;
+            padding: 0;
+            margin: 0 auto;
+            overflow: hidden;
+            transition: opacity 0.4s ease-out, transform 0.4s ease-out, max-height 0.4s ease-out 0.2s, padding 0.4s ease-out 0.2s;
+        }
+
+        .quick-action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0;
+            padding: 1.5rem;
+            background: white;
+            border: 1px solid #e0e7ef;
+            border-radius: 12px;
+            color: var(--cyanview-navy);
+            text-decoration: none;
+            cursor: pointer;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                        box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            animation: buttonPulseIn 0.8s ease-out both;
+            flex: 1;
+            max-width: 320px;
+        }
+
+        .quick-action-btn:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+        .quick-action-btn:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 8px 24px rgba(0, 51, 102, 0.15);
+        }
+
+        .quick-action-btn__icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .quick-action-btn__icon--config {
+            background: #e8eaf6;
+        }
+
+        .quick-action-btn__icon--troubleshoot {
+            background: #fce4ec;
+        }
+
+        .quick-action-btn__title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.4rem;
+        }
+
+        .quick-action-btn__description {
+            font-size: 0.85rem;
+            color: #606770;
+            line-height: 1.5;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes buttonPulseIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.9) translateY(10px);
+            }
+            60% {
+                opacity: 1;
+                transform: scale(1.03) translateY(-2px);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
         /* Responsive */
         @media (max-width: 600px) {
             .hero {
@@ -992,6 +1101,12 @@
             .answer-card {
                 padding: 1rem 1.25rem;
             }
+
+            .quick-actions {
+                flex-direction: column;
+                align-items: center;
+                gap: 0.75rem;
+            }
         }
     </style>
 </head>
@@ -1004,9 +1119,7 @@
         </a>
         <div class="navbar__links">
             <a href="#" class="navbar__link" id="help-link">Help</a>
-            <a href="https://cyanview.cloud/configurator" class="navbar__link" target="_blank">Configurator</a>
-            <a href="https://cyanview.cloud/troubleshooter" class="navbar__link" target="_blank">Troubleshooting</a>
-            <a href="https://support.cyanview.com/docs/" class="navbar__link" target="_blank">Docs & Manuals</a>
+<a href="https://support.cyanview.com/docs/" class="navbar__link" target="_blank">Docs & Manuals</a>
             <a href="https://cyanview.com" class="navbar__link" target="_blank">Cyanview.com</a>
         </div>
     </nav>
@@ -1029,6 +1142,29 @@
             </form>
         </div>
     </section>
+
+    <!-- Quick Action Cards -->
+    <div class="quick-actions" id="quick-actions">
+        <a href="https://cyanview.cloud/configurator" class="quick-action-btn" target="_blank">
+            <div class="quick-action-btn__icon quick-action-btn__icon--config">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3949ab" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </div>
+            <div class="quick-action-btn__title">Configurator</div>
+            <div class="quick-action-btn__description">Build and validate your Cyanview system configuration step by step.</div>
+        </a>
+        <a href="https://cyanview.cloud/troubleshooter" class="quick-action-btn" target="_blank">
+            <div class="quick-action-btn__icon quick-action-btn__icon--troubleshoot">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c2185b" stroke-width="2">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
+            </div>
+            <div class="quick-action-btn__title">Troubleshooting</div>
+            <div class="quick-action-btn__description">Diagnose and resolve common issues with guided troubleshooting steps.</div>
+        </a>
+    </div>
 
     <!-- Info Section -->
     <section class="info-section" id="info-section">
@@ -1580,6 +1716,9 @@ ${bodyContent}
             if (infoSection) {
                 infoSection.style.display = 'block';
             }
+            // Restore quick action buttons
+            const quickActions = document.getElementById('quick-actions');
+            if (quickActions) quickActions.classList.remove('fade-out');
             searchInput.value = '';
             setRandomPlaceholder();
             searchInput.focus();
@@ -1744,6 +1883,9 @@ ${bodyContent}
                                     // Hide info section when streaming begins
                                     if (fullText === '' && infoSection) {
                                         infoSection.style.display = 'none';
+                                        // Fade out quick action buttons
+                                        const quickActions = document.getElementById('quick-actions');
+                                        if (quickActions) quickActions.classList.add('fade-out');
                                         // Initialize answerStore for this exchange
                                         answerStore[exchangeId] = { markdown: '', sources: [], query: query };
                                     }
