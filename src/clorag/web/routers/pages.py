@@ -265,6 +265,13 @@ async def admin_prompts(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("admin_prompts.html", {"request": request})
 
 
+@router.get("/admin/settings", response_class=HTMLResponse)
+async def admin_settings(request: Request) -> HTMLResponse:
+    """Admin RAG settings page."""
+    templates = get_templates()
+    return templates.TemplateResponse("admin_settings.html", {"request": request})
+
+
 @router.get("/admin/ingestion", response_class=HTMLResponse)
 async def admin_ingestion(request: Request) -> HTMLResponse:
     """Admin ingestion management page."""

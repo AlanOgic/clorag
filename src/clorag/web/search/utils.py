@@ -66,12 +66,25 @@ def _group_key(chunk: dict[str, Any]) -> str:
         return chunk.get("subject") or "Support Case"
 
 
+def _get_synthesis_defaults() -> tuple[int, int, int]:
+    """Get synthesis defaults from settings with fallback."""
+    try:
+        from clorag.services.settings_manager import get_setting
+        return (
+            int(get_setting("synthesis.max_chunks")),
+            int(get_setting("synthesis.context_total_budget")),
+            int(get_setting("synthesis.context_group_budget")),
+        )
+    except (KeyError, ImportError, Exception):
+        return 8, 12000, 4000
+
+
 def build_context(
     chunks: list[dict[str, Any]],
-    max_chunks: int = 8,
+    max_chunks: int | None = None,
     graph_context: str | None = None,
-    max_total_chars: int = 12000,
-    max_group_chars: int = 4000,
+    max_total_chars: int | None = None,
+    max_group_chars: int | None = None,
 ) -> str:
     """Build context string from chunks for Claude synthesis.
 
@@ -85,6 +98,15 @@ def build_context(
         max_total_chars: Maximum total characters across all groups.
         max_group_chars: Maximum characters per source group.
     """
+    # Apply defaults from settings if not explicitly provided
+    defaults = _get_synthesis_defaults()
+    if max_chunks is None:
+        max_chunks = defaults[0]
+    if max_total_chars is None:
+        max_total_chars = defaults[1]
+    if max_group_chars is None:
+        max_group_chars = defaults[2]
+
     parts: list[str] = []
 
     # Add graph context first if available

@@ -296,6 +296,24 @@ class PromptTestRequest(BaseModel):
 
 
 # =============================================================================
+# Settings Models
+# =============================================================================
+
+
+class SettingUpdateRequest(BaseModel):
+    """Request body for updating a setting value."""
+
+    value: str
+    change_note: str | None = None
+
+
+class SettingRollbackRequest(BaseModel):
+    """Request body for rolling back a setting to a previous version."""
+
+    version: int
+
+
+# =============================================================================
 # Session Dataclasses
 # =============================================================================
 

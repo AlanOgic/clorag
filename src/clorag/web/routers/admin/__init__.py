@@ -17,6 +17,7 @@ from clorag.web.routers.admin import (
     graph,
     ingestion,
     prompts,
+    settings,
     support,
     terminology,
 )
@@ -35,6 +36,7 @@ router.include_router(chunks.router)
 router.include_router(documents.router)
 router.include_router(drafts.router)
 router.include_router(prompts.router)
+router.include_router(settings.router)
 router.include_router(ingestion.router)
 router.include_router(debug.router)
 

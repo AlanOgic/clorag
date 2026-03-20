@@ -152,8 +152,13 @@ async def perform_search(
         # Generate dense and sparse embeddings in parallel for better latency
         dense_vector, sparse_vector = await generate_embeddings_parallel(req.query)
 
-        # Over-fetch when reranking is enabled (3x the limit, min 15)
-        fetch_limit = max(req.limit * 3, 15) if rerank_enabled else req.limit
+        # Over-fetch when reranking is enabled
+        try:
+            from clorag.services.settings_manager import get_setting
+            overfetch_mult = int(get_setting("retrieval.overfetch_multiplier"))
+        except (KeyError, ImportError, Exception):
+            overfetch_mult = 3
+        fetch_limit = max(req.limit * overfetch_mult, 15) if rerank_enabled else req.limit
 
         results: list[SearchResult] = []
         chunks_for_synthesis: list[dict[str, Any]] = []

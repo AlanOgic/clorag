@@ -198,6 +198,7 @@
             <a href="/admin/metrics" class="navbar__link">Metrics</a>
             <a href="/admin/docs" class="navbar__link">Docs</a>
             <a href="/admin/prompts" class="navbar__link">Prompts</a>
+            <a href="/admin/settings" class="navbar__link">Settings</a>
             <span class="navbar__divider"></span>
             <a href="/" class="navbar__link">AI Search</a>
             <a href="/admin/cameras" class="navbar__link">Cameras</a>
@@ -265,20 +266,8 @@
                         <circle cx="12" cy="13" r="4"/>
                     </svg>
                 </div>
-                <h2 class="admin-card__title">Camera Management</h2>
-                <p class="admin-card__description">Add, edit, and delete camera compatibility entries. Manage protocols, ports, and device types.</p>
-            </a>
-
-            <a href="/admin/cameras-list" class="admin-card">
-                <div class="admin-card__icon" style="background: #e0f2f1;">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00796b" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.35-4.35"/>
-                        <path d="M8 11h6M11 8v6"/>
-                    </svg>
-                </div>
-                <h2 class="admin-card__title">Camera Browser</h2>
-                <p class="admin-card__description">Browse all cameras with filters, search, and detail popup. Quick read-only view of the camera database.</p>
+                <h2 class="admin-card__title">Cameras</h2>
+                <p class="admin-card__description">Browse, edit, and manage camera compatibility entries. Search, merge duplicates, and manage protocols.</p>
             </a>
 
             <a href="/admin/analytics" class="admin-card">
@@ -398,6 +387,17 @@
                 </div>
                 <h2 class="admin-card__title">Knowledge Graph</h2>
                 <p class="admin-card__description">Explore GraphRAG: browse entities, view relationships, and monitor Neo4j graph health.</p>
+            </a>
+
+            <a href="/admin/settings" class="admin-card">
+                <div class="admin-card__icon" style="background: #e8eaf6;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3949ab" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </div>
+                <h2 class="admin-card__title">RAG Settings</h2>
+                <p class="admin-card__description">Fine-tune retrieval thresholds, reranking, synthesis, cache sizes, and prefetch parameters.</p>
             </a>
 
             <button id="backupBtn" class="admin-card" style="border: none; text-align: left; width: 100%; cursor: pointer;">

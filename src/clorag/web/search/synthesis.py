@@ -11,6 +11,7 @@ import anthropic
 
 from clorag.config import get_settings
 from clorag.services.prompt_manager import get_prompt
+from clorag.services.settings_manager import get_setting
 from clorag.web.search.utils import build_context
 
 # Lazy-loaded Anthropic client
@@ -57,9 +58,14 @@ async def synthesize_answer(
         messages.extend(conversation_history)
     messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
 
+    try:
+        max_tokens = int(get_setting("synthesis.max_tokens"))
+    except (KeyError, Exception):
+        max_tokens = 1500
+
     response = await get_anthropic().messages.create(
         model=settings.sonnet_model,
-        max_tokens=1500,
+        max_tokens=max_tokens,
         system=get_prompt("synthesis.web_answer"),
         messages=messages,
     )
@@ -100,9 +106,14 @@ async def synthesize_answer_stream(
         messages.extend(conversation_history)
     messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
 
+    try:
+        max_tokens = int(get_setting("synthesis.max_tokens"))
+    except (KeyError, Exception):
+        max_tokens = 1500
+
     async with get_anthropic().messages.stream(
         model=settings.sonnet_model,
-        max_tokens=1500,
+        max_tokens=max_tokens,
         system=get_prompt("synthesis.web_answer"),
         messages=messages,
     ) as stream:
