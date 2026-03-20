@@ -415,6 +415,7 @@ class VectorStore:
         dense_vector: list[float],
         sparse_vector: SparseVector,
         limit: int = 10,
+        match_filters: dict[str, Any] | None = None,
     ) -> list[SearchResult]:
         """Hybrid search combining dense + sparse vectors with RRF fusion.
 
@@ -426,6 +427,8 @@ class VectorStore:
             dense_vector: Dense embedding vector (voyage-context-3).
             sparse_vector: Sparse BM25 vector.
             limit: Maximum number of results.
+            match_filters: Optional dict of exact-match field filters applied
+                to both prefetch stages (e.g. ``{"category": "troubleshooting"}``).
 
         Returns:
             List of SearchResult objects ranked by RRF fusion.
@@ -441,6 +444,18 @@ class VectorStore:
             prefetch_max = 50
         prefetch_limit = min(limit * prefetch_mult, prefetch_max)
 
+        # Build Qdrant filter from exact-match dict
+        query_filter = None
+        if match_filters:
+            must_conditions = [
+                models.FieldCondition(
+                    key=key,
+                    match=models.MatchValue(value=value),
+                )
+                for key, value in match_filters.items()
+            ]
+            query_filter = models.Filter(must=must_conditions)
+
         response = await self._client.query_points(
             collection_name=collection,
             prefetch=[
@@ -448,11 +463,13 @@ class VectorStore:
                     query=dense_vector,
                     using="dense",
                     limit=prefetch_limit,
+                    filter=query_filter,
                 ),
                 models.Prefetch(
                     query=sparse_vector,
                     using="sparse",
                     limit=prefetch_limit,
+                    filter=query_filter,
                 ),
             ],
             query=models.FusionQuery(fusion=models.Fusion.RRF),

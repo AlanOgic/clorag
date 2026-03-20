@@ -1143,3 +1143,66 @@ class TestPromptTools:
             result = tools["rollback_prompt"](prompt_id="p-001", version=999)
 
         assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_search_hybrid_rrf_with_match_filters(mock_settings):
+    """search_hybrid_rrf passes match_filters to Qdrant prefetch."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from qdrant_client.http import models
+
+    mock_client = AsyncMock()
+    mock_response = MagicMock()
+    mock_response.points = []
+    mock_client.query_points.return_value = mock_response
+
+    with patch("clorag.core.vectorstore.AsyncQdrantClient", return_value=mock_client):
+        from clorag.core.vectorstore import VectorStore
+
+        vs = VectorStore()
+
+        results = await vs.search_hybrid_rrf(
+            collection="test_docs",
+            dense_vector=[0.1] * 1024,
+            sparse_vector=models.SparseVector(indices=[1, 2], values=[0.5, 0.3]),
+            limit=5,
+            match_filters={"category": "troubleshooting"},
+        )
+
+        mock_client.query_points.assert_called_once()
+        call_kwargs = mock_client.query_points.call_args[1]
+
+        for prefetch in call_kwargs["prefetch"]:
+            assert prefetch.filter is not None
+            assert len(prefetch.filter.must) == 1
+            assert prefetch.filter.must[0].key == "category"
+
+
+@pytest.mark.asyncio
+async def test_search_hybrid_rrf_without_filters(mock_settings):
+    """search_hybrid_rrf works without match_filters (backward compat)."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from qdrant_client.http import models
+
+    mock_client = AsyncMock()
+    mock_response = MagicMock()
+    mock_response.points = []
+    mock_client.query_points.return_value = mock_response
+
+    with patch("clorag.core.vectorstore.AsyncQdrantClient", return_value=mock_client):
+        from clorag.core.vectorstore import VectorStore
+
+        vs = VectorStore()
+
+        results = await vs.search_hybrid_rrf(
+            collection="test_docs",
+            dense_vector=[0.1] * 1024,
+            sparse_vector=models.SparseVector(indices=[1, 2], values=[0.5, 0.3]),
+            limit=5,
+        )
+
+        mock_client.query_points.assert_called_once()
+        call_kwargs = mock_client.query_points.call_args[1]
+
+        for prefetch in call_kwargs["prefetch"]:
+            assert prefetch.filter is None
