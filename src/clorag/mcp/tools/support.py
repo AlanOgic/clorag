@@ -134,6 +134,44 @@ def register_support_tools(mcp: FastMCP[MCPServices]) -> None:
         }
 
     @mcp.tool()
+    def get_support_case_raw(case_id: str) -> dict[str, Any]:
+        """Get the raw anonymized thread content of a support case.
+
+        Returns the full email thread as-is (not just the
+        problem/solution summaries). Useful for seeing the
+        complete conversation flow, quoted replies, and
+        original context.
+
+        Args:
+            case_id: Support case ID.
+
+        Returns:
+            Raw thread content with case metadata.
+        """
+        from clorag.mcp.server import get_services
+
+        services = get_services()
+        case = services.support_case_db.get_case_by_id(case_id)
+
+        if not case:
+            return {
+                "error": f"Support case '{case_id}' not found",
+            }
+
+        raw_thread = services.support_case_db.get_raw_thread(
+            case_id,
+        )
+
+        return {
+            "case_id": case.id,
+            "thread_id": case.thread_id,
+            "subject": case.subject,
+            "raw_thread": raw_thread or case.document,
+            "has_raw_thread": raw_thread is not None,
+            "messages_count": case.messages_count,
+        }
+
+    @mcp.tool()
     def get_support_stats() -> dict[str, Any]:
         """Get statistics about the support case database.
 

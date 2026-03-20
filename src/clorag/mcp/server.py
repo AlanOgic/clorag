@@ -2,11 +2,34 @@
 
 from __future__ import annotations
 
+# Configure logging to stderr BEFORE any application imports.
+# Module-level imports trigger database init and model loading that log messages.
+# For stdio transport, stdout must stay clean for JSON-RPC protocol.
+import logging
+import sys
+
+logging.basicConfig(format="%(message)s", stream=sys.stderr, level=logging.INFO, force=True)
+
+import structlog
+
+structlog.configure(
+    processors=[
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.dev.ConsoleRenderer(),
+    ],
+    wrapper_class=structlog.stdlib.BoundLogger,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=False,
+)
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from mcp.server.fastmcp import FastMCP
 
+from clorag.core.analytics_db import AnalyticsDatabase
 from clorag.core.database import get_camera_database
 from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.reranker import RerankerClient
@@ -14,13 +37,21 @@ from clorag.core.retriever import MultiSourceRetriever
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.support_case_db import get_support_case_database
 from clorag.core.vectorstore import VectorStore
+from clorag.mcp.prompts import register_prompts
+from clorag.mcp.resources import register_resources
 from clorag.mcp.tools import (
+    register_analytics_tools,
     register_camera_tools,
+    register_chunk_tools,
     register_document_tools,
+    register_ingestion_tools,
+    register_prompt_tools,
     register_search_tools,
+    register_settings_tools,
     register_support_tools,
 )
 from clorag.services.custom_docs import CustomDocumentService
+from clorag.services.prompt_manager import get_prompt_manager
 
 
 class MCPServices:
@@ -53,6 +84,13 @@ class MCPServices:
             sparse_embeddings=self.sparse_embeddings,
         )
 
+        # Initialize analytics and prompt services
+        from clorag.config import get_settings
+
+        settings = get_settings()
+        self.analytics_db = AnalyticsDatabase(settings.analytics_database_path)
+        self.prompt_manager = get_prompt_manager()
+
 
 # Global services instance (initialized in lifespan)
 _services: MCPServices | None = None
@@ -79,7 +117,10 @@ async def lifespan(app: FastMCP[MCPServices]) -> AsyncIterator[MCPServices]:
         _services = None
 
 
-def create_mcp_server() -> FastMCP[MCPServices]:
+def create_mcp_server(
+    host: str = "127.0.0.1",
+    port: int = 8000,
+) -> FastMCP[MCPServices]:
     """Create and configure the CLORAG MCP server.
 
     Returns:
@@ -95,6 +136,8 @@ def create_mcp_server() -> FastMCP[MCPServices]:
             "troubleshooting, and integration guides."
         ),
         lifespan=lifespan,
+        host=host,
+        port=port,
     )
 
     # Register all tools
@@ -102,15 +145,41 @@ def create_mcp_server() -> FastMCP[MCPServices]:
     register_camera_tools(mcp)
     register_document_tools(mcp)
     register_support_tools(mcp)
+    register_chunk_tools(mcp)
+    register_prompt_tools(mcp)
+    register_settings_tools(mcp)
+    register_analytics_tools(mcp)
+    register_ingestion_tools(mcp)
+
+    # Register resources and resource templates
+    register_resources(mcp)
+
+    # Register prompt templates
+    register_prompts(mcp)
 
     return mcp
 
 
 def main() -> None:
-    """Entry point for the MCP server."""
+    """Entry point for the MCP server (stdio transport for local use)."""
     mcp = create_mcp_server()
     mcp.run(transport="stdio")
 
 
+def main_http() -> None:
+    """Entry point for the MCP server (streamable-http transport for Docker/remote)."""
+    import os
+
+    host = os.getenv("MCP_HOST", "0.0.0.0")
+    port = int(os.getenv("MCP_PORT", "8080"))
+    mcp = create_mcp_server(host=host, port=port)
+    mcp.run(transport="streamable-http")
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+
+    if "--http" in sys.argv:
+        main_http()
+    else:
+        main()

@@ -30,9 +30,8 @@ def register_document_tools(mcp: FastMCP[MCPServices]) -> None:
 
         Args:
             category: Filter by category. Valid categories:
-                - product_info, troubleshooting, configuration
-                - firmware, release_notes, faq, best_practices
-                - pre_sales, internal, other
+                product_info, troubleshooting, configuration, firmware,
+                release_notes, faq, best_practices, pre_sales, internal, other.
             limit: Maximum documents to return (1-50, default 20).
             offset: Number of documents to skip for pagination.
 
@@ -103,17 +102,3 @@ def register_document_tools(mcp: FastMCP[MCPServices]) -> None:
                 "created_by": doc.created_by,
             }
         }
-
-    @mcp.tool()
-    async def get_document_categories() -> dict[str, Any]:
-        """Get available document categories.
-
-        Returns:
-            List of valid categories for filtering and document creation.
-        """
-        from clorag.mcp.server import get_services
-
-        services = get_services()
-        categories = await services.document_service.get_categories()
-
-        return {"categories": categories}
