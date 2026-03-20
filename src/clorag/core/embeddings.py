@@ -12,8 +12,15 @@ from clorag.core.cache import LRUCache, make_cache_key
 
 logger = structlog.get_logger(__name__)
 
-# Query embedding cache settings
-QUERY_CACHE_MAX_SIZE = 200  # Cache up to 200 unique queries
+# Query embedding cache settings — configurable via admin settings
+def _get_query_cache_size() -> int:
+    try:
+        from clorag.services.settings_manager import get_setting
+        return int(get_setting("caches.query_embedding_size"))
+    except (KeyError, ImportError, Exception):
+        return 200
+
+QUERY_CACHE_MAX_SIZE = _get_query_cache_size()
 
 
 class QueryEmbeddingCache:

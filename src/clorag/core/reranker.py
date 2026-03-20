@@ -12,8 +12,15 @@ from clorag.core.cache import LRUCache
 
 logger = structlog.get_logger(__name__)
 
-# Rerank cache settings
-RERANK_CACHE_MAX_SIZE = 100  # Cache up to 100 unique query+docs combinations
+# Rerank cache settings — configurable via admin settings
+def _get_rerank_cache_size() -> int:
+    try:
+        from clorag.services.settings_manager import get_setting
+        return int(get_setting("caches.reranker_size"))
+    except (KeyError, ImportError, Exception):
+        return 100
+
+RERANK_CACHE_MAX_SIZE = _get_rerank_cache_size()
 
 
 @dataclass

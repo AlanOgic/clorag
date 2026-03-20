@@ -9,6 +9,7 @@ from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.reranker import RerankerClient
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import SearchResult, VectorStore
+from clorag.services.settings_manager import get_setting
 from clorag.utils.text_transforms import apply_product_name_transforms
 
 
@@ -59,21 +60,35 @@ def calculate_dynamic_threshold(query: str) -> float:
     words = query.lower().split()
     word_count = len(words)
 
-    # Base threshold based on query length
+    # Base threshold based on query length (from configurable settings)
+    try:
+        short_threshold = get_setting("retrieval.short_query_threshold")
+        medium_threshold = get_setting("retrieval.medium_query_threshold")
+        long_threshold = get_setting("retrieval.long_query_threshold")
+        tech_bonus = get_setting("retrieval.technical_term_bonus")
+        max_cap = get_setting("retrieval.max_threshold_cap")
+    except (KeyError, Exception):
+        # Fallback to hardcoded defaults if settings not available
+        short_threshold = 0.15
+        medium_threshold = 0.20
+        long_threshold = 0.25
+        tech_bonus = 0.05
+        max_cap = 0.30
+
     if word_count <= 2:
-        base = 0.15
+        base = float(short_threshold)
     elif word_count <= 5:
-        base = 0.20
+        base = float(medium_threshold)
     else:
-        base = 0.25
+        base = float(long_threshold)
 
     # Check for technical terms (boost precision)
     query_lower = query.lower()
     has_technical = any(term in query_lower for term in TECHNICAL_TERMS)
     if has_technical:
-        base += 0.05
+        base += float(tech_bonus)
 
-    return min(base, 0.30)  # Cap at 0.30
+    return min(base, float(max_cap))
 
 
 class MultiSourceRetriever:
@@ -154,8 +169,12 @@ class MultiSourceRetriever:
         else:
             threshold = 0.20  # Default fallback
 
-        # Over-fetch when reranking is enabled (3x the limit, min 15)
-        fetch_limit = max(limit * 3, 15) if should_rerank else limit
+        # Over-fetch when reranking is enabled
+        try:
+            overfetch_mult = int(get_setting("retrieval.overfetch_multiplier"))
+        except (KeyError, Exception):
+            overfetch_mult = 3
+        fetch_limit = max(limit * overfetch_mult, 15) if should_rerank else limit
 
         # Search based on source using hybrid RRF
         if source == SearchSource.DOCS:
@@ -196,9 +215,13 @@ class MultiSourceRetriever:
         # Apply threshold filtering post-rerank (reranker scores are calibrated 0-1)
         if was_reranked:
             filtered_results = [r for r in results if r.score >= threshold]
-            # Ensure minimum results (at least 3 if available)
-            if len(filtered_results) < 3 and len(results) >= 3:
-                filtered_results = results[:3]
+            # Ensure minimum results
+            try:
+                min_results = int(get_setting("retrieval.min_guaranteed_results"))
+            except (KeyError, Exception):
+                min_results = 3
+            if len(filtered_results) < min_results and len(results) >= min_results:
+                filtered_results = results[:min_results]
         else:
             # Without reranking, skip threshold on RRF scores (uncalibrated)
             # Just return all results up to limit

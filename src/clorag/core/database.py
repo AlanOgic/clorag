@@ -124,9 +124,16 @@ class CameraDatabase:
         db_dir = Path(self._db_path).parent
         db_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize connection pool and cache
+        # Initialize connection pool and cache (sizes configurable via admin settings)
+        try:
+            from clorag.services.settings_manager import get_setting
+            cache_size = int(get_setting("caches.camera_db_size"))
+            cache_ttl = float(get_setting("caches.camera_db_ttl"))
+        except (KeyError, ImportError, Exception):
+            cache_size = 200
+            cache_ttl = 300.0
         self._pool = ConnectionPool(self._db_path, pool_size=5)
-        self._cache: LRUCache[Any] = LRUCache(max_size=200, ttl_seconds=300.0)  # 5 min TTL
+        self._cache: LRUCache[Any] = LRUCache(max_size=cache_size, ttl_seconds=cache_ttl)
 
         self._ensure_schema()
 

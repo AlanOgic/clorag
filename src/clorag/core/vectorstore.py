@@ -432,7 +432,14 @@ class VectorStore:
         """
         # Dynamic prefetch: fetch more candidates for better RRF fusion quality
         # Scale with requested limit but cap to avoid excessive retrieval
-        prefetch_limit = min(limit * 3, 50)
+        try:
+            from clorag.services.settings_manager import get_setting
+            prefetch_mult = int(get_setting("prefetch.multiplier"))
+            prefetch_max = int(get_setting("prefetch.max_limit"))
+        except (KeyError, ImportError, Exception):
+            prefetch_mult = 3
+            prefetch_max = 50
+        prefetch_limit = min(limit * prefetch_mult, prefetch_max)
 
         response = await self._client.query_points(
             collection_name=collection,
@@ -621,7 +628,15 @@ class VectorStore:
                     best_from_source = pool[0]  # Already sorted by score
                     # Only add if the source has a reasonable score
                     # (at least 50% of the top result's score)
-                    if top_results and best_from_source.score >= top_results[0].score * 0.5:
+                    try:
+                        from clorag.services.settings_manager import get_setting
+                        diversity_thresh = float(
+                            get_setting("reranking.source_diversity_threshold")
+                        )
+                    except (KeyError, ImportError, Exception):
+                        diversity_thresh = 0.5
+                    min_score = top_results[0].score * diversity_thresh
+                    if top_results and best_from_source.score >= min_score:
                         top_results[-1] = best_from_source
                         top_results.sort(key=lambda x: x.score, reverse=True)
 

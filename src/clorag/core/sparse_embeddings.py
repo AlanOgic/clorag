@@ -8,8 +8,15 @@ from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Sparse query cache settings
-SPARSE_CACHE_MAX_SIZE = 200
+# Sparse query cache settings — configurable via admin settings
+def _get_sparse_cache_size() -> int:
+    try:
+        from clorag.services.settings_manager import get_setting
+        return int(get_setting("caches.sparse_embedding_size"))
+    except (KeyError, ImportError, Exception):
+        return 200
+
+SPARSE_CACHE_MAX_SIZE = _get_sparse_cache_size()
 
 
 class SparseQueryCache:
