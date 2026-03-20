@@ -378,12 +378,7 @@ def register_chunk_tools(mcp: FastMCP[MCPServices]) -> None:
 
         limit = max(1, min(20, limit))
 
-        # Generate query embeddings
         import asyncio
-
-        from qdrant_client import models as qmodels
-
-        from clorag.core.vectorstore import SearchResult
 
         dense_task = services.embeddings.embed_query(query)
         sparse_task = asyncio.to_thread(
@@ -395,54 +390,15 @@ def register_chunk_tools(mcp: FastMCP[MCPServices]) -> None:
         )
 
         over_fetch = min(limit * 3, 50)
+        filter_dict = {field: value} if field and value else None
 
-        # Build Qdrant filter if field/value provided
-        query_filter = None
-        if field and value:
-            query_filter = qmodels.Filter(
-                must=[
-                    qmodels.FieldCondition(
-                        key=field,
-                        match=qmodels.MatchValue(value=value),
-                    )
-                ]
-            )
-
-        # Hybrid RRF search on single collection
-        response = await services.vectorstore._client.query_points(
-            collection_name=coll,
-            prefetch=[
-                qmodels.Prefetch(
-                    query=dense_vector,
-                    using="dense",
-                    limit=over_fetch,
-                    filter=query_filter,
-                ),
-                qmodels.Prefetch(
-                    query=sparse_vector,
-                    using="sparse",
-                    limit=over_fetch,
-                    filter=query_filter,
-                ),
-            ],
-            query=qmodels.FusionQuery(
-                fusion=qmodels.Fusion.RRF,
-            ),
+        results = await services.vectorstore.search_hybrid_rrf(
+            collection=coll,
+            dense_vector=dense_vector,
+            sparse_vector=sparse_vector,
             limit=over_fetch,
+            match_filters=filter_dict,
         )
-
-        results = [
-            SearchResult(
-                id=str(r.id),
-                score=r.score,
-                payload=r.payload or {},
-                text=(
-                    r.payload.get("text", "")
-                    if r.payload else ""
-                ),
-            )
-            for r in response.points
-        ]
 
         # Rerank if available
         rerank_enabled = services.retriever.rerank_enabled
