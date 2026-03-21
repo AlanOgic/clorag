@@ -65,7 +65,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Agent** (`agent/`): `tools.py` (Claude Agent SDK MCP tools), `prompts.py`
 
-**MCP** (`mcp/`): Standalone MCP server for Claude Desktop. `server.py` (FastMCP server with lifespan), `tools/` (search, cameras, documents, support). 16+ tools exposing full RAG capabilities via stdio transport.
+**MCP** (`mcp/`): Standalone MCP server for Claude Desktop and remote clients. `server.py` (FastMCP server with lifespan for stdio, manual init for HTTP), `tools/` (search, cameras, documents, support). 16+ tools exposing full RAG capabilities via stdio and StreamableHTTP transports.
 
 **Graph** (`graph/`): `schema.py` (Camera, Product, Protocol, Issue, Solution entities), `enrichment.py`
 
@@ -113,7 +113,7 @@ Environment variables (see `.env.example`):
 - `CHUNK_OVERLAP` (default: `50`) - Chunk overlap (~12.5%)
 - `CHUNK_ADAPTIVE_THRESHOLD` (default: `200`) - Single-chunk threshold (tokens)
 - `OPENAI_COMPAT_API_KEY` - Optional, enables `/v1/chat/completions` OpenAI-compatible API
-- `MCP_API_KEY` - Bearer token for MCP HTTP transport auth (optional, stdio needs no auth)
+- `MCP_API_KEY` - Bearer token for MCP HTTP transport auth (required for HTTP, not needed for stdio). Docker secret: `/run/secrets/mcp_api_key`
 - `MCP_IMPORT_BASE_DIR` (default: `data/imports`) - Base directory for MCP document imports (path containment)
 Settings via `clorag.config.get_settings()` (cached singleton).
 
@@ -256,7 +256,9 @@ rsync -avz --exclude '.venv' ... root@cyanview.cloud:/opt/clorag/
 ssh root@cyanview.cloud "cd /opt/clorag && docker compose build && docker compose up -d"
 ```
 
-Production: https://cyanview.cloud/ (Docker maps 8085→8080)
+Production:
+- Web: https://cyanview.cloud/ (Docker maps 8085→8080)
+- MCP HTTP: https://mcp.cyanview.cloud/ (Docker maps 8086→8080, Bearer auth required)
 
 ## Recent Updates (2026-03-20)
 

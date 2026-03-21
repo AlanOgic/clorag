@@ -18,6 +18,7 @@ _SECRET_FIELDS = {
     "openai_compat_api_key",
     "odoo_api_key",
     "odoo_mcp_api_key",
+    "mcp_api_key",
     "jina_api_key",
     "session_secret",
     "token_encryption_key",

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Enrich camera database with official model codes and URLs from manufacturer websites."""
+"""Enrich camera database with official model codes and URLs from manufacturer websites.
+
+Pipeline: Known mappings → SearXNG search → Jina Reader fetch → LLM extraction.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import anthropic
 import httpx
@@ -19,6 +22,9 @@ from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Jina Reader base URL (converts any URL to clean markdown)
+JINA_READER_URL = "https://r.jina.ai/"
+
 
 @dataclass
 class EnrichmentResult:
@@ -26,6 +32,8 @@ class EnrichmentResult:
 
     code_model: str | None = None
     manufacturer_url: str | None = None
+    source: str = "unknown"  # "known", "jina_fetch", "snippet_only"
+    fetched_urls: list[str] = field(default_factory=list)
 
 # Top manufacturers to enrich
 TOP_MANUFACTURERS = [
@@ -244,20 +252,160 @@ def get_known_enrichment(camera: Camera) -> EnrichmentResult:
     return result
 
 
+async def _fetch_with_jina(
+    http_client: httpx.AsyncClient,
+    url: str,
+    jina_api_key: str | None = None,
+    max_retries: int = 2,
+) -> str | None:
+    """Fetch page content via Jina Reader API (converts URL to clean markdown).
+
+    Args:
+        http_client: HTTP client for web requests.
+        url: URL to fetch.
+        jina_api_key: Optional Jina API key for higher rate limits.
+        max_retries: Max retries on 429 rate limit errors.
+
+    Returns:
+        Page content as markdown text, or None if failed.
+    """
+    jina_url = f"{JINA_READER_URL}{url}"
+
+    headers = {
+        "Accept": "application/json",
+        "X-No-Cache": "true",
+        "X-Retain-Images": "none",
+        # Target product specs content
+        "X-Target-Selector": "main, article, .product-specs, .specifications, "
+        "[class*='spec'], [class*='product'], [class*='detail'], #content",
+        # Remove noise
+        "X-Remove-Selector": "nav, .sidebar, header, footer, .cookie-banner, "
+        ".newsletter, .related-products, .reviews, .cart, .breadcrumb",
+    }
+
+    if jina_api_key:
+        headers["Authorization"] = f"Bearer {jina_api_key}"
+
+    for attempt in range(max_retries + 1):
+        try:
+            response = await http_client.get(jina_url, headers=headers, timeout=30.0)
+
+            if response.status_code == 429:
+                if attempt < max_retries:
+                    delay = 3 ** (attempt + 1)  # 3s, 9s
+                    logger.debug("Jina rate limited, retrying", url=url, delay=delay)
+                    await asyncio.sleep(delay)
+                    continue
+                logger.debug("Jina rate limit exhausted", url=url)
+                return None
+
+            if response.status_code >= 400:
+                logger.debug("Jina fetch failed", url=url, status=response.status_code)
+                return None
+
+            response.raise_for_status()
+
+            data = response.json()
+            jina_data = data.get("data", {})
+            content = (jina_data.get("content") or "").strip()
+
+            if not content or len(content) < 50:
+                logger.debug("Jina returned insufficient content", url=url, length=len(content))
+                return None
+
+            # Truncate to ~4000 chars to avoid blowing up the LLM context
+            if len(content) > 4000:
+                content = content[:4000] + "\n[...truncated]"
+
+            logger.debug("Jina fetch successful", url=url, content_length=len(content))
+            return content
+
+        except (httpx.HTTPError, json.JSONDecodeError) as e:
+            logger.debug("Jina fetch error", url=url, error=str(e))
+            if attempt < max_retries:
+                await asyncio.sleep(2)
+                continue
+            return None
+
+    return None
+
+
+def _pick_best_urls(
+    search_results: list[dict[str, str]],
+    manufacturer_domain: str,
+    max_urls: int = 2,
+) -> list[str]:
+    """Pick the best URLs to fetch from search results.
+
+    Prioritizes: manufacturer official site > B&H/Adorama > other retailers.
+
+    Args:
+        search_results: List of dicts with 'url', 'title', 'snippet' keys.
+        manufacturer_domain: Official manufacturer domain (e.g., 'sony.com').
+        max_urls: Maximum URLs to return.
+
+    Returns:
+        List of URLs ranked by quality.
+    """
+    priority_domains = [
+        manufacturer_domain,  # Official site first
+        "bhphotovideo.com",
+        "adorama.com",
+        "fullcompass.com",
+    ]
+
+    scored: list[tuple[float, str]] = []
+    for r in search_results:
+        url = r.get("url", "")
+        if not url:
+            continue
+
+        score = 0.0
+        url_lower = url.lower()
+
+        # Priority scoring
+        for i, domain in enumerate(priority_domains):
+            if domain and domain in url_lower:
+                score = 10.0 - i  # Higher score for higher priority
+                break
+
+        # Bonus for spec/product pages
+        spec_terms = ["spec", "product", "detail", "feature", "overview"]
+        if any(term in url_lower for term in spec_terms):
+            score += 1.0
+
+        # Penalty for non-useful pages
+        penalty_terms = ["review", "forum", "blog", "news", "video", "youtube"]
+        if any(term in url_lower for term in penalty_terms):
+            score -= 5.0
+
+        scored.append((score, url))
+
+    # Sort by score descending, take top N
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [url for _, url in scored[:max_urls]]
+
+
 async def search_enrichment(
     camera: Camera,
     http_client: httpx.AsyncClient,
     anthropic_client: anthropic.AsyncAnthropic,
     searxng_url: str = "https://search.sapti.me",
 ) -> EnrichmentResult:
-    """Search for camera enrichment data (model code and manufacturer URL).
+    """Search for camera enrichment data using Search → Fetch → Extract pipeline.
 
-    First checks known mappings, then falls back to web search.
+    1. Check known mappings (instant, no API calls)
+    2. SearXNG web search to find relevant URLs
+    3. Jina Reader fetch to get actual page content (not just snippets)
+    4. LLM extraction from full page content
+
+    Falls back to snippet-only extraction if Jina fetch fails.
 
     Args:
         camera: Camera to search for.
         http_client: HTTP client for web requests.
         anthropic_client: Anthropic client for LLM extraction.
+        searxng_url: SearXNG instance URL.
 
     Returns:
         EnrichmentResult with code_model and/or manufacturer_url.
@@ -267,7 +415,7 @@ async def search_enrichment(
     if not camera.manufacturer:
         return result
 
-    # First check known mappings
+    # ── Step 1: Known mappings ──
     known = get_known_enrichment(camera)
     if known.code_model:
         result.code_model = known.code_model
@@ -276,18 +424,17 @@ async def search_enrichment(
         result.manufacturer_url = known.manufacturer_url
         logger.info("Found known URL", camera=camera.name, url=known.manufacturer_url)
 
-    # If we have both, return early
     if result.code_model and result.manufacturer_url:
+        result.source = "known"
         return result
 
-    # Build search query for web search
+    # ── Step 2: SearXNG web search ──
     manufacturer_domain = _get_manufacturer_domain(camera.manufacturer)
     search_query = f"{camera.manufacturer} {camera.name} official product page specifications"
     if manufacturer_domain:
         search_query += f" site:{manufacturer_domain}"
 
     try:
-        # Use SearXNG instance (configurable via SEARXNG_URL env var)
         response = await http_client.get(
             f"{searxng_url}/search",
             params={
@@ -299,31 +446,68 @@ async def search_enrichment(
         )
         response.raise_for_status()
 
-        # Parse JSON response from SearXNG
         search_data = response.json()
-        results = search_data.get("results", [])
+        raw_results = search_data.get("results", [])
 
-        # Extract URLs, titles, and snippets from results
-        urls = [r.get("url", "") for r in results[:5]]
-        titles = [r.get("title", "") for r in results[:5]]
-        snippets = [r.get("content", "") for r in results[:5]]
-
-        # Clean HTML tags
         def clean_html(text: str) -> str:
             return re.sub(r"<[^>]+>", "", text).strip()
 
-        search_results = []
-        for i, (title, snippet, url) in enumerate(zip(titles, snippets, urls, strict=False)):
-            search_results.append(f"Title: {clean_html(title)}\nURL: {url}\nSnippet: {clean_html(snippet)}")
+        search_results = [
+            {
+                "url": r.get("url", ""),
+                "title": clean_html(r.get("title", "")),
+                "snippet": clean_html(r.get("content", "")),
+            }
+            for r in raw_results[:5]
+        ]
 
         if not search_results:
             logger.debug("No search results found", camera=camera.name)
             return result
 
-        search_text = "\n---\n".join(search_results)
-
-        # Use LLM to extract model code and URL
+        # ── Step 3: Jina Reader fetch (NEW) ──
         settings = get_settings()
+        jina_api_key = (
+            settings.jina_api_key.get_secret_value() if settings.jina_api_key else None
+        )
+
+        best_urls = _pick_best_urls(search_results, manufacturer_domain, max_urls=2)
+        fetched_pages: list[str] = []
+
+        for url in best_urls:
+            page_content = await _fetch_with_jina(http_client, url, jina_api_key)
+            if page_content:
+                fetched_pages.append(f"=== Page: {url} ===\n{page_content}")
+                result.fetched_urls.append(url)
+
+            # Rate limit between Jina fetches (especially on free tier)
+            if not jina_api_key:
+                await asyncio.sleep(3)
+
+        # ── Step 4: LLM extraction ──
+        # Build context: prefer fetched pages, fallback to snippets
+        if fetched_pages:
+            search_text = "\n\n".join(fetched_pages)
+            result.source = "jina_fetch"
+            logger.info(
+                "Using Jina-fetched content for extraction",
+                camera=camera.name,
+                pages_fetched=len(fetched_pages),
+            )
+        else:
+            # Fallback: snippet-only (original behavior)
+            snippet_texts = []
+            for r in search_results:
+                snippet_texts.append(
+                    f"Title: {r['title']}\nURL: {r['url']}\nSnippet: {r['snippet']}"
+                )
+            search_text = "\n---\n".join(snippet_texts)
+            result.source = "snippet_only"
+            logger.info(
+                "Jina fetch failed, falling back to snippets",
+                camera=camera.name,
+            )
+
         llm_response = await anthropic_client.messages.create(
             model=settings.sonnet_model,
             max_tokens=200,
@@ -344,34 +528,45 @@ async def search_enrichment(
 
         # Parse JSON response
         try:
-            # Handle potential markdown code blocks
             if "```" in response_text:
                 response_text = re.sub(r"```json?\s*", "", response_text)
                 response_text = re.sub(r"```\s*", "", response_text)
 
             parsed = json.loads(response_text)
 
-            # Only update if we don't already have values from known mappings
             if not result.code_model and parsed.get("code_model"):
                 code_model = parsed["code_model"]
                 if code_model and code_model != "null" and len(code_model) < 50:
                     result.code_model = code_model
-                    logger.info("Found model code via search", camera=camera.name, code_model=code_model)
+                    logger.info(
+                        "Found model code",
+                        camera=camera.name,
+                        code_model=code_model,
+                        source=result.source,
+                    )
 
             if not result.manufacturer_url and parsed.get("manufacturer_url"):
                 url = parsed["manufacturer_url"]
                 if url and url != "null" and url.startswith("http"):
                     result.manufacturer_url = url
-                    logger.info("Found URL via search", camera=camera.name, url=url)
+                    logger.info(
+                        "Found URL",
+                        camera=camera.name,
+                        url=url,
+                        source=result.source,
+                    )
 
         except json.JSONDecodeError:
-            # Fallback: try to extract just the model code from plain text
             if not result.code_model and response_text and "NOT_FOUND" not in response_text:
-                # Try to extract first word/code from response
                 match = re.match(r'^[\w\-]+', response_text)
                 if match and len(match.group()) < 50:
                     result.code_model = match.group()
-                    logger.info("Found model code via search (fallback)", camera=camera.name, code_model=result.code_model)
+                    logger.info(
+                        "Found model code (fallback parse)",
+                        camera=camera.name,
+                        code_model=result.code_model,
+                        source=result.source,
+                    )
 
         return result
 
@@ -434,6 +629,8 @@ async def enrich_cameras(
 
     enriched_count = 0
     processed_count = 0
+    # Track pipeline source stats
+    source_stats: dict[str, int] = {"known": 0, "jina_fetch": 0, "snippet_only": 0, "failed": 0}
 
     try:
         for manufacturer in manufacturers:
@@ -459,10 +656,16 @@ async def enrich_cameras(
 
                 processed_count += 1
 
-                # Search for enrichment data
+                # Search → Fetch → Extract pipeline
                 enrichment = await search_enrichment(
                     camera, http_client, anthropic_client, settings.searxng_url
                 )
+
+                # Track source stats
+                if enrichment.code_model or enrichment.manufacturer_url:
+                    source_stats[enrichment.source] = source_stats.get(enrichment.source, 0) + 1
+                else:
+                    source_stats["failed"] += 1
 
                 # Build update with new data (only update missing fields)
                 update_data: dict[str, str | None] = {}
@@ -486,12 +689,19 @@ async def enrich_cameras(
                         logger.info(
                             "[DRY RUN] Would update camera",
                             camera=camera.name,
+                            source=enrichment.source,
+                            fetched_urls=enrichment.fetched_urls,
                             **update_data,
                         )
                     else:
                         # Update database
                         db.update_camera(camera.id, CameraUpdate(**update_data))
-                        logger.info("Updated camera", camera=camera.name, **update_data)
+                        logger.info(
+                            "Updated camera",
+                            camera=camera.name,
+                            source=enrichment.source,
+                            **update_data,
+                        )
 
                     enriched_count += 1
 
@@ -508,6 +718,7 @@ async def enrich_cameras(
         "Enrichment complete",
         processed=processed_count,
         enriched=enriched_count,
+        source_stats=source_stats,
     )
 
     return enriched_count
@@ -552,5 +763,10 @@ async def main() -> None:
     )
 
 
-if __name__ == "__main__":
+def cli() -> None:
+    """Sync entry point for pyproject scripts."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    cli()

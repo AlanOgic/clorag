@@ -213,10 +213,11 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
     ) -> dict[str, Any]:
         """Enrich camera database with official model codes and manufacturer URLs.
 
-        Checks known mappings first, then falls back to SearXNG web search +
-        Sonnet LLM extraction for unknown cameras.
+        Pipeline: Known mappings → SearXNG search → Jina Reader fetch → LLM extraction.
+        Uses Jina Reader to fetch actual page content (not just search snippets)
+        for much more accurate model code and URL extraction.
 
-        WARNING: Can be slow due to web search rate limiting (2s delay between requests).
+        WARNING: Can be slow due to web search + Jina rate limiting.
 
         Args:
             manufacturer: Specific manufacturer to enrich (None for top 15 manufacturers).

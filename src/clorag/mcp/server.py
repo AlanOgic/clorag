@@ -179,6 +179,12 @@ def main_http() -> None:
     settings = get_settings()
     host = os.getenv("MCP_HOST", "0.0.0.0")
     port = int(os.getenv("MCP_PORT", "8080"))
+    # Initialize services before creating the app (lifespan doesn't run with streamable_http_app)
+    # Must set on the actual module (not __main__) to avoid python -m dual-module issue
+    import clorag.mcp.server as _mod
+
+    _mod._services = MCPServices()
+
     mcp = create_mcp_server(host=host, port=port)
 
     # Get the Starlette app, wrap with auth if configured

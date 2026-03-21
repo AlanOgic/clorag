@@ -85,12 +85,14 @@ services:
       - QDRANT_API_KEY_FILE=/run/secrets/qdrant_api_key
       - ADMIN_PASSWORD_FILE=/run/secrets/admin_password
       - NEO4J_PASSWORD_FILE=/run/secrets/neo4j_password
+      - MCP_API_KEY_FILE=/run/secrets/mcp_api_key
     secrets:
       - anthropic_api_key
       - voyage_api_key
       - qdrant_api_key
       - admin_password
       - neo4j_password
+      - mcp_api_key
     volumes:
       - ./data:/app/data
     networks:
@@ -162,3 +164,5 @@ secrets:
     file: ./secrets/openai_compat_api_key
   odoo_mcp_api_key:
     file: ./secrets/odoo_mcp_api_key
+  mcp_api_key:
+    file: ./secrets/mcp_api_key
