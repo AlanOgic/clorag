@@ -1,15 +1,14 @@
 """Admin authentication and brute force protection.
 
-This module provides admin authentication via session cookies or API header,
+This module provides admin authentication via session cookies,
 along with brute force protection through login attempt tracking.
 """
 
-import secrets
 import time
 from typing import Annotated
 
 import structlog
-from fastapi import Cookie, Header, HTTPException
+from fastapi import Cookie, HTTPException
 from itsdangerous import BadSignature, SignatureExpired
 
 from clorag.config import get_settings
@@ -91,20 +90,17 @@ def get_login_tracker() -> LoginAttemptTracker:
 
 
 def verify_admin(
-    x_admin_password: Annotated[str | None, Header()] = None,
     admin_session: Annotated[str | None, Cookie()] = None,
 ) -> bool:
-    """Verify admin access via header password OR session cookie.
+    """Verify admin access via session cookie.
 
-    Two authentication methods are supported:
-    1. X-Admin-Password header - for API calls (legacy support)
-    2. admin_session cookie - for browser sessions (signed with itsdangerous)
+    Session cookies are signed with itsdangerous and validated against
+    the session secret.
     """
     settings = get_settings()
     if not settings.admin_password:
         raise HTTPException(status_code=503, detail="Admin access not configured")
 
-    # Method 1: Check session cookie first (preferred for browser)
     if admin_session:
         try:
             serializer = get_session_serializer()
@@ -115,12 +111,5 @@ def verify_admin(
             logger.debug("Admin session expired")
         except BadSignature:
             logger.debug("Invalid admin session signature")
-
-    # Method 2: Check header password (API calls / legacy)
-    if x_admin_password is not None and secrets.compare_digest(
-        x_admin_password.encode("utf-8"),
-        settings.admin_password.get_secret_value().encode("utf-8"),
-    ):
-        return True
 
     raise HTTPException(status_code=401, detail="Unauthorized")

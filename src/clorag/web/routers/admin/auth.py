@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Cookie, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from slowapi.util import get_remote_address
 
@@ -24,6 +24,7 @@ from clorag.web.auth import (
     generate_csrf_token,
     get_login_tracker,
     get_session_serializer,
+    verify_admin,
 )
 from clorag.web.dependencies import limiter
 from clorag.web.schemas import LoginRequest, LoginResponse
@@ -173,72 +174,32 @@ async def api_admin_csrf_token(
 
 
 @router.get("/backup")
+@limiter.limit("3/hour")
 async def api_admin_backup(
     request: Request,
-    admin_session: Annotated[str | None, Cookie()] = None,
-    x_admin_password: Annotated[str | None, Header()] = None,
+    _auth: Annotated[bool, Depends(verify_admin)],
 ) -> StreamingResponse:
-    """Download a backup ZIP of all SQLite databases.
-
-    Requires admin authentication via session cookie or X-Admin-Password header.
-    Returns a ZIP file containing:
-    - clorag.db (camera database)
-    - analytics.db (search analytics)
-    """
-    from itsdangerous import BadSignature, SignatureExpired
-
-    # Verify authentication (session or header)
-    authenticated = False
-
+    """Download a backup ZIP of all SQLite databases."""
     settings = get_settings()
-
-    # Check session cookie first
-    if admin_session:
-        try:
-            serializer = get_session_serializer()
-            data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
-            if data.get("authenticated"):
-                authenticated = True
-        except (SignatureExpired, BadSignature):
-            pass
-
-    # Fall back to header auth
-    if not authenticated and x_admin_password:
-        if settings.admin_password and secrets.compare_digest(
-            x_admin_password.encode("utf-8"),
-            settings.admin_password.get_secret_value().encode("utf-8"),
-        ):
-            authenticated = True
-
-    if not authenticated:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
     camera_db_path = Path(settings.database_path)
     analytics_db_path = Path(settings.analytics_database_path)
 
-    # Create ZIP in memory
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        # Add camera database
         if camera_db_path.exists():
             zf.write(camera_db_path, "clorag.db")
             logger.info("Added camera database to backup", path=str(camera_db_path))
-
-        # Add analytics database
         if analytics_db_path.exists():
             zf.write(analytics_db_path, "analytics.db")
             logger.info("Added analytics database to backup", path=str(analytics_db_path))
 
     zip_buffer.seek(0)
-
-    # Generate filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"clorag_backup_{timestamp}.zip"
 
     logger.info("Database backup created", filename=filename)
-
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
