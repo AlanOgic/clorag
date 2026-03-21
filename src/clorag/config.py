@@ -133,11 +133,11 @@ class Settings(BaseSettings):
     )
     session_secret: SecretStr | None = Field(
         default=None,
-        description="Secret key for signing session cookies. If not set, derived from admin_password via PBKDF2.",
+        description="Secret for session cookie signing. Falls back to admin_password.",
     )
     token_encryption_key: SecretStr | None = Field(
         default=None,
-        description="Secret key for encrypting OAuth tokens. If not set, falls back to admin_password.",
+        description="Secret for OAuth token encryption. Falls back to admin_password.",
     )
 
     # Analytics Database (separate from camera database)
