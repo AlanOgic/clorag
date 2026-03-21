@@ -82,8 +82,23 @@ def get_session_store() -> SessionStore:
 
 
 def get_session_serializer() -> URLSafeTimedSerializer:
-    """Get session serializer using admin password as secret key."""
+    """Get session serializer using dedicated session secret.
+
+    Falls back to PBKDF2-derived key from admin_password if session_secret not set.
+    """
+    import hashlib
+
     settings = get_settings()
     if not settings.admin_password:
         raise HTTPException(status_code=503, detail="Admin access not configured")
-    return URLSafeTimedSerializer(settings.admin_password.get_secret_value())
+
+    if settings.session_secret:
+        secret = settings.session_secret.get_secret_value()
+    else:
+        # Derive a separate key from admin_password so raw password is never used as HMAC key
+        raw = settings.admin_password.get_secret_value()
+        secret = hashlib.pbkdf2_hmac(
+            "sha256", raw.encode(), b"clorag-session-signing", 100_000
+        ).hex()
+
+    return URLSafeTimedSerializer(secret)
