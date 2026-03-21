@@ -18,16 +18,26 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Create non-root user
+RUN groupadd --gid 1001 clorag && \
+    useradd --uid 1001 --gid clorag --no-create-home clorag
+
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY src/ ./src/
 
+# Create data directory with correct ownership
+RUN mkdir -p /app/data && chown -R clorag:clorag /app
+
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
 ENV PYTHONUNBUFFERED=1
+
+# Run as non-root user
+USER clorag
 
 # Expose port
 EXPOSE 8080

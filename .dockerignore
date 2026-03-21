@@ -46,3 +46,6 @@ Thumbs.db
 # Google credentials (sensitive)
 credentials.json
 token.json
+
+# Docker Secrets (mounted at runtime, not in image)
+secrets/

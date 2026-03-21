@@ -53,3 +53,6 @@ logs/
 # Data cache
 .cache/
 data/
+
+# Docker Secrets
+secrets/
