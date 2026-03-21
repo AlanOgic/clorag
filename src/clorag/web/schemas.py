@@ -45,7 +45,11 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     source: SearchSource = SearchSource.BOTH
     limit: int = Field(10, ge=1, le=50)
-    session_id: str | None = Field(None, description="Session ID for follow-up conversations")
+    session_id: str | None = Field(
+        None,
+        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        description="Session ID previously issued by the server (UUID v4)",
+    )
 
 
 class SourceLink(BaseModel):
