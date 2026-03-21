@@ -1,14 +1,36 @@
 """Configuration management for CLORAG using pydantic-settings."""
 
+import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Fields that support Docker Secrets via _FILE suffix
+_SECRET_FIELDS = {
+    "anthropic_api_key",
+    "voyage_api_key",
+    "qdrant_api_key",
+    "admin_password",
+    "neo4j_password",
+    "openai_compat_api_key",
+    "odoo_api_key",
+    "odoo_mcp_api_key",
+    "jina_api_key",
+    "session_secret",
+    "token_encryption_key",
+}
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """Application settings loaded from environment variables.
+
+    Supports Docker Secrets: for any secret field, set VAR_NAME_FILE to a file
+    path (e.g. /run/secrets/api_key) and the value will be read from that file.
+    The _FILE variant takes precedence over the direct env var.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -16,6 +38,19 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _read_secret_files(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Read secrets from Docker Secret files (_FILE suffix convention)."""
+        for field_name in _SECRET_FIELDS:
+            env_file_key = f"{field_name.upper()}_FILE"
+            file_path = os.environ.get(env_file_key)
+            if file_path:
+                path = Path(file_path)
+                if path.is_file():
+                    data[field_name] = path.read_text().strip()
+        return data
 
     # API Keys
     anthropic_api_key: SecretStr = Field(..., description="Anthropic API key")
@@ -95,6 +130,14 @@ class Settings(BaseSettings):
     )
     admin_password: SecretStr | None = Field(
         default=None, description="Admin password for camera management"
+    )
+    session_secret: SecretStr | None = Field(
+        default=None,
+        description="Secret key for signing session cookies. If not set, derived from admin_password via PBKDF2.",
+    )
+    token_encryption_key: SecretStr | None = Field(
+        default=None,
+        description="Secret key for encrypting OAuth tokens. If not set, falls back to admin_password.",
     )
 
     # Analytics Database (separate from camera database)
