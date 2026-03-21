@@ -19,8 +19,10 @@ from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Salt file path (stored separately from encrypted tokens)
-SALT_FILE = Path("data/.token_salt")
+def _get_salt_path() -> Path:
+    """Resolve salt file path from database_path for consistency across working dirs."""
+    settings = get_settings()
+    return Path(settings.database_path).parent / ".token_salt"
 
 
 def _get_or_create_salt() -> bytes:
@@ -29,18 +31,18 @@ def _get_or_create_salt() -> bytes:
     The salt is stored in a separate file and should be backed up
     along with the encrypted tokens.
     """
-    if SALT_FILE.exists():
-        return SALT_FILE.read_bytes()
+    salt_path = _get_salt_path()
+    if salt_path.exists():
+        return salt_path.read_bytes()
 
-    # Create a new random salt
     salt = os.urandom(16)
-    SALT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    SALT_FILE.write_bytes(salt)
+    salt_path.parent.mkdir(parents=True, exist_ok=True)
+    salt_path.write_bytes(salt)
     return salt
 
 
 def _derive_key(password: str) -> bytes:
-    """Derive a Fernet key from the admin password using PBKDF2."""
+    """Derive a Fernet key from password using PBKDF2."""
     salt = _get_or_create_salt()
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -53,17 +55,21 @@ def _derive_key(password: str) -> bytes:
 
 
 def _get_fernet() -> Fernet | None:
-    """Get a Fernet instance using the admin password as key.
+    """Get a Fernet instance for token encryption.
 
-    Returns None if admin password is not configured.
+    Uses token_encryption_key if set, otherwise falls back to admin_password.
     """
     settings = get_settings()
-    if not settings.admin_password:
-        logger.warning("Admin password not configured, token encryption disabled")
-        return None
+    if settings.token_encryption_key:
+        key = _derive_key(settings.token_encryption_key.get_secret_value())
+        return Fernet(key)
 
-    key = _derive_key(settings.admin_password.get_secret_value())
-    return Fernet(key)
+    if settings.admin_password:
+        key = _derive_key(settings.admin_password.get_secret_value())
+        return Fernet(key)
+
+    logger.warning("No encryption key configured, token encryption disabled")
+    return None
 
 
 def encrypt_token_data(data: dict[str, object]) -> str:
