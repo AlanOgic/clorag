@@ -332,27 +332,24 @@ async def _fetch_with_jina(
 
 def _pick_best_urls(
     search_results: list[dict[str, str]],
-    manufacturer_domain: str,
+    manufacturer_domains: list[str],
     max_urls: int = 2,
 ) -> list[str]:
     """Pick the best URLs to fetch from search results.
 
-    Prioritizes: manufacturer official site > B&H/Adorama > other retailers.
+    Prioritizes: manufacturer official sites > trusted retailers > other.
 
     Args:
         search_results: List of dicts with 'url', 'title', 'snippet' keys.
-        manufacturer_domain: Official manufacturer domain (e.g., 'sony.com').
+        manufacturer_domains: Official manufacturer domains (e.g., ['pro.sony.com', 'sony.com']).
         max_urls: Maximum URLs to return.
 
     Returns:
         List of URLs ranked by quality.
     """
-    priority_domains = [
-        manufacturer_domain,  # Official site first
-        "bhphotovideo.com",
-        "adorama.com",
-        "fullcompass.com",
-    ]
+    # Build priority list: official domains first, then trusted retailers
+    priority_domains = [*manufacturer_domains]
+    priority_domains.extend(["bhphotovideo.com", "adorama.com", "fullcompass.com"])
 
     scored: list[tuple[float, str]] = []
     for r in search_results:
@@ -363,16 +360,21 @@ def _pick_best_urls(
         score = 0.0
         url_lower = url.lower()
 
-        # Priority scoring
+        # Priority scoring — manufacturer domains get highest scores
         for i, domain in enumerate(priority_domains):
             if domain and domain in url_lower:
-                score = 10.0 - i  # Higher score for higher priority
+                score = 10.0 - i * 0.5  # Gradual decrease
                 break
 
         # Bonus for spec/product pages
         spec_terms = ["spec", "product", "detail", "feature", "overview"]
         if any(term in url_lower for term in spec_terms):
-            score += 1.0
+            score += 2.0
+
+        # Bonus for professional/broadcast content
+        pro_terms = ["professional", "broadcast", "cinema", "pro."]
+        if any(term in url_lower for term in pro_terms):
+            score += 1.5
 
         # Penalty for non-useful pages
         penalty_terms = ["review", "forum", "blog", "news", "video", "youtube"]
@@ -428,11 +430,9 @@ async def search_enrichment(
         result.source = "known"
         return result
 
-    # ── Step 2: SearXNG web search ──
-    manufacturer_domain = _get_manufacturer_domain(camera.manufacturer)
+    # ── Step 2: SearXNG web search (no site: filter for broader results) ──
+    manufacturer_domains = _get_manufacturer_domains(camera.manufacturer)
     search_query = f"{camera.manufacturer} {camera.name} official product page specifications"
-    if manufacturer_domain:
-        search_query += f" site:{manufacturer_domain}"
 
     try:
         response = await http_client.get(
@@ -471,7 +471,7 @@ async def search_enrichment(
             settings.jina_api_key.get_secret_value() if settings.jina_api_key else None
         )
 
-        best_urls = _pick_best_urls(search_results, manufacturer_domain, max_urls=2)
+        best_urls = _pick_best_urls(search_results, manufacturer_domains, max_urls=2)
         fetched_pages: list[str] = []
 
         for url in best_urls:
@@ -578,26 +578,29 @@ async def search_enrichment(
         return result
 
 
-def _get_manufacturer_domain(manufacturer: str) -> str:
-    """Get the official domain for a manufacturer."""
-    domains = {
-        "Sony": "sony.com",
-        "Canon": "canon.com",
-        "Panasonic": "panasonic.com",
-        "Blackmagic": "blackmagicdesign.com",
-        "ARRI": "arri.com",
-        "RED": "red.com",
-        "Grass Valley": "grassvalley.com",
-        "Ikegami": "ikegami.com",
-        "Hitachi": "hitachi-kokusai.com",
-        "JVC": "jvc.com",
-        "Marshall": "marshall-usa.com",
-        "Birddog": "birddog.tv",
-        "Dreamchip": "dreamchip.de",
-        "Z CAM": "z-cam.com",
-        "DJI": "dji.com",
+def _get_manufacturer_domains(manufacturer: str) -> list[str]:
+    """Get official domains for a manufacturer (primary + pro/broadcast sites)."""
+    domains: dict[str, list[str]] = {
+        "Sony": ["pro.sony.com", "sony.com"],
+        "Canon": ["canon.com/professional", "canon.com"],
+        "Panasonic": ["na.panasonic.com/us/cameras-camcorders", "panasonic.com"],
+        "Blackmagic": ["blackmagicdesign.com"],
+        "ARRI": ["arri.com"],
+        "RED": ["red.com"],
+        "Grass Valley": ["grassvalley.com"],
+        "Ikegami": ["ikegami.com"],
+        "Hitachi": ["hitachi-kokusai.com"],
+        "JVC": ["pro.jvc.com", "jvc.com"],
+        "Marshall": ["marshall-usa.com"],
+        "Birddog": ["birddog.tv"],
+        "Dreamchip": ["dreamchip.de"],
+        "Z CAM": ["z-cam.com"],
+        "DJI": ["dji.com"],
+        "Ross": ["rossvideo.com"],
+        "PTZOptics": ["ptzoptics.com"],
+        "Lumens": ["mylumens.com"],
     }
-    return domains.get(manufacturer, "")
+    return domains.get(manufacturer, [])
 
 
 async def enrich_cameras(
