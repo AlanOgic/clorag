@@ -150,24 +150,26 @@ async def api_admin_session(
 async def api_admin_csrf_token(
     admin_session: Annotated[str | None, Cookie()] = None,
 ) -> dict[str, str]:
-    """Get a CSRF token for state-changing requests.
+    """Get a CSRF token bound to the current session.
 
-    Returns a signed CSRF token that must be included in the
-    X-CSRF-Token header for POST, PUT, DELETE requests.
-
-    The token is valid for 1 hour and should be refreshed periodically.
+    Requires a valid admin session cookie. The token is bound to the
+    session ID and valid for 1 hour.
     """
     from itsdangerous import BadSignature, SignatureExpired
 
-    # Extract session ID for binding if authenticated
-    session_id = None
-    if admin_session:
-        try:
-            serializer = get_session_serializer()
-            data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
-            session_id = data.get("session_id")
-        except (SignatureExpired, BadSignature):
-            pass  # Generate unbound token for unauthenticated requests
+    if not admin_session:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    try:
+        serializer = get_session_serializer()
+        data = serializer.loads(admin_session, max_age=ADMIN_SESSION_MAX_AGE)
+        if not data.get("authenticated"):
+            raise HTTPException(status_code=401, detail="Authentication required")
+        session_id = data.get("session_id")
+    except (SignatureExpired, BadSignature):
+        raise HTTPException(
+            status_code=401, detail="Session expired, please login again"
+        )
 
     token = generate_csrf_token(session_id)
     return {"csrf_token": token}
