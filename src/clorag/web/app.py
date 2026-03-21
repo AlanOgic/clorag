@@ -117,7 +117,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         # HSTS - enforce HTTPS for 1 year, include subdomains
         response.headers["Strict-Transport-Security"] = (
-            "max-age=31536000; includeSubDomains; preload"
+            "max-age=31536000; includeSubDomains"
         )
         # Content Security Policy with nonce for inline scripts
         # SECURITY: Uses per-request nonce for script execution (CSP Level 2+).
