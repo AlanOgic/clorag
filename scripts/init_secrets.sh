@@ -41,7 +41,7 @@ for key in "${SECRET_KEYS[@]}"; do
 
     if [ -n "$value" ]; then
         printf '%s' "$value" > "$SECRETS_DIR/$filename"
-        chmod 600 "$SECRETS_DIR/$filename"
+        chmod 644 "$SECRETS_DIR/$filename"
         echo "  Created: $SECRETS_DIR/$filename"
     else
         echo "  Skipped: $key (not found or empty in $ENV_FILE)"
