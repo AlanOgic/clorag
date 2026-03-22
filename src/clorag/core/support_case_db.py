@@ -8,6 +8,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -415,11 +416,11 @@ class SupportCaseDatabase:
 
         return row["raw_thread"] if row else None
 
-    def get_stats(self) -> dict[str, int | dict[str, int]]:
+    def get_stats(self) -> dict[str, Any]:
         """Get statistics about stored support cases.
 
         Returns:
-            Dict with stats (total, by_category, by_product, etc.).
+            Dict with stats (total, by_category, by_product, by_quality, date_range).
         """
         with self._cursor() as cursor:
             cursor.execute("SELECT COUNT(*) as total FROM support_cases")
@@ -459,11 +460,36 @@ class SupportCaseDatabase:
                 str(row["resolution_quality"]): row["count"] for row in cursor.fetchall()
             }
 
+            # Date range from indexed created_at column
+            cursor.execute(
+                """
+                SELECT MIN(created_at) as earliest,
+                       MAX(created_at) as latest,
+                       COUNT(*) as total_cases
+                FROM support_cases
+                WHERE created_at IS NOT NULL
+                """
+            )
+            row = cursor.fetchone()
+            date_range: dict[str, str | int] = {}
+            if row and row["earliest"]:
+                try:
+                    earliest = datetime.fromisoformat(row["earliest"])
+                    latest = datetime.fromisoformat(row["latest"])
+                    date_range = {
+                        "earliest": earliest.strftime("%Y-%m-%d"),
+                        "latest": latest.strftime("%Y-%m-%d"),
+                        "total_messages": row["total_cases"],
+                    }
+                except (ValueError, TypeError):
+                    pass
+
         return {
             "total": total,
             "by_category": by_category,
             "by_product": by_product,
             "by_quality": by_quality,
+            "date_range": date_range,
         }
 
     def delete_case(self, case_id: str) -> bool:

@@ -276,6 +276,7 @@
             <div class="stat-card">
                 <div class="stat-card__label">Total Cases</div>
                 <div class="stat-card__value" id="statTotal">-</div>
+                <div class="stat-card__sub" id="statDateRange" style="font-size: 0.8rem; color: var(--text-muted, #6c757d); margin-top: 0.25rem;"></div>
             </div>
             <div class="stat-card">
                 <div class="stat-card__label">By Category</div>
@@ -414,6 +415,12 @@
                 const stats = await response.json();
 
                 document.getElementById('statTotal').textContent = stats.total || 0;
+
+                // Date range
+                const dateEl = document.getElementById('statDateRange');
+                if (stats.date_range && stats.date_range.earliest) {
+                    dateEl.textContent = `${stats.date_range.earliest} to ${stats.date_range.latest} (${stats.date_range.total_messages} messages)`;
+                }
 
                 // By category
                 const catEl = document.getElementById('statCategories');

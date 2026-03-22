@@ -493,6 +493,68 @@ class CameraDatabase:
             row = cursor.fetchone()
             return self._row_to_camera(row) if row else None
 
+    @staticmethod
+    def _normalize_camera_name(name: str, manufacturer: str | None = None) -> str:
+        """Normalize camera name for fuzzy matching and duplicate detection.
+
+        Strips manufacturer-specific model line prefixes (AW-, ILME-, ILCE-, AG-)
+        that are often omitted in casual references. Normalizes Mark synonyms.
+        Does NOT strip product series prefixes (BRC, HDC, PXW, etc.).
+
+        Examples:
+            "FX-3" -> "fx3"
+            "AW-UE160" -> "ue160"
+            "ILME-FX6" -> "fx6"
+            "Pyxis 6K" -> "pyxis6k"
+            "BRC-AM7" -> "brcam7"  (BRC is part of the name)
+            "HDC-5500 Mark II" -> "hdc5500mk2"
+        """
+        n = name.strip().lower()
+        # Strip manufacturer name prefix if present (e.g. "Sony FX6" -> "FX6")
+        if manufacturer:
+            mfr_lower = manufacturer.lower()
+            if n.startswith(mfr_lower + " "):
+                n = n[len(mfr_lower) + 1:]
+        # Strip manufacturer model-line prefixes (commonly omitted)
+        # AW- (Panasonic), AG- (Panasonic), ILME- (Sony), ILCE- (Sony)
+        n = re.sub(r"^(aw-|ag-|ilme-|ilce-)", "", n)
+        # Normalize Mark synonyms
+        n = re.sub(r"mk\s*iii|mark\s*iii|mark\s*3|mk\s*3", "mk3", n)
+        n = re.sub(r"mk\s*ii|mark\s*ii|mark\s*2|mk\s*2", "mk2", n)
+        n = re.sub(r"mk\s*i\b|mark\s*i\b|mk\s*1\b|mark\s*1\b", "mk1", n)
+        # Strip common suffixes
+        n = re.sub(r"\s+head$", "", n)
+        # Remove hyphens, spaces, underscores, dots
+        n = re.sub(r"[-_.\s]", "", n)
+        return n
+
+    def find_camera_by_similar_name(
+        self, name: str, manufacturer: str | None = None
+    ) -> Camera | None:
+        """Find an existing camera by normalized name matching.
+
+        Handles variations like FX-3/FX3, AW-UE160/UE160, ILME-FX6/FX6.
+
+        Args:
+            name: Camera name to search for.
+            manufacturer: Optional manufacturer to narrow search.
+
+        Returns:
+            Best matching Camera or None.
+        """
+        normalized = self._normalize_camera_name(name, manufacturer)
+        if not normalized:
+            return None
+
+        # Search all cameras (checking manufacturer-filtered first is redundant
+        # since we iterate the full list and the cache covers both)
+        all_cameras = self.list_cameras()
+        for camera in all_cameras:
+            if self._normalize_camera_name(camera.name, camera.manufacturer) == normalized:
+                return camera
+
+        return None
+
     def get_cameras_by_ids(self, camera_ids: list[int]) -> list[Camera]:
         """Get multiple cameras by their IDs.
 
@@ -733,8 +795,9 @@ class CameraDatabase:
     def upsert_camera(self, camera: CameraCreate, source: CameraSource) -> Camera:
         """Insert or update camera by name.
 
-        If camera exists, merges arrays (ports, protocols, controls, notes).
+        If camera exists (exact or fuzzy match), merges arrays.
         If camera doesn't exist, creates new entry.
+        Fuzzy matching handles FX-3/FX3, AW-UE160/UE160, ILME-FX6/FX6 etc.
 
         Args:
             camera: Camera data.
@@ -743,7 +806,17 @@ class CameraDatabase:
         Returns:
             Created or updated Camera object.
         """
+        # Try exact match first, then fuzzy match
         existing = self.get_camera_by_name(camera.name)
+        if not existing:
+            existing = self.find_camera_by_similar_name(camera.name, camera.manufacturer)
+            if existing:
+                logger.info(
+                    "Fuzzy matched camera",
+                    new_name=camera.name,
+                    existing_name=existing.name,
+                    existing_id=existing.id,
+                )
 
         if existing:
             # Merge arrays - combine unique values
@@ -1220,30 +1293,12 @@ class CameraDatabase:
         """
         all_cameras = self.list_cameras()
 
-        # Normalize name for comparison
-        def _normalize(name: str, manufacturer: str | None) -> str:
-            n = name.lower()
-            # Strip manufacturer prefix if present
-            if manufacturer:
-                mfr_lower = manufacturer.lower()
-                if n.startswith(mfr_lower + " "):
-                    n = n[len(mfr_lower) + 1:]
-            # Replace known synonyms
-            n = re.sub(r"mk\s*iii|mark\s*iii|mark\s*3|mk\s*3", "mk3", n)
-            n = re.sub(r"mk\s*ii|mark\s*ii|mark\s*2|mk\s*2", "mk2", n)
-            n = re.sub(r"mk\s*i\b|mark\s*i\b|mk\s*1\b|mark\s*1\b", "mk1", n)
-            # Strip common suffixes
-            n = re.sub(r"\s+head$", "", n)
-            # Remove spaces, hyphens, dots for comparison
-            n = re.sub(r"[\s\-\.]", "", n)
-            return n
-
         # Group by (normalized_name, manufacturer)
         groups: dict[tuple[str, str], list[Camera]] = defaultdict(list)
         for camera in all_cameras:
             assert camera.id is not None
             mfr_key = (camera.manufacturer or "").lower()
-            key = (_normalize(camera.name, camera.manufacturer), mfr_key)
+            key = (self._normalize_camera_name(camera.name, camera.manufacturer), mfr_key)
             groups[key].append(camera)
 
         # Also cross-reference: code_model of A matches name of B
