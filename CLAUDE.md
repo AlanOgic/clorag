@@ -24,7 +24,9 @@ uv run ingest-curated --max-threads 300    # Gmail threads (--offset N for incre
 uv run import-docs ./folder --category pre_sales  # Bulk import custom docs
 
 # Maintenance
-uv run enrich-cameras                      # Extract camera info from docs
+uv run extract-cameras --from-sqlite       # Extract cameras from support cases
+uv run extract-cameras --docs-only         # Extract cameras from Qdrant docs
+uv run enrich-cameras                      # Enrich cameras with model codes + URLs
 uv run populate-graph                      # Build Neo4j knowledge graph
 uv run draft-support                       # Auto-reply drafts (--preview)
 uv run rebuild-fts                         # Rebuild camera FTS5 index

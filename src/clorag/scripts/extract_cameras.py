@@ -126,17 +126,77 @@ async def main(
     )
 
 
-if __name__ == "__main__":
+async def extract_from_support_cases(
+    extractor: CameraExtractor,
+    limit: int = 1000,
+) -> int:
+    """Extract cameras from SQLite support cases (no Qdrant needed)."""
+    from clorag.core.support_case_db import get_support_case_database
+
+    db = get_support_case_database()
+    camera_db = get_camera_database()
+
+    cases, total = db.list_cases(limit=limit, offset=0)
+    log.info("Loaded support cases from SQLite", count=len(cases), total=total)
+
+    contents: list[tuple[str, str | None]] = []
+    for case in cases:
+        if case.document and len(case.document) > 100:
+            contents.append((case.document, None))
+
+    if not contents:
+        log.warning("No valid support case documents found")
+        return 0
+
+    cameras = await extractor.extract_from_batch(contents, concurrency=5)
+
+    for camera in cameras:
+        camera_db.upsert_camera(camera, CameraSource.SUPPORT_CASE)
+
+    log.info("Cameras extracted from support cases", count=len(cameras))
+    return len(cameras)
+
+
+def cli() -> None:
+    """Sync entry point for pyproject scripts."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Extract cameras from Qdrant")
-    parser.add_argument("--docs-only", action="store_true", help="Only extract from docs")
-    parser.add_argument("--cases-only", action="store_true", help="Only extract from cases")
+    parser = argparse.ArgumentParser(description="Extract cameras from existing data")
+    parser.add_argument("--docs-only", action="store_true", help="Only extract from docs (Qdrant)")
+    parser.add_argument("--cases-only", action="store_true", help="Only extract from support cases")
+    parser.add_argument("--from-sqlite", action="store_true", help="Read cases from SQLite instead of Qdrant")
     parser.add_argument("--limit", type=int, default=1000, help="Max documents to process")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be extracted without saving")
     args = parser.parse_args()
 
-    asyncio.run(main(
-        docs_only=args.docs_only,
-        cases_only=args.cases_only,
-        limit=args.limit,
-    ))
+    async def run() -> None:
+        extractor = CameraExtractor()
+        total = 0
+
+        try:
+            if args.from_sqlite or args.cases_only:
+                count = await extract_from_support_cases(extractor, limit=args.limit)
+                total += count
+
+            if not args.cases_only and not args.from_sqlite:
+                await main(
+                    docs_only=args.docs_only,
+                    cases_only=args.cases_only,
+                    limit=args.limit,
+                )
+        finally:
+            await extractor.close()
+
+        db = get_camera_database()
+        stats = db.get_stats()
+        log.info(
+            "Final stats",
+            total_cameras=stats["total_cameras"],
+            manufacturers=stats["manufacturers"],
+        )
+
+    asyncio.run(run())
+
+
+if __name__ == "__main__":
+    cli()
