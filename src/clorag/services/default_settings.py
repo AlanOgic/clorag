@@ -37,8 +37,10 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="retrieval.short_query_threshold",
         name="Short Query Threshold",
         description=(
-            "Minimum relevance score for short queries (1–2 words like"
-            " 'RIO' or 'tally'). Lower = more results, higher = stricter."
+            "After reranking, chunks scoring below this value are discarded"
+            " for 1–2 word queries (e.g. 'RIO', 'tally'). Reranker scores"
+            " range 0–1. At 0.15, most loosely related chunks survive."
+            " Raise to tighten; lower to show more results for vague queries."
         ),
         category="retrieval",
         value_type="float",
@@ -51,9 +53,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="retrieval.medium_query_threshold",
         name="Medium Query Threshold",
         description=(
-            "Minimum relevance score for medium queries (3–5 words like"
-            " 'RIO firmware update'). Higher because more words give"
-            " better signal."
+            "Post-rerank score cutoff for 3–5 word queries (e.g. 'RIO"
+            " firmware update'). Multi-word queries produce sharper reranker"
+            " scores, so a higher cutoff filters noise without losing good"
+            " matches. Applied only when reranking is enabled; skipped"
+            " otherwise (RRF scores are uncalibrated)."
         ),
         category="retrieval",
         value_type="float",
@@ -66,8 +70,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="retrieval.long_query_threshold",
         name="Long Query Threshold",
         description=(
-            "Minimum relevance score for detailed queries (6+ words)."
-            " Strictest threshold — long queries should match precisely."
+            "Post-rerank score cutoff for 6+ word queries (e.g. 'how to"
+            " connect a Sony FX6 via SDI to a RIO'). Long queries carry"
+            " strong intent, so this is the strictest threshold — chunks"
+            " must be highly relevant to survive. Still capped by"
+            " Max Threshold Cap."
         ),
         category="retrieval",
         value_type="float",
@@ -80,9 +87,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="retrieval.technical_term_bonus",
         name="Technical Term Bonus",
         description=(
-            "Extra score added to threshold when the query contains"
-            " technical terms (VISCA, SDI, HDMI, NDI…). Makes filtering"
-            " stricter for specific technical questions."
+            "Added to the base threshold when the query contains any of"
+            " 30+ known technical terms (VISCA, SDI, HDMI, NDI, SRT, PTZ,"
+            " tally, etc.). A query like 'VISCA over IP' gets threshold"
+            " 0.20 + 0.05 = 0.25, discarding generic chunks that mention"
+            " VISCA only in passing. Set to 0 to disable the bonus."
         ),
         category="retrieval",
         value_type="float",
@@ -95,8 +104,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="retrieval.max_threshold_cap",
         name="Max Threshold Cap",
         description=(
-            "Upper limit for the threshold after all bonuses. Prevents"
-            " over-filtering that would return too few results."
+            "Hard ceiling on the final threshold after base + technical"
+            " bonus are summed. Prevents a long technical query from"
+            " reaching e.g. 0.25 + 0.05 = 0.30+, which would over-filter"
+            " and return too few chunks. The result is: min(base + bonus,"
+            " this cap). Raise only if you see too many low-quality chunks."
         ),
         category="retrieval",
         value_type="float",
@@ -109,9 +121,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="retrieval.min_guaranteed_results",
         name="Min Guaranteed Results",
         description=(
-            "Always return at least this many results, even if scores"
-            " fall below the threshold. Safety net so users never get"
-            " an empty answer."
+            "Safety net: if threshold filtering leaves fewer than this many"
+            " chunks, the top N by reranker score are kept anyway. Ensures"
+            " Claude always has context to work with, even for niche queries"
+            " where all scores are low. Only applies when reranking is"
+            " active. Set to 1 for strict filtering, higher for safety."
         ),
         category="retrieval",
         value_type="int",
@@ -124,9 +138,12 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="retrieval.overfetch_multiplier",
         name="Overfetch Multiplier",
         description=(
-            "How many extra results to fetch before reranking trims them."
-            " 3× means fetch 30 to pick the best 10. Higher = better"
-            " quality but slower."
+            "Multiplied by the requested result count to decide how many"
+            " chunks to fetch from Qdrant before the Voyage reranker trims"
+            " them. With limit=10 and multiplier=3, fetches 30 chunks,"
+            " reranks all 30, keeps the best 10. Higher values give the"
+            " reranker more candidates (better quality) but cost more"
+            " Voyage API tokens and add ~50ms per extra 10 chunks."
         ),
         category="retrieval",
         value_type="int",
@@ -142,8 +159,12 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="reranking.top_k",
         name="Rerank Top-K",
         description=(
-            "How many results to keep after the reranker scores them."
-            " These are the chunks sent to Claude for answer synthesis."
+            "After Voyage rerank-2.5 scores all overfetched chunks, only"
+            " the top K are kept. These surviving chunks are then threshold-"
+            "filtered and sent to Claude for synthesis. Increasing this"
+            " gives Claude more context but increases API cost and response"
+            " time. Interact with Overfetch Multiplier: overfetch feeds"
+            " candidates in, top_k decides how many come out."
         ),
         category="reranking",
         value_type="int",
@@ -156,9 +177,12 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="reranking.source_diversity_threshold",
         name="Source Diversity Threshold",
         description=(
-            "Ensures results include docs, cases, and custom docs — not"
-            " just one source. A result qualifies if its score is at"
-            " least this fraction of the top result (0.5 = 50%)."
+            "After RRF merge across the 3 collections (docs, cases, custom),"
+            " if a collection has no result in the top set, its best chunk"
+            " replaces the lowest-scoring result — but only if that chunk"
+            " scores at least this fraction of the #1 result. At 0.5, a"
+            " collection needs ≥50% of the top score to earn a slot."
+            " Set to 0 to always force diversity; 1.0 to disable it."
         ),
         category="reranking",
         value_type="float",
@@ -174,9 +198,12 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="synthesis.max_tokens",
         name="Max Tokens",
         description=(
-            "Maximum length of Claude's answer (~750 words at 1500"
-            " tokens). Increase for complex answers, decrease for"
-            " snappier replies."
+            "Passed as max_tokens to the Claude Sonnet API call for both"
+            " streaming and non-streaming synthesis. Controls the maximum"
+            " length of the AI answer. ~750 words at 1500 tokens."
+            " Increase for complex multi-step answers or comparison tables;"
+            " decrease for snappier replies. Directly impacts API cost"
+            " (output tokens are billed)."
         ),
         category="synthesis",
         value_type="int",
@@ -189,9 +216,13 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="synthesis.context_total_budget",
         name="Context Total Budget",
         description=(
-            "Total character budget for all context sent to Claude."
-            " Shared across docs, cases, and custom docs. Larger = more"
-            " context but higher cost and latency."
+            "Maximum total characters of retrieved text injected into"
+            " Claude's prompt across all source groups combined. Once this"
+            " budget is exhausted, remaining groups are truncated or"
+            " dropped entirely. At 12000 chars (~3000 tokens), the context"
+            " fits comfortably in the prompt with room for system"
+            " instructions. Increase for thorough answers; decrease to"
+            " reduce input token cost and latency."
         ),
         category="synthesis",
         value_type="int",
@@ -204,8 +235,12 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="synthesis.context_group_budget",
         name="Context Group Budget",
         description=(
-            "Character budget per source type (docs, cases, custom)."
-            " Prevents one source from dominating the context window."
+            "Maximum characters per source group (chunks from the same"
+            " page or thread are merged into one group). If a single doc"
+            " page has 6000 chars of matching chunks, only the first 4000"
+            " are kept. This prevents one verbose source from consuming"
+            " the entire Context Total Budget, leaving room for other"
+            " sources. Should be ≤ total_budget / 3 for balanced coverage."
         ),
         category="synthesis",
         value_type="int",
@@ -218,9 +253,13 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="synthesis.max_chunks",
         name="Max Chunks",
         description=(
-            "Maximum text chunks passed to Claude. Each chunk is a"
-            " section of a document or support case. Diminishing returns"
-            " past 8–10."
+            "Hard limit on the number of text chunks selected for context"
+            " building, applied before character budgets. Chunks are taken"
+            " in reranker-score order, then grouped by source page/thread."
+            " With 8 chunks, Claude typically sees 3–5 source groups."
+            " Beyond 10, answers rarely improve but cost and latency grow."
+            " Interacts with context budgets: whichever limit hits first"
+            " wins."
         ),
         category="synthesis",
         value_type="int",
@@ -236,9 +275,12 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="caches.query_embedding_size",
         name="Query Embedding Cache Size",
         description=(
-            "Recent query embeddings kept in memory. Cache hits skip the"
-            " Voyage API call, saving ~200ms per search. Increase for"
-            " high traffic."
+            "LRU cache slots for Voyage voyage-context-3 dense embeddings."
+            " When a user repeats a query (or another user asks the same"
+            " thing), the cached 1024-dim vector is reused instead of"
+            " calling the Voyage API — saving ~200ms and one API call."
+            " Each entry is ~4KB. At 200 slots = ~800KB memory. Read at"
+            " startup; changes need a restart to take effect."
         ),
         category="caches",
         value_type="int",
@@ -251,9 +293,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="caches.sparse_embedding_size",
         name="Sparse Embedding Cache Size",
         description=(
-            "Recent BM25 sparse vectors kept in memory. Used alongside"
-            " dense embeddings for hybrid search. Cache hits save ~50ms"
-            " per search."
+            "LRU cache slots for BM25 sparse vectors (the keyword-matching"
+            " half of hybrid search). Computed locally — no API call — but"
+            " caching still saves ~50ms of tokenization and TF-IDF math."
+            " Keyed by exact query string. Same memory profile as dense"
+            " cache. Read at startup; changes need a restart."
         ),
         category="caches",
         value_type="int",
@@ -266,9 +310,12 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="caches.reranker_size",
         name="Reranker Cache Size",
         description=(
-            "Recent reranker results kept in memory. Cache hits skip"
-            " the Voyage rerank API, saving ~300ms. Same query + same"
-            " docs = cache hit."
+            "LRU cache slots for Voyage rerank-2.5 results. Keyed by"
+            " hash(query + document IDs), so a cache hit requires the exact"
+            " same query AND the same retrieved chunks. Saves ~300ms and"
+            " one Voyage API call per hit. Lower hit rate than embedding"
+            " caches because the key is more specific. Read at startup;"
+            " changes need a restart."
         ),
         category="caches",
         value_type="int",
@@ -281,8 +328,11 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="caches.camera_db_size",
         name="Camera DB Cache Size",
         description=(
-            "Camera database query results kept in memory. Speeds up"
-            " the /cameras page and camera search API."
+            "LRU cache slots for camera SQLite query results (list, search,"
+            " stats). Caches the full result set for each distinct query."
+            " Speeds up /cameras page loads, camera search API, and"
+            " comparison lookups. Invalidated when cameras are added,"
+            " merged, or edited. Read at startup; changes need a restart."
         ),
         category="caches",
         value_type="int",
@@ -295,8 +345,12 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="caches.camera_db_ttl",
         name="Camera DB Cache TTL",
         description=(
-            "How long camera data stays cached before refresh (seconds)."
-            " 300s = 5 min. Lower if camera data changes frequently."
+            "Time-to-live in seconds for camera DB cache entries. After"
+            " this duration, the next request triggers a fresh SQLite"
+            " query. At 300s (5 min), camera edits take up to 5 minutes"
+            " to appear on the public /cameras page. Set lower during"
+            " bulk camera imports; higher for stable production. Read at"
+            " startup; changes need a restart."
         ),
         category="caches",
         value_type="int",
@@ -312,9 +366,13 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="prefetch.multiplier",
         name="Prefetch Multiplier",
         description=(
-            "Candidates Qdrant fetches per vector type before RRF merge."
-            " 3× with limit 10 = 30 candidates per collection. Higher ="
-            " better fusion quality."
+            "Inside each Qdrant collection, both dense and sparse vectors"
+            " independently fetch (limit × this multiplier) candidates"
+            " before RRF merges them. With limit=10 and multiplier=3,"
+            " each vector type retrieves 30 candidates per collection."
+            " Higher values improve RRF fusion quality (more overlap"
+            " between dense and sparse sets) but increase Qdrant query"
+            " time. Capped by Prefetch Max Limit."
         ),
         category="prefetch",
         value_type="int",
@@ -327,9 +385,13 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="prefetch.max_limit",
         name="Prefetch Max Limit",
         description=(
-            "Hard cap on prefetch candidates regardless of multiplier."
-            " Prevents excessive memory usage. 50 is safe for most"
-            " deployments."
+            "Hard ceiling on prefetch candidates per vector type per"
+            " collection: min(limit × multiplier, this cap). Prevents"
+            " runaway retrieval when the requested limit is large (e.g."
+            " limit=50 × multiplier=3 = 150 would be capped to 50)."
+            " Controls peak Qdrant memory per query. 50 is safe for most"
+            " deployments; raise only if you see RRF quality drop at"
+            " high limits."
         ),
         category="prefetch",
         value_type="int",
