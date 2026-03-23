@@ -344,12 +344,19 @@ class SettingsManager:
                 continue
 
             if existing and force:
-                # Update existing setting with default value
-                self._db.update_setting(
-                    setting_id=existing.id,
+                # Reset value AND sync metadata (name, description, bounds…)
+                self._db.upsert_setting(
+                    key=default.key,
+                    name=default.name,
+                    description=default.description,
+                    category=default.category,
+                    value_type=default.value_type,
                     value=default.default_value,
-                    change_note="Reset to default",
-                    updated_by="system",
+                    default_value=default.default_value,
+                    min_value=default.min_value,
+                    max_value=default.max_value,
+                    requires_restart=default.requires_restart,
+                    created_by="system",
                 )
                 updated += 1
             else:
