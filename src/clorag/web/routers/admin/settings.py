@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.dependencies import limiter
 from clorag.web.schemas import (
+    SettingMetadataUpdateRequest,
     SettingRollbackRequest,
     SettingUpdateRequest,
 )
@@ -125,6 +126,33 @@ async def api_setting_update(
     try:
         setting = sm.update(
             setting_id, updates.value, updates.change_note, "admin"
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not setting:
+        raise HTTPException(status_code=404, detail="Setting not found")
+    return setting.to_dict()
+
+
+@router.put("/settings/{setting_id}/metadata")
+@limiter.limit("30/minute")
+async def api_setting_update_metadata(
+    request: Request,
+    setting_id: str,
+    updates: Annotated[SettingMetadataUpdateRequest, Body()],
+    _admin: bool = Depends(verify_admin),
+    _csrf: bool = Depends(verify_csrf),
+) -> dict[str, Any]:
+    """Update setting metadata (min, max, default) without changing the value."""
+    from clorag.services.settings_manager import get_settings_manager
+
+    sm = get_settings_manager()
+    try:
+        setting = sm.update_metadata(
+            setting_id,
+            min_value=updates.min_value,
+            max_value=updates.max_value,
+            default_value=updates.default_value,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

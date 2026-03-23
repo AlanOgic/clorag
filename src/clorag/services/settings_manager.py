@@ -298,6 +298,39 @@ class SettingsManager:
 
         return setting
 
+    def update_metadata(
+        self,
+        setting_id: str,
+        min_value: float | None = None,
+        max_value: float | None = None,
+        default_value: str | None = None,
+    ) -> Setting | None:
+        """Update setting metadata (min, max, default) without changing the value.
+
+        Args:
+            setting_id: The setting UUID.
+            min_value: New minimum bound.
+            max_value: New maximum bound.
+            default_value: New default value string.
+
+        Returns:
+            Updated Setting or None if not found.
+
+        Raises:
+            ValueError: If validation fails.
+        """
+        setting = self._db.update_metadata(
+            setting_id=setting_id,
+            min_value=min_value,
+            max_value=max_value,
+            default_value=default_value,
+            updated_by="admin",
+        )
+        if setting:
+            self._invalidate_cache(setting.key)
+            logger.info("Setting metadata updated", key=setting.key, id=setting_id)
+        return setting
+
     def rollback_setting(
         self,
         setting_id: str,

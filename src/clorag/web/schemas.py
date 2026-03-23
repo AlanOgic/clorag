@@ -311,6 +311,14 @@ class SettingUpdateRequest(BaseModel):
     change_note: str | None = None
 
 
+class SettingMetadataUpdateRequest(BaseModel):
+    """Request body for updating setting metadata (min, max, default)."""
+
+    min_value: float | None = None
+    max_value: float | None = None
+    default_value: str | None = None
+
+
 class SettingRollbackRequest(BaseModel):
     """Request body for rolling back a setting to a previous version."""
 

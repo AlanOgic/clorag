@@ -647,6 +647,58 @@ class SettingsDatabase:
         logger.info("Created setting", key=key, id=setting_id)
         return self.get_by_id(setting_id)  # type: ignore
 
+    def update_metadata(
+        self,
+        setting_id: str,
+        min_value: float | None = None,
+        max_value: float | None = None,
+        default_value: str | None = None,
+        updated_by: str | None = None,
+    ) -> Setting | None:
+        """Update setting metadata (min, max, default) without changing the value.
+
+        Args:
+            setting_id: The setting UUID.
+            min_value: New minimum bound (None to keep current).
+            max_value: New maximum bound (None to keep current).
+            default_value: New default value string (None to keep current).
+            updated_by: Who made this update.
+
+        Returns:
+            Updated Setting object or None if not found.
+
+        Raises:
+            ValueError: If default_value fails type validation.
+        """
+        existing = self.get_by_id(setting_id)
+        if not existing:
+            return None
+
+        new_min = min_value if min_value is not None else existing.min_value
+        new_max = max_value if max_value is not None else existing.max_value
+        new_default = default_value if default_value is not None else existing.default_value
+
+        # Validate default value against type and new bounds
+        if default_value is not None:
+            _validate_value(new_default, existing.value_type, new_min, new_max)
+
+        # Validate current value against new bounds
+        _validate_value(existing.value, existing.value_type, new_min, new_max)
+
+        now = datetime.utcnow().isoformat()
+
+        with self._get_connection() as conn:
+            conn.execute(
+                """UPDATE settings
+                   SET min_value = ?, max_value = ?, default_value = ?,
+                       updated_at = ?, updated_by = ?
+                   WHERE id = ?""",
+                (new_min, new_max, new_default, now, updated_by, setting_id),
+            )
+            conn.commit()
+
+        return self.get_by_id(setting_id)
+
     def get_versions(self, setting_id: str) -> list[SettingVersion]:
         """Get all versions of a setting.
 

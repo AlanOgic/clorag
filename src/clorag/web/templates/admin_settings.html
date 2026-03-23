@@ -225,6 +225,69 @@
             color: var(--cyanview-navy);
         }
 
+        /* Page-specific: Options panel */
+        .setting-card__options-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--cyan-dark);
+            padding: 0;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .setting-card__options-toggle:hover {
+            color: var(--cyanview-navy);
+        }
+
+        .setting-card__options {
+            display: none;
+            padding: 0.75rem 0 0;
+            margin-top: 0.75rem;
+            border-top: 1px dashed #e0e0e0;
+        }
+
+        .setting-card__options.open {
+            display: block;
+        }
+
+        .setting-card__options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .setting-card__options-field label {
+            display: block;
+            font-size: 0.75rem;
+            color: #888;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+
+        .setting-card__options-field input {
+            width: 100%;
+            padding: 0.35rem 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            box-sizing: border-box;
+        }
+
+        .setting-card__options-field input:focus {
+            outline: none;
+            border-color: var(--cyan-dark);
+        }
+
+        .setting-card__options-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
         /* Page-specific: Empty state */
         .empty-state {
             text-align: center;
@@ -399,7 +462,32 @@
                             ${s.min_value !== null && s.min_value !== undefined ? `<span class="setting-card__meta">Min: ${s.min_value}</span>` : ''}
                             ${s.max_value !== null && s.max_value !== undefined ? `<span class="setting-card__meta">Max: ${s.max_value}</span>` : ''}
                             <span class="setting-card__meta setting-card__meta--source ${s.source === 'database' ? 'customized' : 'default'}">${s.source === 'database' ? 'Customized' : 'Default'}</span>
+                            ${s.id ? `<button class="setting-card__options-toggle" onclick="toggleOptions('${s.id}')">Options</button>` : ''}
                         </div>
+                        ${s.id ? `
+                        <div class="setting-card__options" id="options-${s.id}">
+                            <div class="setting-card__options-grid">
+                                <div class="setting-card__options-field">
+                                    <label>Min</label>
+                                    <input type="number" step="${step}" id="opt-min-${s.id}"
+                                           value="${s.min_value !== null && s.min_value !== undefined ? s.min_value : ''}">
+                                </div>
+                                <div class="setting-card__options-field">
+                                    <label>Max</label>
+                                    <input type="number" step="${step}" id="opt-max-${s.id}"
+                                           value="${s.max_value !== null && s.max_value !== undefined ? s.max_value : ''}">
+                                </div>
+                                <div class="setting-card__options-field">
+                                    <label>Default</label>
+                                    <input type="number" step="${step}" id="opt-default-${s.id}"
+                                           value="${s.default_value}">
+                                </div>
+                            </div>
+                            <div class="setting-card__options-actions">
+                                <button class="btn btn-sm btn-primary" onclick="saveMetadata('${s.id}', '${escapeHtml(s.key)}')">Save Options</button>
+                                ${s.is_customized ? `<button class="btn btn-sm btn-secondary" onclick="resetToDefault('${s.id}', '${escapeHtml(s.key)}', '${s.default_value}')">Reset to Default</button>` : ''}
+                            </div>
+                        </div>` : ''}
                     </div>`;
                 }).join('');
             } catch (error) {
@@ -509,6 +597,63 @@
                 } else {
                     const err = await response.json();
                     showAlert(err.detail || 'Rollback failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Toggle options panel
+        function toggleOptions(settingId) {
+            const panel = document.getElementById(`options-${settingId}`);
+            if (panel) panel.classList.toggle('open');
+        }
+
+        // Save metadata (min, max, default)
+        async function saveMetadata(settingId, settingKey) {
+            const minInput = document.getElementById(`opt-min-${settingId}`);
+            const maxInput = document.getElementById(`opt-max-${settingId}`);
+            const defaultInput = document.getElementById(`opt-default-${settingId}`);
+
+            const payload = {};
+            if (minInput && minInput.value !== '') payload.min_value = parseFloat(minInput.value);
+            if (maxInput && maxInput.value !== '') payload.max_value = parseFloat(maxInput.value);
+            if (defaultInput && defaultInput.value !== '') payload.default_value = defaultInput.value;
+
+            if (Object.keys(payload).length === 0) {
+                showAlert('No changes to save', 'error');
+                return;
+            }
+
+            try {
+                const response = await AdminUtils.putJson(`/api/admin/settings/${settingId}/metadata`, payload);
+                if (response.ok) {
+                    showAlert(`Options for "${settingKey}" saved`, 'success');
+                    loadSettings();
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to save options', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Reset value to default
+        async function resetToDefault(settingId, settingKey, defaultValue) {
+            if (!confirm(`Reset "${settingKey}" to default value (${defaultValue})?`)) return;
+
+            try {
+                const response = await AdminUtils.putJson(`/api/admin/settings/${settingId}`, {
+                    value: defaultValue,
+                    change_note: 'Reset to default'
+                });
+                if (response.ok) {
+                    showAlert(`"${settingKey}" reset to default`, 'success');
+                    loadSettings();
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Reset failed', 'error');
                 }
             } catch (error) {
                 showAlert('Error: ' + error.message, 'error');
