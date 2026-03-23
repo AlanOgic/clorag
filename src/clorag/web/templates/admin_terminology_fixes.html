@@ -219,6 +219,7 @@
         let currentLimit = 50;
         let allFixes = [];
         let selectedIds = new Set();
+        let csrfToken = null;
 
         async function checkSession() {
             try {
@@ -226,6 +227,13 @@
                 const data = await response.json();
                 if (!data.authenticated) {
                     window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+                // Fetch CSRF token from dedicated endpoint
+                const csrfRes = await fetch('/api/admin/csrf-token', { credentials: 'include' });
+                if (csrfRes.ok) {
+                    const csrfData = await csrfRes.json();
+                    csrfToken = csrfData.csrf_token;
                 }
             } catch (error) {
                 window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
@@ -396,9 +404,11 @@
 
         async function updateStatus(id, status) {
             try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
                 const response = await fetch(`/api/admin/terminology-fixes/${id}/status`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers,
                     credentials: 'include',
                     body: JSON.stringify({ status })
                 });
@@ -424,9 +434,11 @@
             }
 
             try {
+                const approveHeaders = { 'Content-Type': 'application/json' };
+                if (csrfToken) approveHeaders['X-CSRF-Token'] = csrfToken;
                 const response = await fetch('/api/admin/terminology-fixes/batch-status', {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: approveHeaders,
                     credentials: 'include',
                     body: JSON.stringify({ ids: Array.from(selectedIds), status: 'approved' })
                 });
@@ -455,9 +467,11 @@
             }
 
             try {
+                const rejectHeaders = { 'Content-Type': 'application/json' };
+                if (csrfToken) rejectHeaders['X-CSRF-Token'] = csrfToken;
                 const response = await fetch('/api/admin/terminology-fixes/batch-status', {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: rejectHeaders,
                     credentials: 'include',
                     body: JSON.stringify({ ids: Array.from(selectedIds), status: 'rejected' })
                 });
@@ -491,8 +505,11 @@
             progressEl.classList.add('active');
 
             try {
+                const applyHeaders = {};
+                if (csrfToken) applyHeaders['X-CSRF-Token'] = csrfToken;
                 const response = await fetch('/api/admin/terminology-fixes/apply', {
                     method: 'POST',
+                    headers: applyHeaders,
                     credentials: 'include'
                 });
 
@@ -543,8 +560,11 @@
                     url += `?max_chunks=${maxChunks}`;
                 }
 
+                const scanHeaders = {};
+                if (csrfToken) scanHeaders['X-CSRF-Token'] = csrfToken;
                 const response = await fetch(url, {
                     method: 'POST',
+                    headers: scanHeaders,
                     credentials: 'include'
                 });
 
