@@ -235,8 +235,8 @@ class SettingsManager:
                 "created_at": setting.created_at.isoformat() if setting.created_at else None,
                 "updated_at": setting.updated_at.isoformat() if setting.updated_at else None,
                 "updated_by": setting.updated_by,
-                "source": "database",
-                "is_customized": True,
+                "source": "database" if setting.value != setting.default_value else "default",
+                "is_customized": setting.value != setting.default_value,
             }
 
         return list(result.values())
