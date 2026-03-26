@@ -2,6 +2,29 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.10.2] - 2026-03-26
+
+### Added
+
+- **Conversation Grounding**
+  - Message-level separator injected in `synthesis.py` when conversation history exists
+  - New `<conversation_grounding>` section in `synthesis.web_layer` prompt
+  - Prevents multi-turn answer contamination (e.g., FX3 details bleeding into FX6 answer)
+  - History used for intent resolution only; each response grounded in current context block
+
+- **Prompt Backup/Restore** (`init-prompts`)
+  - `--backup` exports all customized prompts (DB differs from default) to `data/prompt_backups/<timestamp>.json`
+  - `--backup -o path.json` for explicit output path
+  - `--restore FILE` re-applies customizations on top of current DB
+  - Restore skips prompts that match current defaults or are no longer in the registry
+  - `--force` now auto-backups customizations before resetting (safety net)
+
+### Changed
+
+- `--list` now marks customized prompts with `*` suffix and shows count
+- `--stats` now reports customization count and lists customized prompt keys
+- `--category` filter now includes `base` category
+
 ## [0.10.1] - 2026-03-20
 
 ### Added

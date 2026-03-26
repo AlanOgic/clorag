@@ -3,22 +3,179 @@
 
 Usage:
     uv run init-prompts           # Initialize (skip existing)
-    uv run init-prompts --force   # Reset all to defaults
+    uv run init-prompts --force   # Reset all to defaults (auto-backups first)
     uv run init-prompts --list    # List all prompts
     uv run init-prompts --stats   # Show statistics
+    uv run init-prompts --backup  # Export customized prompts to JSON
+    uv run init-prompts --restore FILE  # Restore customizations from backup
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
-from clorag.services.default_prompts import DEFAULT_PROMPTS
+from clorag.services.default_prompts import DEFAULT_PROMPTS, get_default_prompt
 from clorag.services.prompt_manager import get_prompt_manager
 from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Default backup directory
+BACKUP_DIR = Path("data/prompt_backups")
+
+
+def _get_customized_prompts() -> list[dict[str, Any]]:
+    """Find all prompts whose DB content differs from the hardcoded default.
+
+    Returns:
+        List of dicts with key, content, name, description, model, category, variables.
+    """
+    pm = get_prompt_manager()
+    customized: list[dict[str, Any]] = []
+
+    for default in DEFAULT_PROMPTS:
+        try:
+            data = pm.get_prompt_with_metadata(default.key)
+        except KeyError:
+            continue
+
+        if data["source"] != "database":
+            continue
+
+        db_content = data["prompt"]["content"]
+        if db_content != default.content:
+            customized.append({
+                "key": default.key,
+                "name": data["prompt"].get("name", default.name),
+                "description": data["prompt"].get("description"),
+                "model": data["prompt"].get("model"),
+                "category": default.category,
+                "variables": data["prompt"].get("variables", []),
+                "content": db_content,
+            })
+
+    return customized
+
+
+def backup_prompts(output_path: str | None = None) -> Path | None:
+    """Export all customized prompts to a JSON file.
+
+    Args:
+        output_path: Optional explicit path. Defaults to data/prompt_backups/<timestamp>.json.
+
+    Returns:
+        Path to the backup file, or None if nothing to backup.
+    """
+    customized = _get_customized_prompts()
+
+    if not customized:
+        print("No customized prompts found (all match defaults).")
+        return None
+
+    if output_path:
+        backup_path = Path(output_path)
+    else:
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = BACKUP_DIR / f"prompts_{timestamp}.json"
+
+    backup_data = {
+        "backed_up_at": datetime.now().isoformat(),
+        "prompt_count": len(customized),
+        "prompts": customized,
+    }
+
+    backup_path.write_text(json.dumps(backup_data, indent=2, ensure_ascii=False))
+    print(f"\nBacked up {len(customized)} customized prompt(s) to: {backup_path}")
+
+    for p in customized:
+        print(f"  {p['key']}")
+
+    return backup_path
+
+
+def restore_prompts(backup_file: str) -> None:
+    """Restore customized prompts from a backup file.
+
+    Applies saved content on top of whatever is currently in the DB.
+    Only restores prompts whose keys still exist in the default registry.
+
+    Args:
+        backup_file: Path to the JSON backup file.
+    """
+    path = Path(backup_file)
+    if not path.exists():
+        print(f"Error: Backup file not found: {backup_file}", file=sys.stderr)
+        sys.exit(1)
+
+    backup_data = json.loads(path.read_text())
+    prompts_to_restore = backup_data.get("prompts", [])
+
+    if not prompts_to_restore:
+        print("Backup file contains no prompts.")
+        return
+
+    pm = get_prompt_manager()
+    from clorag.core.prompt_db import get_prompt_database
+    db = get_prompt_database()
+
+    restored = 0
+    skipped = 0
+    not_found = 0
+
+    for saved in prompts_to_restore:
+        key = saved["key"]
+
+        # Only restore if the key still exists in the default registry
+        default = get_default_prompt(key)
+        if not default:
+            print(f"  SKIP {key} (no longer in default registry)")
+            not_found += 1
+            continue
+
+        # Skip if saved content is identical to the current default
+        if saved["content"] == default.content:
+            print(f"  SKIP {key} (matches current default)")
+            skipped += 1
+            continue
+
+        # Find the DB entry to update
+        existing = db.get_prompt_by_key(key)
+        if existing:
+            db.update_prompt(
+                prompt_id=existing.id,
+                content=saved["content"],
+                change_note="Restored from backup",
+                updated_by="system",
+            )
+            restored += 1
+            print(f"  RESTORED {key}")
+        else:
+            # Prompt not in DB yet — create it
+            db.create_prompt(
+                key=key,
+                name=saved.get("name", default.name),
+                content=saved["content"],
+                category=saved.get("category", default.category),
+                description=saved.get("description", default.description),
+                model=saved.get("model", default.model),
+                variables=saved.get("variables", default.variables),
+                created_by="system",
+            )
+            restored += 1
+            print(f"  CREATED {key}")
+
+    # Clear cache after restore
+    pm.reload_all()
+
+    print(f"\nRestore complete: {restored} restored, {skipped} skipped, {not_found} removed from registry")
+    print(f"Source: {backup_file}")
+    print(f"Backed up at: {backup_data.get('backed_up_at', 'unknown')}")
 
 
 def list_prompts(category: str | None = None) -> None:
@@ -29,6 +186,9 @@ def list_prompts(category: str | None = None) -> None:
     if not prompts:
         print("No prompts found.")
         return
+
+    # Also get customized list for marking
+    customized_keys = {p["key"] for p in _get_customized_prompts()}
 
     # Group by category
     by_category: dict[str, list[dict[str, Any]]] = {}
@@ -44,7 +204,11 @@ def list_prompts(category: str | None = None) -> None:
             source = "DB" if p["source"] == "database" else "DEF"
             model = p.get("model", "?")
             vars_count = len(p.get("variables", []))
-            print(f"  [{source}] {p['key']:40} ({model:6}) {vars_count} vars")
+            custom_mark = " *" if p["key"] in customized_keys else ""
+            print(f"  [{source}] {p['key']:40} ({model:6}) {vars_count} vars{custom_mark}")
+
+    if customized_keys:
+        print(f"\n  * = customized ({len(customized_keys)} prompt(s) differ from defaults)")
 
 
 def show_stats() -> None:
@@ -59,9 +223,14 @@ def show_stats() -> None:
     # Cache stats
     cache_stats = pm.get_cache_stats()
 
+    # Customization stats
+    customized = _get_customized_prompts()
+
     print("\n=== PROMPT DATABASE STATS ===")
     print(f"Total prompts in DB: {db_stats['total']}")
     print(f"Total versions:      {db_stats['versions_count']}")
+    print(f"Customized:          {len(customized)}")
+
     print("\nBy category:")
     by_category = db_stats.get("by_category", {})
     if isinstance(by_category, dict):
@@ -76,6 +245,11 @@ def show_stats() -> None:
     for cat, count in sorted(by_cat.items()):
         print(f"  {cat}: {count}")
 
+    if customized:
+        print("\n=== CUSTOMIZED PROMPTS ===")
+        for p in customized:
+            print(f"  {p['key']}")
+
     print("\n=== CACHE STATS ===")
     print(f"Hits:       {cache_stats['hits']}")
     print(f"Misses:     {cache_stats['misses']}")
@@ -85,8 +259,20 @@ def show_stats() -> None:
 
 
 def initialize_prompts(force: bool = False) -> None:
-    """Initialize database with default prompts."""
+    """Initialize database with default prompts.
+
+    When force=True, automatically backs up customized prompts first.
+    """
     pm = get_prompt_manager()
+
+    # Auto-backup before force reset
+    if force:
+        customized = _get_customized_prompts()
+        if customized:
+            print("Auto-backing up customized prompts before reset...")
+            backup_path = backup_prompts()
+            if backup_path:
+                print(f"  Use --restore {backup_path} to re-apply later\n")
 
     print(f"Initializing prompts (force={force})...")
     result = pm.initialize_defaults(force=force)
@@ -132,27 +318,30 @@ def main() -> None:
         epilog="""
 Examples:
   uv run init-prompts                 # Initialize database with defaults
-  uv run init-prompts --force         # Reset all prompts to defaults
-  uv run init-prompts --list          # List all prompts
+  uv run init-prompts --force         # Reset all to defaults (auto-backups)
+  uv run init-prompts --list          # List all prompts (* = customized)
   uv run init-prompts --category analysis  # List prompts in category
   uv run init-prompts --stats         # Show statistics
   uv run init-prompts --export analysis.thread_analyzer  # Export prompt
+  uv run init-prompts --backup        # Backup customized prompts
+  uv run init-prompts --backup -o my_prompts.json  # Backup to specific file
+  uv run init-prompts --restore data/prompt_backups/prompts_20260326.json
         """,
     )
 
     parser.add_argument(
         "--force", "-f",
         action="store_true",
-        help="Force reset all prompts to defaults (WARNING: loses customizations)",
+        help="Force reset all prompts to defaults (auto-backups customizations first)",
     )
     parser.add_argument(
         "--list", "-l",
         action="store_true",
-        help="List all prompts",
+        help="List all prompts (* marks customized)",
     )
     parser.add_argument(
         "--category", "-c",
-        choices=["agent", "analysis", "synthesis", "drafts", "graph", "scripts"],
+        choices=["base", "agent", "analysis", "synthesis", "drafts", "graph", "scripts"],
         help="Filter by category (with --list)",
     )
     parser.add_argument(
@@ -165,10 +354,29 @@ Examples:
         metavar="KEY",
         help="Export a specific prompt by key",
     )
+    parser.add_argument(
+        "--backup", "-b",
+        action="store_true",
+        help="Backup all customized prompts to JSON",
+    )
+    parser.add_argument(
+        "--restore", "-r",
+        metavar="FILE",
+        help="Restore customized prompts from a backup file",
+    )
+    parser.add_argument(
+        "--output", "-o",
+        metavar="PATH",
+        help="Output path for --backup (default: data/prompt_backups/<timestamp>.json)",
+    )
 
     args = parser.parse_args()
 
-    if args.list:
+    if args.backup:
+        backup_prompts(output_path=args.output)
+    elif args.restore:
+        restore_prompts(args.restore)
+    elif args.list:
         list_prompts(category=args.category)
     elif args.stats:
         show_stats()

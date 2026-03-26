@@ -35,8 +35,12 @@ uv run rebuild-fts                         # Rebuild camera FTS5 index
 uv run fix-rio-terminology --preview       # Scan for RIO terminology issues
 uv run fix-rio-terminology --apply         # Apply approved fixes
 uv run init-prompts                        # Initialize prompt database with defaults
-uv run init-prompts --list                 # List all prompts
+uv run init-prompts --force                # Reset all to defaults (auto-backups first)
+uv run init-prompts --list                 # List all prompts (* = customized)
 uv run init-prompts --stats                # Show prompt database stats
+uv run init-prompts --backup               # Backup customized prompts to JSON
+uv run init-prompts --backup -o file.json  # Backup to specific path
+uv run init-prompts --restore FILE         # Restore customizations from backup
 uv run init-settings                       # Initialize RAG settings with defaults
 uv run init-settings --list                # List all settings by category
 uv run init-settings --stats               # Show settings database stats
@@ -135,6 +139,7 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Search quality logging**: Scores + source types logged per query; `/api/admin/search-quality` for low-score review
 - **Contextualized embeddings**: `voyage-context-3` uses `/v1/contextualizedembeddings` API (not `/v1/embeddings`) to encode chunks with full document context
 - **Synthesis grounding**: Prompt instructs "I don't know" on insufficient context; prefers docs over cases on conflicts
+- **Conversation grounding**: Follow-up questions use history for intent only (e.g., "and the FX6?" → "connect the FX6"); facts from previous answers are never mixed into current response. Enforced via message-level separator + `<conversation_grounding>` prompt rule
 
 ### Chunking
 - **Token-based sizing**: Uses `tiktoken` (cl100k_base) for 15-20% more consistent chunk sizes vs character-based
@@ -222,6 +227,8 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 - **Prompt composition**: `get_composed_prompt()` concatenates multiple prompt keys at runtime. Web = `base.system_prompt` + `synthesis.web_layer`, CLI = `base.system_prompt` + `agent.tools_layer`
 - **Version history**: Every content change creates a new version for audit and rollback
 - **Fallback to defaults**: If DB prompt not found, falls back to hardcoded defaults in `default_prompts.py`
+- **Backup/restore**: `init-prompts --backup` exports customized prompts to JSON; `--restore FILE` re-applies them. `--force` auto-backups before resetting
+- **Customization detection**: Compares DB content against hardcoded defaults to identify truly customized prompts
 - **Caching**: In-memory cache with TTL (default: 300s) for performance, hot reload via API
 - **Variable substitution**: `{variable}` placeholders auto-detected and substituted at runtime
 - **Categories**: agent, analysis, base, synthesis, drafts, graph, scripts
@@ -264,7 +271,19 @@ Production:
 - Web: https://cyanview.cloud/ (Docker maps 8085→8080)
 - MCP HTTP: https://mcp.cyanview.cloud/ (Docker maps 8086→8080, Bearer auth required)
 
-## Recent Updates (2026-03-20)
+## Recent Updates (2026-03-26)
+
+### v0.10.2: Conversation Grounding + Prompt Backup/Restore
+
+- **Conversation grounding**: Fixed multi-turn answer contamination where follow-up questions (e.g., "connect FX6" after "connect FX3") would bleed facts from previous answers into the current response
+  - Message-level separator injected between history and new question in `synthesis.py`
+  - `<conversation_grounding>` rule added to `synthesis.web_layer` prompt
+  - History used for intent resolution only; each answer grounded exclusively in current context
+- **Prompt backup/restore**: `init-prompts --backup` exports customized prompts to `data/prompt_backups/<timestamp>.json`; `--restore FILE` re-applies them selectively
+  - `--force` auto-backups before resetting (safety net)
+  - Customization detection compares DB content against hardcoded defaults
+  - `--list` now marks customized prompts with `*`; `--stats` shows customization count
+  - Restore skips prompts matching current defaults or removed from registry
 
 ### v0.10.1: Prompt Composition (base + layer)
 

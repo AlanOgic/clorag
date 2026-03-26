@@ -56,6 +56,15 @@ async def synthesize_answer(
     messages: list[dict[str, Any]] = []
     if conversation_history:
         messages.extend(conversation_history)
+        # Ground Claude: history is for intent only, not as a fact source
+        messages.append({"role": "user", "content": (
+            "New question follows. Answer ONLY using the Context provided below. "
+            "Use conversation history to understand intent (e.g., 'and the FX6?' means "
+            "'same question but for FX6'), but do NOT reuse facts or steps from previous answers."
+        )})
+        messages.append({"role": "assistant", "content": (
+            "Understood. I'll answer exclusively from the new context."
+        )})
     messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
 
     try:
@@ -104,6 +113,15 @@ async def synthesize_answer_stream(
     messages: list[dict[str, Any]] = []
     if conversation_history:
         messages.extend(conversation_history)
+        # Ground Claude: history is for intent only, not as a fact source
+        messages.append({"role": "user", "content": (
+            "New question follows. Answer ONLY using the Context provided below. "
+            "Use conversation history to understand intent (e.g., 'and the FX6?' means "
+            "'same question but for FX6'), but do NOT reuse facts or steps from previous answers."
+        )})
+        messages.append({"role": "assistant", "content": (
+            "Understood. I'll answer exclusively from the new context."
+        )})
     messages.append({"role": "user", "content": f"Question: {query}\n\nContext:\n{context}"})
 
     try:
