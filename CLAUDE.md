@@ -139,6 +139,7 @@ Settings via `clorag.config.get_settings()` (cached singleton).
 - **Search quality logging**: Scores + source types logged per query; `/api/admin/search-quality` for low-score review
 - **Contextualized embeddings**: `voyage-context-3` uses `/v1/contextualizedembeddings` API (not `/v1/embeddings`) to encode chunks with full document context
 - **Synthesis grounding**: Prompt instructs "I don't know" on insufficient context; prefers docs over cases on conflicts
+- **User feedback**: Thumbs up/down per answer with optional comment on downvote. Stored in `search_feedback` table (upsert per search_id). Admin sees satisfaction rate + recent feedback at `/admin/analytics`
 - **Conversation grounding**: Follow-up questions use history for intent only (e.g., "and the FX6?" → "connect the FX6"); facts from previous answers are never mixed into current response. Enforced via message-level separator + `<conversation_grounding>` prompt rule
 
 ### Chunking
@@ -272,6 +273,17 @@ Production:
 - MCP HTTP: https://mcp.cyanview.cloud/ (Docker maps 8086→8080, Bearer auth required)
 
 ## Recent Updates (2026-03-26)
+
+### v0.10.3: User Feedback (Thumbs Up/Down)
+
+- **Feedback buttons**: Thumbs up/down on every AI answer, enabled after streaming completes
+- **Optional comment**: Text field appears on thumbs down for "What could be improved?"
+- **Feedback API**: `POST /api/feedback` (rate-limited 10/min, upsert — one vote per search)
+- **search_id linking**: `log_search()` now runs before SSE `done` event, `search_id` included in payload
+- **Admin dashboard**: Feedback stats (satisfaction rate, total, up/down counts) + recent feedback table at `/admin/analytics`
+- **Database**: `search_feedback` table in analytics DB with upsert on `search_id`
+- **New endpoints**: `POST /api/feedback`, `GET /api/admin/feedback-stats`, `GET /api/admin/feedback/recent`
+- **New schemas**: `FeedbackRequest`, `FeedbackResponse`
 
 ### v0.10.2: Conversation Grounding + Prompt Backup/Restore
 

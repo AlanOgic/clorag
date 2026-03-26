@@ -556,6 +556,52 @@
                 </div>
             </div>
 
+            <!-- User Feedback -->
+            <div class="section section--collapsible">
+                <div class="section__header" id="feedbackHeader" data-section="feedback">
+                    <h3 class="section__title">User Feedback</h3>
+                    <span class="section__toggle">
+                        <span id="feedbackLabel">Show</span>
+                        <svg class="expand-icon" id="feedbackIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </span>
+                </div>
+                <div class="section__content" id="feedbackContent">
+                    <div class="stats-grid" id="feedbackStats" style="margin-bottom: 1.5rem;">
+                        <div class="stat-card">
+                            <div class="stat-card__value" id="feedbackTotal">-</div>
+                            <div class="stat-card__label">Total Feedback</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card__value" id="feedbackUp" style="color: #2e7d32;">-</div>
+                            <div class="stat-card__label">Thumbs Up</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card__value" id="feedbackDown" style="color: #c62828;">-</div>
+                            <div class="stat-card__label">Thumbs Down</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card__value" id="feedbackSatisfaction">-</div>
+                            <div class="stat-card__label">Satisfaction Rate</div>
+                        </div>
+                    </div>
+                    <table class="data-table" id="feedbackTable">
+                        <thead>
+                            <tr>
+                                <th>Query</th>
+                                <th>Rating</th>
+                                <th>Comment</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feedbackTableBody">
+                            <tr><td colspan="4">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Recent Searches -->
             <div class="section">
                 <h3 class="section__title">Recent Searches (All)</h3>
@@ -644,6 +690,9 @@
         document.getElementById('recentConversationsHeader').addEventListener('click', () => {
             AdminActions.toggleSection('recentConversations');
         });
+        document.getElementById('feedbackHeader').addEventListener('click', () => {
+            AdminActions.toggleSection('feedback');
+        });
 
         // Register page-specific action handlers
         AdminActions.register('open-search-detail', (el) => {
@@ -698,8 +747,9 @@
             // Recent searches table
             renderRecentTable(data.recent_searches || []);
 
-            // Load conversations separately
+            // Load conversations and feedback separately
             loadConversations();
+            loadFeedback();
         }
 
         async function loadConversations() {
@@ -712,6 +762,53 @@
                 console.error('Failed to load conversations:', error);
                 document.getElementById('conversationsContainer').innerHTML =
                     '<p class="no-conversations">Failed to load conversations</p>';
+            }
+        }
+
+        async function loadFeedback() {
+            try {
+                const [statsRes, recentRes] = await Promise.all([
+                    fetch('/api/admin/feedback-stats?days=30'),
+                    fetch('/api/admin/feedback/recent?limit=20'),
+                ]);
+                if (!statsRes.ok || !recentRes.ok) throw new Error('Failed to load feedback');
+
+                const stats = await statsRes.json();
+                const recent = await recentRes.json();
+
+                // Stats cards
+                document.getElementById('feedbackTotal').textContent = stats.total || 0;
+                document.getElementById('feedbackUp').textContent = stats.thumbs_up || 0;
+                document.getElementById('feedbackDown').textContent = stats.thumbs_down || 0;
+                const satRate = stats.satisfaction_rate || 0;
+                const satEl = document.getElementById('feedbackSatisfaction');
+                satEl.textContent = stats.total > 0 ? satRate + '%' : '-';
+                if (satRate >= 70) satEl.style.color = '#2e7d32';
+                else if (satRate >= 40) satEl.style.color = '#f57c00';
+                else if (stats.total > 0) satEl.style.color = '#c62828';
+
+                // Recent feedback table
+                const tbody = document.getElementById('feedbackTableBody');
+                if (!recent || recent.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;">No feedback yet</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = recent.map(f => {
+                    const query = (f.query || '').length > 60 ? f.query.substring(0, 60) + '...' : (f.query || '-');
+                    const icon = f.rating === 'up' ? '👍' : '👎';
+                    const comment = f.comment ? (f.comment.length > 80 ? f.comment.substring(0, 80) + '...' : f.comment) : '-';
+                    const time = f.updated_at || f.feedback_at || '-';
+                    return `<tr>
+                        <td>${AdminActions.escapeHtml ? AdminActions.escapeHtml(query) : query}</td>
+                        <td style="text-align:center;">${icon}</td>
+                        <td>${AdminActions.escapeHtml ? AdminActions.escapeHtml(comment) : comment}</td>
+                        <td>${time}</td>
+                    </tr>`;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load feedback:', error);
+                document.getElementById('feedbackTableBody').innerHTML =
+                    '<tr><td colspan="4" style="text-align:center;color:#e53935;">Failed to load feedback</td></tr>';
             }
         }
 

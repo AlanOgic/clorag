@@ -456,6 +456,103 @@
             gap: 0.5rem;
         }
 
+        /* Feedback buttons */
+        .feedback-buttons {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .feedback-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            cursor: pointer;
+            color: #999;
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .feedback-btn:hover {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .feedback-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .feedback-btn.active-up {
+            background: #e8f5e9;
+            border-color: #4caf50;
+            color: #2e7d32;
+        }
+
+        .feedback-btn.active-down {
+            background: #fce4ec;
+            border-color: #e53935;
+            color: #c62828;
+        }
+
+        .feedback-comment-container {
+            border-top: 1px solid #e8f4fc;
+            padding: 0.75rem 1rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-start;
+        }
+
+        .feedback-comment {
+            flex: 1;
+            border: 1px solid #d0e3ff;
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.85rem;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 36px;
+            max-height: 100px;
+        }
+
+        .feedback-comment:focus {
+            outline: none;
+            border-color: var(--cyan-blue);
+        }
+
+        .feedback-comment-submit {
+            padding: 0.5rem 1rem;
+            background: var(--cyan-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+
+        .feedback-comment-submit:hover {
+            background: var(--cyan-dark);
+        }
+
+        .feedback-thanks {
+            font-size: 0.8rem;
+            color: #4caf50;
+            padding: 0.5rem 1rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
         /* Excalidraw diagrams use hand-drawn style - minimal CSS overrides needed */
         .answer-content .mermaid-container.excalidraw-container svg {
             /* Excalidraw handles all styling internally */
@@ -600,33 +697,9 @@
             opacity: 0.5;
         }
 
-        /* Footer - Sticky */
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            padding: 0.75rem 1rem;
-            background: #f6f6f6;
-            color: #606770;
-            font-size: 0.85rem;
-            border-top: 1px solid #e0e0e0;
-            z-index: 50;
-        }
-
         /* Add padding to body to prevent content from being hidden behind sticky footer */
         body {
-            padding-bottom: 50px;
-        }
-
-        .footer a {
-            color: var(--cyan-dark);
-            text-decoration: none;
-        }
-
-        .footer a:hover {
-            text-decoration: underline;
+            padding-bottom: 70px;
         }
 
         /* Help Modal */
@@ -1190,13 +1263,7 @@
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <p>
-            Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
-            AI Search with Claude AI, Voyage AI & Qdrant
-        </p>
-    </footer>
+    {% include 'partials/_legal_footer.html' %}
 
     <script nonce="{{ request.state.csp_nonce }}">
         const searchForm = document.getElementById('search-form');
@@ -1663,6 +1730,18 @@ ${bodyContent}
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                         </svg>
                         <span class="answer-title">AI Answer</span>
+                        <div class="feedback-buttons" id="feedback-${exchangeId}" style="display:none;">
+                            <button class="feedback-btn" data-action="feedback" data-rating="up" data-exchange="${exchangeId}" title="Helpful">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                                </svg>
+                            </button>
+                            <button class="feedback-btn" data-action="feedback" data-rating="down" data-exchange="${exchangeId}" title="Not helpful">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+                                </svg>
+                            </button>
+                        </div>
                         <div class="answer-header-actions">
                             <div class="export-dropdown" id="export-dropdown-${exchangeId}">
                                 <button class="export-btn" title="Export answer" data-action="toggle-export" data-exchange="${exchangeId}">
@@ -1703,6 +1782,10 @@ ${bodyContent}
                         </div>
                     </div>
                     <div class="answer-content" id="answer-content-${exchangeId}"></div>
+                    <div class="feedback-comment-container" id="feedback-comment-${exchangeId}" style="display:none;">
+                        <textarea class="feedback-comment" id="feedback-textarea-${exchangeId}" placeholder="What could be improved?" maxlength="1000" rows="2"></textarea>
+                        <button class="feedback-comment-submit" data-action="submit-feedback-comment" data-exchange="${exchangeId}">Send</button>
+                    </div>
                 </div>
                 <div class="followup-input-container" id="followup-container-${exchangeId}" style="display: none;">
                     <form class="followup-form" data-action="followup-form" data-exchange="${exchangeId}">
@@ -1824,6 +1907,17 @@ ${bodyContent}
                                         answerStore[exchangeId].sources = data.sources || [];
                                     }
                                 } else if (data.type === 'done') {
+                                    // Store search_id for feedback linking
+                                    if (answerStore[exchangeId]) {
+                                        answerStore[exchangeId].searchId = data.search_id || 0;
+                                    }
+
+                                    // Enable feedback buttons if search was logged
+                                    if (data.search_id > 0) {
+                                        const feedbackEl = document.getElementById(`feedback-${exchangeId}`);
+                                        if (feedbackEl) feedbackEl.style.display = 'flex';
+                                    }
+
                                     // Final render with XSS protection
                                     answerContentEl.innerHTML = safeMarkdown(fullText);
 
@@ -1920,6 +2014,14 @@ ${bodyContent}
                     e.preventDefault();
                     exportAnswer(target.dataset.format, exchangeId);
                     break;
+                case 'feedback':
+                    e.preventDefault();
+                    handleFeedback(exchangeId, target.dataset.rating);
+                    break;
+                case 'submit-feedback-comment':
+                    e.preventDefault();
+                    submitFeedbackComment(exchangeId);
+                    break;
             }
         });
 
@@ -1932,6 +2034,66 @@ ${bodyContent}
                 handleFollowup(e, exchangeId);
             }
         });
+
+        // Feedback handling
+        function handleFeedback(exchangeId, rating) {
+            const data = answerStore[exchangeId];
+            if (!data || !data.searchId) return;
+
+            const container = document.getElementById(`feedback-${exchangeId}`);
+            if (!container) return;
+
+            // Toggle active state
+            container.querySelectorAll('.feedback-btn').forEach(btn => {
+                btn.classList.remove('active-up', 'active-down');
+            });
+            const clicked = container.querySelector(`[data-rating="${rating}"]`);
+            clicked.classList.add(rating === 'up' ? 'active-up' : 'active-down');
+
+            const commentContainer = document.getElementById(`feedback-comment-${exchangeId}`);
+            if (rating === 'down') {
+                // Show comment box for thumbs down
+                commentContainer.style.display = 'flex';
+                document.getElementById(`feedback-textarea-${exchangeId}`).focus();
+            } else {
+                // Thumbs up: hide comment, send immediately
+                commentContainer.style.display = 'none';
+                sendFeedback(data.searchId, rating, null, exchangeId);
+            }
+        }
+
+        async function sendFeedback(searchId, rating, comment, exchangeId) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+            try {
+                await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        search_id: searchId,
+                        rating: rating,
+                        comment: comment,
+                        session_id: currentSessionId,
+                    }),
+                });
+            } catch (err) {
+                console.warn('Feedback submission failed:', err);
+            }
+        }
+
+        function submitFeedbackComment(exchangeId) {
+            const data = answerStore[exchangeId];
+            if (!data || !data.searchId) return;
+
+            const textarea = document.getElementById(`feedback-textarea-${exchangeId}`);
+            const comment = textarea.value.trim() || null;
+            sendFeedback(data.searchId, 'down', comment, exchangeId);
+
+            // Replace comment box with thanks message
+            const commentContainer = document.getElementById(`feedback-comment-${exchangeId}`);
+            commentContainer.innerHTML = '<div class="feedback-thanks">Thanks for your feedback!</div>';
+        }
 
         // Random placeholder examples
         const placeholderExamples = [

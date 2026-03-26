@@ -199,6 +199,26 @@ async def api_get_conversations(
     return analytics.get_recent_conversations(limit=limit)
 
 
+@router.get("/feedback-stats", tags=["Feedback"])
+async def api_feedback_stats(
+    days: int = 30,
+    _: bool = Depends(verify_admin),
+) -> dict[str, Any]:
+    """Get aggregated user feedback statistics."""
+    analytics = get_analytics_db()
+    return analytics.get_feedback_stats(days=days)
+
+
+@router.get("/feedback/recent", tags=["Feedback"])
+async def api_recent_feedback(
+    limit: int = 20,
+    _: bool = Depends(verify_admin),
+) -> list[dict[str, Any]]:
+    """Get recent user feedback with associated queries."""
+    analytics = get_analytics_db()
+    return analytics.get_recent_feedback(limit=limit)
+
+
 def _generate_cache_recommendations(
     dense_stats: dict[str, int | float],
     sparse_stats: dict[str, int | float],

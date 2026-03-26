@@ -82,6 +82,29 @@ class SearchResponse(BaseModel):
     results: list[SearchResult]
     total: int
     session_id: str | None = None  # Session ID for follow-up conversations
+    search_id: int = 0  # Analytics record ID for feedback linking
+
+
+# =============================================================================
+# Feedback Models
+# =============================================================================
+
+
+class FeedbackRequest(BaseModel):
+    """Request body for submitting search feedback."""
+
+    search_id: int
+    rating: str = Field(..., pattern="^(up|down)$")
+    comment: str | None = Field(None, max_length=1000)
+    session_id: str | None = None
+
+
+class FeedbackResponse(BaseModel):
+    """Response after submitting feedback."""
+
+    success: bool
+    search_id: int
+    rating: str
 
 
 class DebugSearchResponse(BaseModel):

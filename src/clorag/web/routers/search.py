@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, Response, StreamingResponse
 
 from clorag.web.auth import get_session_store
 from clorag.web.dependencies import get_analytics_db, get_templates, limiter
-from clorag.web.schemas import SearchRequest, SearchResponse
+from clorag.web.schemas import FeedbackRequest, FeedbackResponse, SearchRequest, SearchResponse
 from clorag.web.search import (
     extract_source_links,
     perform_search,
@@ -91,17 +91,13 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
             # Then send sources at the end
             yield f"data: {json.dumps({'type': 'sources', 'sources': source_links})}\n\n"
 
-            # Signal completion
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
-
-            # Store this exchange in the session for future follow-ups
+            # Assemble full response and log to analytics BEFORE done event
+            # so we can include search_id for feedback linking
             full_response = "".join(collected_response)
-            session.add_exchange(req.query, full_response)
-
-            # Log search to analytics with full data after streaming completes
+            search_id = 0
             response_time_ms = int((time.time() - search_start_time) * 1000)
             try:
-                get_analytics_db().log_search(
+                search_id = get_analytics_db().log_search(
                     query=req.query,
                     source=req.source.value,
                     response_time_ms=response_time_ms,
@@ -115,6 +111,12 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
                 )
             except Exception as e:
                 logger.warning("Failed to log search analytics", error=str(e))
+
+            # Signal completion with search_id for feedback
+            yield f"data: {json.dumps({'type': 'done', 'search_id': search_id})}\n\n"
+
+            # Store this exchange in the session for future follow-ups
+            session.add_exchange(req.query, full_response)
         except Exception as e:
             logger.error("Error during streaming response", error=str(e), query=req.query)
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
@@ -161,10 +163,11 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
     # Extract top 3 unique source links
     source_links = extract_source_links(chunks_for_synthesis, as_model=True)
 
-    # Log search to analytics with full data (non-blocking)
+    # Log search to analytics to get search_id for feedback
+    search_id = 0
     response_time_ms = int((time.time() - start_time) * 1000)
     try:
-        get_analytics_db().log_search(
+        search_id = get_analytics_db().log_search(
             query=req.query,
             source=req.source.value,
             response_time_ms=response_time_ms,
@@ -187,4 +190,29 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
         results=results,
         total=len(results),
         session_id=session.session_id,
+        search_id=search_id,
     )
+
+
+@router.post("/api/feedback", response_model=FeedbackResponse)
+@limiter.limit("10/minute")
+async def submit_feedback(request: Request, req: FeedbackRequest) -> FeedbackResponse:
+    """Submit thumbs up/down feedback for a search answer.
+
+    One feedback per search_id — submitting again replaces the previous vote.
+    Rate limited to 10 requests per minute per IP.
+    """
+    if req.search_id <= 0:
+        return FeedbackResponse(success=False, search_id=req.search_id, rating=req.rating)
+
+    try:
+        get_analytics_db().save_feedback(
+            search_id=req.search_id,
+            rating=req.rating,
+            comment=req.comment,
+            session_id=req.session_id,
+        )
+        return FeedbackResponse(success=True, search_id=req.search_id, rating=req.rating)
+    except Exception as e:
+        logger.warning("Failed to save feedback", error=str(e), search_id=req.search_id)
+        return FeedbackResponse(success=False, search_id=req.search_id, rating=req.rating)

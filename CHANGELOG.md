@@ -2,6 +2,25 @@
 
 All notable changes to CLORAG will be documented in this file.
 
+## [0.10.3] - 2026-03-26
+
+### Added
+
+- **User Feedback**
+  - Thumbs up/down buttons on every AI answer card, enabled after streaming completes
+  - Optional comment textarea appears on thumbs down ("What could be improved?")
+  - `POST /api/feedback` public endpoint with rate limiting (10/min) and upsert (one vote per search)
+  - `search_id` now included in SSE `done` event payload for feedback linking
+  - `search_feedback` table in analytics DB with unique constraint on `search_id`
+  - Admin dashboard: feedback stats cards (total, up, down, satisfaction %) + recent feedback table
+  - New endpoints: `GET /api/admin/feedback-stats`, `GET /api/admin/feedback/recent`
+  - New schemas: `FeedbackRequest`, `FeedbackResponse`
+  - `SearchResponse` model now includes `search_id` field
+
+### Changed
+
+- `log_search()` call reordered before SSE `done` event in streaming endpoint (was after)
+
 ## [0.10.2] - 2026-03-26
 
 ### Added
