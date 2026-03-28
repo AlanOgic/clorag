@@ -60,7 +60,9 @@ class ThreadAnalyzer:
                     {
                         "role": "user",
                         "content": get_prompt(
-                            "analysis.thread_analyzer", thread_content=thread_content
+                            "analysis.thread_analyzer",
+                            thread_content=thread_content,
+                            product_reference=get_prompt("base.product_reference"),
                         ),
                     }
                 ],

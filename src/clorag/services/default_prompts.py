@@ -27,15 +27,7 @@ class PromptDefinition:
 # AGENT PROMPTS
 # =============================================================================
 
-BASE_SYSTEM_PROMPT = """\
-<base>
-
-<identity>
-You are a senior Cyanview team member — knowledgeable, warm, and practical. You have deep expertise in camera control systems, network topology for broadcast and live events, and the full Cyanview product ecosystem.
-
-Always speak as part of the team: use "we", "us", "our". Never say "Cyanview says" or "the company recommends". Never say "contact Cyanview support" — you ARE the support.
-</identity>
-
+PRODUCT_ECOSYSTEM_REFERENCE = """\
 <product_ecosystem>
 Use this as ground truth for product guidance. Retrieved sources supplement this — they do not override it.
 
@@ -72,7 +64,18 @@ Use this as ground truth for product guidance. Retrieved sources supplement this
 - REMI (remote production): ALWAYS requires at least 1 RIO +WAN as cloud gateway — even for IP-only setups.
 - "RIO-Live" / "RIO Live" = old name for RIO +LAN.
 </decision_points>
-</product_ecosystem>
+</product_ecosystem>"""
+
+BASE_SYSTEM_PROMPT = """\
+<base>
+
+<identity>
+You are a senior Cyanview team member — knowledgeable, warm, and practical. You have deep expertise in camera control systems, network topology for broadcast and live events, and the full Cyanview product ecosystem.
+
+Always speak as part of the team: use "we", "us", "our". Never say "Cyanview says" or "the company recommends". Never say "contact Cyanview support" — you ARE the support.
+</identity>
+
+""" + PRODUCT_ECOSYSTEM_REFERENCE + """
 
 <response_rules>
 
@@ -232,13 +235,7 @@ These placeholders are intentional for anonymization. Do NOT try to reveal or gu
 </thread>
 
 Product Reference (for accurate classification):
-- Controllers: RCP (compact, aka "RCP Compact"), RCP-J (with iris joystick, standard OB van rack size). Both need DUO/QUATTRO/OCTO/MSU license
-- Interfaces: CI0 (serial-to-IP, 2 ports, stateless), CI0BM (CI0 + Blackmagic SDI board), RIO (autonomous, 2 serial + USB, maintains camera/lens connection independently of network)
-- RIO licenses: RIO +WAN (REMI/cloud/remote, WAN/4G, 1–128 cameras), RIO +LAN (LAN-only, max 2 cameras, formerly "RIO-Live")
-- Other: VP4 (4-ch color corrector/CCU), NIO (16 GPIO tally over Ethernet/WiFi/4G), RSBM (SDI control board for Blackmagic, used with CI0 or RIO)
-- Connection types: IP cameras (Sony CGI/SDK, Canon XC, Panasonic PTZ, BirdDog, ARRI CAP, VISCA IP) → direct to RCP. Serial (Sony 8-pin, LANC, VISCA RS-232/422) → needs CI0/RIO. USB (Sony Alpha, Canon R5) → needs RIO. SDI (Blackmagic) → needs CI0BM or CI0/RIO + RSBM
-- Adapters: Sony FX6 requires USB-C to Ethernet adapter. Sony FX9 needs XDCA-FX9 extension unit
-- Lens motors (Canon Cine-Servo, Fujinon Cabrio): CI0 or RIO, but RIO recommended (maintains lens connection on network drop)
+{product_reference}
 
 Analyze the thread and respond with a JSON object containing:
 
@@ -300,17 +297,8 @@ Review this analyzed support case and:
 3. ENSURE all summaries are fully anonymized (no customer/company names)
 4. Ensure keywords are comprehensive and useful for search
 5. Validate the category assignment
-6. Validate product identification:
-   - "RIO-Live" or "RIO Live" in thread → product should be "RIO +LAN"
-   - REMI/cloud/remote/WAN/4G mentions → product should be "RIO +WAN"
-   - LAN-only/local/max 2 cameras → product should be "RIO +LAN"
-   - USB camera control (Sony Alpha, Canon R5) → product should include "RIO" (only RIO has USB)
-   - Serial-only conversion → product could be "CI0" or "RIO"
-   - SDI control (Blackmagic) → product should be "CI0BM" or "CI0/RIO + RSBM"
-   - IP cameras (Sony CGI, Canon XC, Panasonic PTZ, VISCA IP) → direct to RCP, no CI0/RIO needed
-   - License mentions (DUO/QUATTRO/OCTO/MSU) → category should be "RCP"
-   - Lens motor control (Cine-Servo, Cabrio) → CI0 or RIO, but RIO preferred for reliability
-   - Adapter notes: FX6 needs USB-C to Ethernet, FX9 needs XDCA-FX9 extension
+6. Validate product identification using this product reference:
+{product_reference}
 7. Generate a final structured document for the knowledge base
 
 <original_thread>
@@ -617,18 +605,7 @@ FORMAT RULES:
 - Total length: 150-400 words (adapt to complexity)
 
 PRODUCT KNOWLEDGE:
-- CI0: serial-to-IP (2 ports), stateless — network drop = lost camera AND lens control
-- RIO: autonomous (2 serial + USB) — maintains camera+lens connections independently of network
-- CI0 vs RIO: network drops losing control → likely CI0. Suggest RIO for broadcast/mission-critical
-- REMI/remote/cloud → ALWAYS requires RIO +WAN as cloud gateway, even for IP-only setups
-- RIO +WAN: REMI/cloud/remote, WAN/4G, 1–128 cameras
-- RIO +LAN: LAN-only, max 2 cameras, formerly "RIO-Live" / "RIO Live"
-- USB cameras (Sony Alpha, Canon R5) → only RIO supports USB
-- SDI camera control (Blackmagic) → requires CI0BM or CI0/RIO + RSBM board
-- IP cameras (Sony CGI/SDK, Canon XC, Panasonic PTZ, BirdDog, ARRI CAP, VISCA IP) → direct to RCP, no CI0/RIO needed
-- Lens motors (Cine-Servo, Cabrio) → CI0 or RIO, but RIO recommended for reliability
-- RCP / RCP-J licenses: DUO (2 cam), QUATTRO (4), OCTO (8), MSU (128)
-- Adapters: FX6 needs USB-C to Ethernet, FX9 needs XDCA-FX9 extension
+{product_reference}
 
 CONTENT RULES:
 - Use ONLY information from the provided context - never invent details
@@ -703,6 +680,16 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         content=BASE_SYSTEM_PROMPT,
         variables=[],
     ),
+    # Product ecosystem reference (shared by analysis/draft prompts)
+    PromptDefinition(
+        key="base.product_reference",
+        name="Product Ecosystem Reference",
+        description="Shared Cyanview product knowledge injected into analysis and draft prompts",
+        model="claude",
+        category="base",
+        content=PRODUCT_ECOSYSTEM_REFERENCE,
+        variables=[],
+    ),
     # Agent tools layer (CLI-specific)
     PromptDefinition(
         key="agent.tools_layer",
@@ -721,7 +708,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         model="sonnet",
         category="analysis",
         content=ANALYSIS_THREAD_ANALYZER,
-        variables=["thread_content"],
+        variables=["thread_content", "product_reference"],
     ),
     PromptDefinition(
         key="analysis.quality_controller",
@@ -739,6 +726,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
             "product",
             "resolution_quality",
             "anonymized_subject",
+            "product_reference",
         ],
     ),
     PromptDefinition(
@@ -796,7 +784,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         model="sonnet",
         category="drafts",
         content=DRAFTS_EMAIL_GENERATOR,
-        variables=[],
+        variables=["product_reference"],
     ),
     # Synthesis prompts
     PromptDefinition(

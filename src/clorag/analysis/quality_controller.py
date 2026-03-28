@@ -59,6 +59,7 @@ class QualityController:
                 product=analysis.product or "N/A",
                 resolution_quality=analysis.resolution_quality or "N/A",
                 anonymized_subject=analysis.anonymized_subject or "N/A",
+                product_reference=get_prompt("base.product_reference"),
             )
 
             response = await self._client.messages.create(

@@ -218,7 +218,10 @@ Write a professional email reply addressing this customer's issue. Use the retri
         response = await self._client.messages.create(
             model=self._model,
             max_tokens=1000,
-            system=get_prompt("drafts.email_generator"),
+            system=get_prompt(
+                "drafts.email_generator",
+                product_reference=get_prompt("base.product_reference"),
+            ),
             messages=[{"role": "user", "content": user_content}],
         )
 

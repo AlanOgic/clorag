@@ -224,8 +224,9 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search. Sonnet-generated keywords auto-enriched alongside user-provided tags.
 
 ### Prompt Management
-- **Admin-editable prompts**: 12 LLM prompts stored in SQLite, editable via `/admin/prompts` without code changes
+- **Admin-editable prompts**: 13 LLM prompts stored in SQLite, editable via `/admin/prompts` without code changes
 - **Prompt composition**: `get_composed_prompt()` concatenates multiple prompt keys at runtime. Web = `base.system_prompt` + `synthesis.web_layer`, CLI = `base.system_prompt` + `agent.tools_layer`
+- **Shared product knowledge**: `base.product_reference` contains the canonical `<product_ecosystem>` block, injected via `{product_reference}` variable into `analysis.thread_analyzer`, `analysis.quality_controller`, and `drafts.email_generator`. Edit once at `/admin/prompts` to update product facts everywhere.
 - **Version history**: Every content change creates a new version for audit and rollback
 - **Fallback to defaults**: If DB prompt not found, falls back to hardcoded defaults in `default_prompts.py`
 - **Backup/restore**: `init-prompts --backup` exports customized prompts to JSON; `--restore FILE` re-applies them. `--force` auto-backups before resetting
