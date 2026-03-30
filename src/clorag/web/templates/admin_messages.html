@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Messages - Cyanview Admin</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        /* Page-specific: Page header */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            color: var(--cyanview-navy);
+        }
+
+        /* Page-specific: Messages table */
+        .messages-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .messages-table th,
+        .messages-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .messages-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .messages-table td {
+            font-size: 0.9rem;
+            color: var(--cyanview-navy);
+        }
+
+        .messages-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* Type dots */
+        .type-dot {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .type-dot::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .type-dot--info::before { background: #0288d1; }
+        .type-dot--warning::before { background: #f57c00; }
+        .type-dot--feature::before { background: #7b1fa2; }
+        .type-dot--fix::before { background: #388e3c; }
+
+        /* Toggle switch */
+        .toggle-switch {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: #ccc;
+            border-radius: 22px;
+            transition: background 0.2s;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--cyan-dark);
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(18px);
+        }
+
+        /* Body preview */
+        .body-preview {
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #606770;
+            font-size: 0.85rem;
+        }
+
+        /* Action buttons */
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.3rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+
+        .action-btn:hover { background: #f0f0f0; }
+        .action-btn--edit { color: var(--cyan-dark); }
+        .action-btn--delete { color: #dc3545; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #888;
+            font-size: 1rem;
+        }
+
+        /* Modal form */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.4rem;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--cyan-dark);
+        }
+
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .form-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--cyan-dark);
+        }
+
+        .expired-badge {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: #f8d7da;
+            color: #721c24;
+            margin-left: 0.4rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .messages-table { font-size: 0.8rem; }
+            .messages-table th,
+            .messages-table td { padding: 0.5rem; }
+            .form-row { grid-template-columns: 1fr; }
+        }
+    </style>
+    <script src="/static/js/admin.js"></script>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar__brand">
+            <img src="/static/img/logo_cyanview.svg" alt="Cyanview" class="navbar__logo">
+            <span class="navbar__badge">ADMIN</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/admin" class="navbar__link">Dashboard</a>
+            <a href="/admin/ingestion" class="navbar__link">Ingestion</a>
+            <a href="/admin/analytics" class="navbar__link">Analytics</a>
+            <a href="/admin/metrics" class="navbar__link">Metrics</a>
+            <a href="/admin/docs" class="navbar__link">Docs</a>
+            <a href="/admin/prompts" class="navbar__link">Prompts</a>
+            <a href="/admin/settings" class="navbar__link">Settings</a>
+            <a href="/admin/messages" class="navbar__link navbar__link--active">Messages</a>
+            <span class="navbar__divider"></span>
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/admin/cameras" class="navbar__link">Cameras</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-header">
+            <h1 class="page-title">Messages</h1>
+            <button class="btn btn-primary" onclick="openCreateModal()">Create Message</button>
+        </div>
+
+        <!-- Alert container -->
+        <div id="alertContainer"></div>
+
+        <!-- Messages table -->
+        <table class="messages-table" id="messagesTable">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Title</th>
+                    <th>Body</th>
+                    <th>Active</th>
+                    <th>Order</th>
+                    <th>Created</th>
+                    <th>Expires</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="messagesBody">
+                <tr><td colspan="8" class="empty-state">Loading messages...</td></tr>
+            </tbody>
+        </table>
+    </main>
+
+    <!-- Create/Edit Modal -->
+    <div class="modal" id="messageModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Create Message</h2>
+                <button class="modal-close" onclick="closeModal('messageModal')">&times;</button>
+            </div>
+            <form id="messageForm" onsubmit="handleSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="msgTitle">Title</label>
+                    <input type="text" id="msgTitle" class="form-input" required maxlength="200" placeholder="Message title">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="msgBody">Body</label>
+                    <textarea id="msgBody" class="form-textarea" required maxlength="1000" placeholder="Message body text"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="msgType">Type</label>
+                        <select id="msgType" class="form-select">
+                            <option value="info">Info</option>
+                            <option value="warning">Warning</option>
+                            <option value="feature">Feature</option>
+                            <option value="fix">Fix</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="msgOrder">Sort Order</label>
+                        <input type="number" id="msgOrder" class="form-input" value="0" min="0" max="999">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="msgLink">Link URL (optional)</label>
+                    <input type="text" id="msgLink" class="form-input" maxlength="500" placeholder="https://...">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="msgExpires">Expires At (optional)</label>
+                        <input type="datetime-local" id="msgExpires" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="form-checkbox">
+                            <input type="checkbox" id="msgActive" checked>
+                            <label for="msgActive">Active</label>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Create</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('messageModal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Delete Message</h2>
+                <button class="modal-close" onclick="closeModal('deleteModal')">&times;</button>
+            </div>
+            <p>Are you sure you want to delete "<span id="deleteTitle"></span>"?</p>
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                <button class="btn btn-primary" style="background: #dc3545;" onclick="confirmDelete()">Delete</button>
+                <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script nonce="{{ request.state.csp_nonce }}">
+        let editingId = null;
+        let deletingId = null;
+
+        // Check session
+        async function checkSession() {
+            try {
+                const response = await fetch('/api/admin/session', { credentials: 'include' });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch (error) {
+                window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
+            }
+        }
+
+        // Load messages
+        async function loadMessages() {
+            try {
+                const response = await fetch('/api/admin/messages', { credentials: 'include' });
+                if (!response.ok) throw new Error('Failed to load messages');
+                const messages = await response.json();
+
+                const tbody = document.getElementById('messagesBody');
+                if (!messages || messages.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No messages yet. Click "Create Message" to add one.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = messages.map(m => {
+                    const isExpired = m.expires_at && new Date(m.expires_at) < new Date();
+                    const bodyPreview = m.body.length > 50 ? m.body.substring(0, 50) + '...' : m.body;
+                    const expiresDisplay = m.expires_at ? formatDate(m.expires_at) : '-';
+
+                    return `
+                    <tr>
+                        <td><span class="type-dot type-dot--${escapeHtml(m.message_type)}">${escapeHtml(m.message_type)}</span></td>
+                        <td>${escapeHtml(m.title)}</td>
+                        <td><span class="body-preview" title="${escapeAttr(m.body)}">${escapeHtml(bodyPreview)}</span></td>
+                        <td>
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${m.is_active ? 'checked' : ''} onchange="toggleActive('${m.id}', this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </td>
+                        <td>${m.sort_order}</td>
+                        <td>${formatDate(m.created_at)}</td>
+                        <td>${expiresDisplay}${isExpired ? '<span class="expired-badge">Expired</span>' : ''}</td>
+                        <td>
+                            <button class="action-btn action-btn--edit" onclick="openEditModal('${m.id}')" title="Edit">Edit</button>
+                            <button class="action-btn action-btn--delete" onclick="openDeleteModal('${m.id}', '${escapeAttr(m.title)}')" title="Delete">Delete</button>
+                        </td>
+                    </tr>`;
+                }).join('');
+            } catch (error) {
+                showAlert('Failed to load messages: ' + error.message, 'error');
+            }
+        }
+
+        // Open create modal
+        function openCreateModal() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = 'Create Message';
+            document.getElementById('submitBtn').textContent = 'Create';
+            document.getElementById('messageForm').reset();
+            document.getElementById('msgActive').checked = true;
+            document.getElementById('messageModal').classList.add('active');
+        }
+
+        // Open edit modal
+        async function openEditModal(id) {
+            try {
+                const response = await fetch('/api/admin/messages', { credentials: 'include' });
+                const messages = await response.json();
+                const msg = messages.find(m => m.id === id);
+                if (!msg) { showAlert('Message not found', 'error'); return; }
+
+                editingId = id;
+                document.getElementById('modalTitle').textContent = 'Edit Message';
+                document.getElementById('submitBtn').textContent = 'Save';
+                document.getElementById('msgTitle').value = msg.title;
+                document.getElementById('msgBody').value = msg.body;
+                document.getElementById('msgType').value = msg.message_type;
+                document.getElementById('msgOrder').value = msg.sort_order;
+                document.getElementById('msgLink').value = msg.link_url || '';
+                document.getElementById('msgActive').checked = msg.is_active;
+
+                if (msg.expires_at) {
+                    // Convert ISO to datetime-local format
+                    const dt = new Date(msg.expires_at);
+                    const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                    document.getElementById('msgExpires').value = local;
+                } else {
+                    document.getElementById('msgExpires').value = '';
+                }
+
+                document.getElementById('messageModal').classList.add('active');
+            } catch (error) {
+                showAlert('Failed to load message: ' + error.message, 'error');
+            }
+        }
+
+        // Handle form submit (create or update)
+        async function handleSubmit(event) {
+            event.preventDefault();
+
+            const payload = {
+                title: document.getElementById('msgTitle').value.trim(),
+                body: document.getElementById('msgBody').value.trim(),
+                message_type: document.getElementById('msgType').value,
+                sort_order: parseInt(document.getElementById('msgOrder').value, 10),
+                link_url: document.getElementById('msgLink').value.trim() || null,
+                is_active: document.getElementById('msgActive').checked,
+                expires_at: document.getElementById('msgExpires').value || null,
+            };
+
+            // Convert datetime-local to ISO format
+            if (payload.expires_at) {
+                payload.expires_at = new Date(payload.expires_at).toISOString();
+            }
+
+            try {
+                let response;
+                if (editingId) {
+                    response = await AdminUtils.putJson(`/api/admin/messages/${editingId}`, payload);
+                } else {
+                    response = await AdminUtils.postJson('/api/admin/messages', payload);
+                }
+
+                if (response.ok) {
+                    showAlert(editingId ? 'Message updated' : 'Message created', 'success');
+                    closeModal('messageModal');
+                    loadMessages();
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to save message', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Toggle active status
+        async function toggleActive(id, isActive) {
+            try {
+                const response = await AdminUtils.putJson(`/api/admin/messages/${id}`, { is_active: isActive });
+                if (!response.ok) {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to update', 'error');
+                    loadMessages(); // revert toggle
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+                loadMessages(); // revert toggle
+            }
+        }
+
+        // Open delete modal
+        function openDeleteModal(id, title) {
+            deletingId = id;
+            document.getElementById('deleteTitle').textContent = title;
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        // Confirm delete
+        async function confirmDelete() {
+            if (!deletingId) return;
+
+            try {
+                const csrfToken = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1];
+                const response = await fetch(`/api/admin/messages/${deletingId}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: { 'X-CSRF-Token': csrfToken || '' },
+                });
+
+                if (response.ok) {
+                    showAlert('Message deleted', 'success');
+                    closeModal('deleteModal');
+                    loadMessages();
+                } else {
+                    const err = await response.json();
+                    showAlert(err.detail || 'Failed to delete', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Close modal
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Show alert
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Escape for attribute
+        function escapeAttr(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // Format date
+        function formatDate(isoString) {
+            if (!isoString) return '-';
+            return new Date(isoString).toLocaleString();
+        }
+
+        // Close modals on outside click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal')) {
+                    closeModal(modal.id);
+                }
+            });
+        });
+
+        // Initialize
+        checkSession().then(() => {
+            loadMessages();
+        });
+    </script>
+</body>
+</html>

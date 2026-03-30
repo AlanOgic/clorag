@@ -393,3 +393,30 @@ class ConversationSession:
     def is_expired(self) -> bool:
         """Check if session has expired."""
         return (time.time() - self.last_accessed) > SESSION_TTL_SECONDS
+
+
+# =============================================================================
+# Message Models
+# =============================================================================
+
+
+class MessageCreateRequest(BaseModel):
+    """Request to create a new message."""
+    title: str = Field(..., min_length=1, max_length=200)
+    body: str = Field(..., min_length=1, max_length=1000)
+    message_type: str = Field("info", pattern=r"^(info|warning|feature|fix)$")
+    link_url: str | None = Field(None, max_length=500)
+    is_active: bool = True
+    sort_order: int = Field(0, ge=0, le=999)
+    expires_at: str | None = None
+
+
+class MessageUpdateRequest(BaseModel):
+    """Request to update a message."""
+    title: str | None = Field(None, min_length=1, max_length=200)
+    body: str | None = Field(None, min_length=1, max_length=1000)
+    message_type: str | None = Field(None, pattern=r"^(info|warning|feature|fix)$")
+    link_url: str | None = None
+    is_active: bool | None = None
+    sort_order: int | None = Field(None, ge=0, le=999)
+    expires_at: str | None = None

@@ -16,6 +16,7 @@ from clorag.web.routers.admin import (
     drafts,
     graph,
     ingestion,
+    messages,
     prompts,
     settings,
     support,
@@ -38,6 +39,7 @@ router.include_router(drafts.router)
 router.include_router(prompts.router)
 router.include_router(settings.router)
 router.include_router(ingestion.router)
+router.include_router(messages.router)
 router.include_router(debug.router)
 
 __all__ = ["router"]
