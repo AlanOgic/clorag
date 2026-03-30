@@ -4,6 +4,7 @@ This module provides shared dependencies that multiple routers need access to,
 including rate limiting, templates, database access, and authentication.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
@@ -30,6 +31,41 @@ limiter = Limiter(key_func=get_remote_address)
 # Templates
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+
+def _timeago(value: str | datetime | None) -> str:
+    """Convert a datetime to a relative time string."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except (ValueError, TypeError):
+            return str(value)
+    now = datetime.now()
+    diff = now - value
+    seconds = int(diff.total_seconds())
+    if seconds < 60:
+        return "just now"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} min ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours}h ago"
+    days = hours // 24
+    if days < 7:
+        return f"{days} day{'s' if days != 1 else ''} ago"
+    weeks = days // 7
+    if weeks < 5:
+        return f"{weeks} week{'s' if weeks != 1 else ''} ago"
+    months = days // 30
+    if months < 12:
+        return f"{months} month{'s' if months != 1 else ''} ago"
+    return value.strftime("%Y-%m-%d")
+
+
+templates.env.filters["timeago"] = _timeago
 
 
 def get_templates() -> Jinja2Templates:

@@ -1,0 +1,186 @@
+<!-- Cookie Consent Banner (GDPR / Belgian DPA compliant) -->
+<div id="cookie-banner" class="cookie-banner" style="display: none;">
+    <div class="cookie-banner__content">
+        <p class="cookie-banner__text">
+            We use strictly necessary cookies for site functionality.
+            Read our <a href="/cookies">Cookie Policy</a> for details.
+        </p>
+        <div class="cookie-banner__actions">
+            <button id="cookie-reject" class="cookie-banner__btn cookie-banner__btn--reject">Reject All</button>
+            <button id="cookie-customize" class="cookie-banner__btn cookie-banner__btn--customize">Customize</button>
+            <button id="cookie-accept" class="cookie-banner__btn cookie-banner__btn--accept">Accept All</button>
+        </div>
+        <!-- Customize panel (hidden by default) -->
+        <div id="cookie-customize-panel" class="cookie-banner__panel" style="display: none;">
+            <label class="cookie-banner__option">
+                <input type="checkbox" checked disabled>
+                <span><strong>Strictly Necessary</strong> — Required for site functionality (always on)</span>
+            </label>
+            <label class="cookie-banner__option">
+                <input type="checkbox" id="cookie-analytics-toggle">
+                <span><strong>Analytics</strong> — Help us improve the service (currently inactive)</span>
+            </label>
+            <div class="cookie-banner__panel-actions">
+                <button id="cookie-save" class="cookie-banner__btn cookie-banner__btn--accept">Save Preferences</button>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+    .cookie-banner {
+        position: fixed;
+        bottom: 55px;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border-top: 2px solid #e0e0e0;
+        padding: 1rem 1.5rem;
+        z-index: 200;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .cookie-banner__content {
+        max-width: 960px;
+        margin: 0 auto;
+    }
+    .cookie-banner__text {
+        font-size: 0.9rem;
+        color: #333;
+        margin-bottom: 0.75rem;
+        line-height: 1.5;
+    }
+    .cookie-banner__text a {
+        color: var(--cyan-dark, #0077b6);
+        text-decoration: underline;
+    }
+    .cookie-banner__actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .cookie-banner__btn {
+        padding: 0.5rem 1.25rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.2s, border-color 0.2s;
+    }
+    .cookie-banner__btn--accept {
+        background: #2e7d32;
+        color: #fff;
+        border-color: #2e7d32;
+    }
+    .cookie-banner__btn--accept:hover {
+        background: #1b5e20;
+    }
+    .cookie-banner__btn--reject {
+        background: #fff;
+        color: #333;
+        border-color: #999;
+    }
+    .cookie-banner__btn--reject:hover {
+        background: #f5f5f5;
+    }
+    .cookie-banner__btn--customize {
+        background: #fff;
+        color: #333;
+        border-color: #999;
+    }
+    .cookie-banner__btn--customize:hover {
+        background: #f5f5f5;
+    }
+    .cookie-banner__panel {
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e0e0e0;
+    }
+    .cookie-banner__option {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.85rem;
+        color: #333;
+        cursor: pointer;
+    }
+    .cookie-banner__option input {
+        margin-top: 3px;
+    }
+    .cookie-banner__panel-actions {
+        margin-top: 0.75rem;
+    }
+    @media (max-width: 600px) {
+        .cookie-banner {
+            bottom: 55px;
+            padding: 0.75rem 1rem;
+        }
+        .cookie-banner__actions {
+            flex-direction: column;
+        }
+        .cookie-banner__btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    var STORAGE_KEY = 'cookie_consent';
+    var banner = document.getElementById('cookie-banner');
+    var acceptBtn = document.getElementById('cookie-accept');
+    var rejectBtn = document.getElementById('cookie-reject');
+    var customizeBtn = document.getElementById('cookie-customize');
+    var saveBtn = document.getElementById('cookie-save');
+    var panel = document.getElementById('cookie-customize-panel');
+    var analyticsToggle = document.getElementById('cookie-analytics-toggle');
+
+    function getConsent() {
+        try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function setConsent(necessary, analytics) {
+        var consent = { necessary: necessary, analytics: analytics, timestamp: new Date().toISOString() };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(consent));
+        banner.style.display = 'none';
+    }
+
+    // Public API for future analytics integration
+    window.CookieConsent = {
+        hasAnalytics: function() {
+            var c = getConsent();
+            return c ? c.analytics === true : false;
+        },
+        revoke: function() {
+            localStorage.removeItem(STORAGE_KEY);
+            banner.style.display = '';
+        }
+    };
+
+    // Show banner if no consent recorded
+    if (!getConsent()) {
+        banner.style.display = '';
+    }
+
+    acceptBtn.addEventListener('click', function() {
+        setConsent(true, true);
+    });
+
+    rejectBtn.addEventListener('click', function() {
+        setConsent(true, false);
+    });
+
+    customizeBtn.addEventListener('click', function() {
+        panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    });
+
+    saveBtn.addEventListener('click', function() {
+        setConsent(true, analyticsToggle.checked);
+    });
+})();
+</script>
