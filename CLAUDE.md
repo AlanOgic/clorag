@@ -89,7 +89,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 - `search/` - Search pipeline: `pipeline.py`, `synthesis.py`, `utils.py`
 - `dependencies.py` - FastAPI dependency injection
 - `templates/` - 34 Jinja2 templates including `/admin/docs` (11 doc pages)
-- Admin UI at `/admin/{cameras,cameras-list,knowledge,analytics,metrics,drafts,chunks,graph,support-cases,prompts,settings,ingestion,terminology-fixes}`, REST APIs at `/api/`
+- Admin UI at `/admin/{cameras,cameras-list,knowledge,analytics,metrics,drafts,chunks,graph,support-cases,prompts,settings,ingestion,terminology-fixes,messages}`, REST APIs at `/api/`
 
 **Models** (`models/`): `camera.py`, `custom_document.py` (10 categories), `support_case.py`
 
@@ -222,6 +222,9 @@ ssh -L 7687:localhost:7687 root@cyanview.cloud -N -f
 
 ### Custom Documents
 10 categories: product_info, troubleshooting, configuration, firmware, release_notes, faq, best_practices, pre_sales, internal, other. Supports .txt/.md/.pdf upload, full metadata, chunked and embedded into RAG search. Sonnet-generated keywords auto-enriched alongside user-provided tags.
+
+### Messages
+Admin-managed announcements displayed on the public index page. Collapsible "Latest Updates" panel between hero and quick-action tiles. 4 message types: info (blue), warning (orange), feature (green), fix (red). Stored in `messages` table in analytics SQLite DB. Auto-hides expired messages. Hidden entirely when 0 active messages. Admin CRUD at `/admin/messages`, public API at `GET /api/messages`.
 
 ### Prompt Management
 - **Admin-editable prompts**: 13 LLM prompts stored in SQLite, editable via `/admin/prompts` without code changes
