@@ -141,9 +141,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             f"{script_src}; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://esm.sh https://api.fontshare.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://esm.sh; "
             "img-src 'self' data: https:; "
-            "font-src 'self' https://cdn.jsdelivr.net https://esm.sh https://cdn.fontshare.com; "
+            "font-src 'self' https://cdn.jsdelivr.net https://esm.sh; "
             "connect-src 'self' https://esm.sh https://cdn.jsdelivr.net;"
             "frame-ancestors 'none'"
         )

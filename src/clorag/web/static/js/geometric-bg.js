@@ -470,8 +470,18 @@ class GeometricBackground {
             this.mouse.active = false;
         });
 
-        // Start animation
-        this.animate(0);
+        // Ensure Phenomena font is loaded before starting animation
+        // Canvas ctx.font silently falls back if the font isn't ready
+        if (document.fonts && document.fonts.load) {
+            document.fonts.load("700 48px 'Phenomena'").then(() => {
+                this.animate(0);
+            }).catch(() => {
+                // Start anyway with fallback font
+                this.animate(0);
+            });
+        } else {
+            this.animate(0);
+        }
     }
 
     destroy() {
