@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Policy - Cyanview AI Search</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+            padding-bottom: 70px;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo { height: 32px; }
+
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover { color: var(--cyan-dark); }
+
+        .legal-content {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .legal-content h1 {
+            font-size: 1.8rem;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.5rem;
+        }
+
+        .legal-content .last-updated {
+            color: #999;
+            font-size: 0.85rem;
+            margin-bottom: 2rem;
+        }
+
+        .legal-content h2 {
+            font-size: 1.25rem;
+            color: var(--cyanview-navy);
+            margin-top: 2rem;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.3rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .legal-content p {
+            margin-bottom: 0.75rem;
+            color: #444;
+        }
+
+        .legal-content ul {
+            margin: 0.5rem 0 1rem 1.5rem;
+            color: #444;
+        }
+
+        .legal-content li { margin-bottom: 0.35rem; }
+
+        .legal-content a {
+            color: var(--cyan-dark);
+            text-decoration: underline;
+        }
+
+        .legal-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        .legal-content th, .legal-content td {
+            border: 1px solid #e0e0e0;
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+        }
+
+        .legal-content th {
+            background: #f6f6f6;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .legal-content .manage-btn {
+            display: inline-block;
+            padding: 0.5rem 1.25rem;
+            background: var(--cyan-dark);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-decoration: none;
+            margin-top: 0.5rem;
+        }
+
+        .legal-content .manage-btn:hover {
+            background: var(--cyanview-navy);
+            color: #fff;
+        }
+
+        @media (max-width: 768px) {
+            .legal-content { margin: 1rem; padding: 1.25rem; }
+            .legal-content h1 { font-size: 1.4rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="/static/img/logo_cyanview.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">Search</a>
+            <a href="/help" class="navbar__link">Help</a>
+            <a href="https://cyanview.com" class="navbar__link" target="_blank">Cyanview.com</a>
+        </div>
+    </nav>
+
+    <main class="legal-content">
+        <h1>Cookie Policy</h1>
+        <p class="last-updated">Last updated: {{ last_updated or 'March 2026' }}</p>
+
+        <h2>1. What Are Cookies</h2>
+        <p>Cookies are small text files stored on your device by your web browser when you visit a website. They serve various purposes such as remembering your preferences, enabling functionality, and analyzing site usage. Some data is stored in your browser's local storage, which operates similarly but remains on your device.</p>
+
+        <h2>2. Cookies and Storage We Use</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Purpose</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>admin_session</code></td>
+                    <td>Cookie</td>
+                    <td>Strictly Necessary</td>
+                    <td>Authenticates admin users. Only set when logging into the admin interface.</td>
+                    <td>{{ retention_session or '24 hours' }}</td>
+                </tr>
+                <tr>
+                    <td><code>cookie_consent</code></td>
+                    <td>Local Storage</td>
+                    <td>Strictly Necessary</td>
+                    <td>Remembers your cookie consent preference so the banner is not shown again.</td>
+                    <td>Persistent (until cleared)</td>
+                </tr>
+                <tr>
+                    <td><code>csrf_token</code></td>
+                    <td>Cookie</td>
+                    <td>Strictly Necessary</td>
+                    <td>Protects against cross-site request forgery attacks on form submissions.</td>
+                    <td>Session</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p><strong>Analytics cookies:</strong> This service does not currently use analytics cookies. If analytics cookies are introduced in the future, they will require your explicit consent before being set, and this policy will be updated accordingly.</p>
+
+        <h2>3. How to Manage Your Preferences</h2>
+        <p>You can change your cookie preferences at any time:</p>
+        <ul>
+            <li><strong>Cookie consent banner:</strong> Click the button below to reopen the consent banner and update your preferences.</li>
+            <li><strong>Browser settings:</strong> Most browsers allow you to block or delete cookies through their settings. Note that blocking strictly necessary cookies may prevent parts of the site from functioning correctly.</li>
+        </ul>
+        <button class="manage-btn" id="reopen-banner">Manage Cookie Preferences</button>
+
+        <h2>4. More Information</h2>
+        <p>For more details about how we process your data, please see our <a href="/privacy">Privacy Policy</a>.</p>
+        <p>For questions about cookies on this site, contact us at <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</p>
+
+        <h2>5. Changes to This Policy</h2>
+        <p>We may update this Cookie Policy to reflect changes in our practices or legal requirements. The "Last updated" date at the top will be revised accordingly.</p>
+    </main>
+
+    {% include 'partials/_legal_footer.html' %}
+    {% include 'partials/_cookie_banner.html' %}
+
+    <script nonce="{{ request.state.csp_nonce }}">
+        document.getElementById('reopen-banner').addEventListener('click', function() {
+            if (window.CookieConsent && window.CookieConsent.revoke) {
+                window.CookieConsent.revoke();
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }
+        });
+    </script>
+</body>
+</html>

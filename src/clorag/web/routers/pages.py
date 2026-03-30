@@ -28,6 +28,25 @@ logger = structlog.get_logger()
 # Cache for admin OpenAPI schema
 _admin_openapi_schema: dict[str, Any] | None = None
 
+# Company information for legal pages (update with real values)
+COMPANY_INFO: dict[str, str] = {
+    "company_name": "Cyanview SA",
+    "legal_form": "Societe Anonyme",
+    "registered_office": "[Address], Belgium",
+    "rpr_number": "[RPR Number]",
+    "rpr_court": "Tribunal de l'entreprise de [District]",
+    "cbe_number": "[CBE Number]",
+    "vat_number": "BE [VAT Number]",
+    "contact_email": "support@cyanview.com",
+    "dpo_email": "privacy@cyanview.com",
+    "responsible_person": "Cyanview SA",
+    "hosting_provider": "[Hosting Provider Name and Address]",
+    "hosting_location": "European Union",
+    "retention_analytics": "12 months",
+    "retention_session": "24 hours",
+    "last_updated": "March 2026",
+}
+
 
 # =============================================================================
 # Public Pages
@@ -46,6 +65,42 @@ async def video_page(request: Request) -> HTMLResponse:
     """Public video showcase page."""
     templates = get_templates()
     return templates.TemplateResponse("video.html", {"request": request})
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy(request: Request) -> HTMLResponse:
+    """Privacy policy page (GDPR requirement)."""
+    templates = get_templates()
+    return templates.TemplateResponse(
+        "privacy.html", {"request": request, **COMPANY_INFO}
+    )
+
+
+@router.get("/terms", response_class=HTMLResponse)
+async def terms_of_service(request: Request) -> HTMLResponse:
+    """Terms of service page."""
+    templates = get_templates()
+    return templates.TemplateResponse(
+        "terms.html", {"request": request, **COMPANY_INFO}
+    )
+
+
+@router.get("/legal", response_class=HTMLResponse)
+async def legal_notice(request: Request) -> HTMLResponse:
+    """Legal notice / mentions legales (Belgian law requirement)."""
+    templates = get_templates()
+    return templates.TemplateResponse(
+        "legal.html", {"request": request, **COMPANY_INFO}
+    )
+
+
+@router.get("/cookies", response_class=HTMLResponse)
+async def cookie_policy(request: Request) -> HTMLResponse:
+    """Cookie policy page."""
+    templates = get_templates()
+    return templates.TemplateResponse(
+        "cookies.html", {"request": request, **COMPANY_INFO}
+    )
 
 
 # =============================================================================
@@ -277,6 +332,13 @@ async def admin_ingestion(request: Request) -> HTMLResponse:
     """Admin ingestion management page."""
     templates = get_templates()
     return templates.TemplateResponse("admin_ingestion.html", {"request": request})
+
+
+@router.get("/admin/messages", response_class=HTMLResponse)
+async def admin_messages(request: Request) -> HTMLResponse:
+    """Admin messages management page."""
+    templates = get_templates()
+    return templates.TemplateResponse("admin_messages.html", {"request": request})
 
 
 @router.get("/admin/metrics", response_class=HTMLResponse)

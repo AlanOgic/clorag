@@ -6,6 +6,7 @@ Provides public search endpoints with streaming and non-streaming Claude synthes
 import json
 import time
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Request
@@ -28,15 +29,38 @@ logger = structlog.get_logger()
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> Response:
     """Render the search home page."""
+    from clorag.core.messages_db import get_messages_database
+
     templates = get_templates()
-    return templates.TemplateResponse("index.html", {"request": request})
+    try:
+        db = get_messages_database()
+        messages = [m.to_dict() for m in db.get_active_messages()]
+    except Exception:
+        messages = []
+    return templates.TemplateResponse("index.html", {"request": request, "messages": messages})
+
+
+@router.get("/api/messages")
+async def api_public_messages() -> list[dict[str, Any]]:
+    """Get active messages for public display."""
+    from clorag.core.messages_db import get_messages_database
+
+    db = get_messages_database()
+    return [m.to_dict() for m in db.get_active_messages()]
 
 
 @router.get("/robots.txt")
 async def robots_txt() -> Response:
     """Block search engine crawlers from indexing."""
     return Response(
-        content="User-agent: *\nDisallow: /\n",
+        content=(
+            "User-agent: *\n"
+            "Disallow: /\n"
+            "Allow: /privacy\n"
+            "Allow: /terms\n"
+            "Allow: /legal\n"
+            "Allow: /cookies\n"
+        ),
         media_type="text/plain",
     )
 

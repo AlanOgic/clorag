@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal Notice - Cyanview AI Search</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+            padding-bottom: 70px;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo { height: 32px; }
+
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover { color: var(--cyan-dark); }
+
+        .legal-content {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .legal-content h1 {
+            font-size: 1.8rem;
+            color: var(--cyanview-navy);
+            margin-bottom: 2rem;
+        }
+
+        .legal-content h2 {
+            font-size: 1.25rem;
+            color: var(--cyanview-navy);
+            margin-top: 2rem;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.3rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .legal-content p {
+            margin-bottom: 0.75rem;
+            color: #444;
+        }
+
+        .legal-content a {
+            color: var(--cyan-dark);
+            text-decoration: underline;
+        }
+
+        .legal-info {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            gap: 0.5rem 1rem;
+            margin: 1rem 0;
+        }
+
+        .legal-info dt {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .legal-info dd {
+            color: #444;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .legal-content { margin: 1rem; padding: 1.25rem; }
+            .legal-content h1 { font-size: 1.4rem; }
+            .legal-info {
+                grid-template-columns: 1fr;
+                gap: 0.25rem;
+            }
+            .legal-info dt { margin-top: 0.75rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="/static/img/logo_cyanview.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">Search</a>
+            <a href="/help" class="navbar__link">Help</a>
+            <a href="https://cyanview.com" class="navbar__link" target="_blank">Cyanview.com</a>
+        </div>
+    </nav>
+
+    <main class="legal-content">
+        <h1>Legal Notice</h1>
+        <p>In accordance with Belgian law (Loi du 11 mars 2003), the following information is provided about the publisher of this website.</p>
+
+        <h2>Publisher</h2>
+        <dl class="legal-info">
+            <dt>Company Name</dt>
+            <dd>{{ company_name }}</dd>
+
+            <dt>Legal Form</dt>
+            <dd>{{ legal_form }}</dd>
+
+            <dt>Registered Office</dt>
+            <dd>{{ registered_office }}</dd>
+
+            <dt>Enterprise Number</dt>
+            <dd>{{ cbe_number }} (BCE/CBE)</dd>
+
+            <dt>RPR / RPM</dt>
+            <dd>{{ rpr_number }} &mdash; {{ rpr_court }}</dd>
+
+            <dt>VAT Number</dt>
+            <dd>{{ vat_number }}</dd>
+
+            <dt>Contact Email</dt>
+            <dd><a href="mailto:{{ contact_email }}">{{ contact_email }}</a></dd>
+        </dl>
+
+        <h2>Responsible for Content</h2>
+        <p>{{ responsible_person or company_name }}, at the address listed above.</p>
+
+        <h2>Hosting</h2>
+        <dl class="legal-info">
+            <dt>Hosting Provider</dt>
+            <dd>{{ hosting_provider }}</dd>
+
+            <dt>Hosting Location</dt>
+            <dd>{{ hosting_location or 'European Union' }}</dd>
+        </dl>
+
+        <h2>Intellectual Property</h2>
+        <p>All content on this website (text, images, software, trademarks, logos) is the property of {{ company_name }} or its licensors and is protected by Belgian and international intellectual property law. Any reproduction, distribution, or use without prior written authorization is prohibited.</p>
+
+        <h2>Applicable Law</h2>
+        <p>This website is governed by Belgian law. Any dispute relating to the use of this website shall be subject to the exclusive jurisdiction of the courts of Brussels, Belgium.</p>
+    </main>
+
+    {% include 'partials/_legal_footer.html' %}
+    {% include 'partials/_cookie_banner.html' %}
+</body>
+</html>

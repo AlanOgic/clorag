@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Cyanview AI Search</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+            padding-bottom: 70px;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo { height: 32px; }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover { color: var(--cyan-dark); }
+
+        .legal-content {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .legal-content h1 {
+            font-size: 1.8rem;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.5rem;
+        }
+
+        .legal-content .last-updated {
+            color: #999;
+            font-size: 0.85rem;
+            margin-bottom: 2rem;
+        }
+
+        .legal-content h2 {
+            font-size: 1.25rem;
+            color: var(--cyanview-navy);
+            margin-top: 2rem;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.3rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .legal-content h3 {
+            font-size: 1.05rem;
+            color: #333;
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .legal-content p {
+            margin-bottom: 0.75rem;
+            color: #444;
+        }
+
+        .legal-content ul, .legal-content ol {
+            margin: 0.5rem 0 1rem 1.5rem;
+            color: #444;
+        }
+
+        .legal-content li {
+            margin-bottom: 0.35rem;
+        }
+
+        .legal-content a {
+            color: var(--cyan-dark);
+            text-decoration: underline;
+        }
+
+        .legal-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        .legal-content th, .legal-content td {
+            border: 1px solid #e0e0e0;
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+        }
+
+        .legal-content th {
+            background: #f6f6f6;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .legal-content .highlight-box {
+            background: #e3f2fd;
+            border-left: 4px solid var(--cyan-dark);
+            padding: 1rem 1.25rem;
+            margin: 1rem 0;
+            border-radius: 0 4px 4px 0;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .legal-content {
+                margin: 1rem;
+                padding: 1.25rem;
+            }
+            .legal-content h1 { font-size: 1.4rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="/static/img/logo_cyanview.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">Search</a>
+            <a href="/help" class="navbar__link">Help</a>
+            <a href="https://cyanview.com" class="navbar__link" target="_blank">Cyanview.com</a>
+        </div>
+    </nav>
+
+    <main class="legal-content">
+        <h1>Privacy Policy</h1>
+        <p class="last-updated">Last updated: {{ last_updated or 'March 2026' }}</p>
+
+        <div class="highlight-box">
+            This service uses artificial intelligence (Claude AI by Anthropic) to generate responses.
+            Your search queries are processed by third-party AI services. No user accounts are required
+            for public use of this service.
+        </div>
+
+        <h2>1. Data Controller</h2>
+        <p>
+            <strong>{{ company_name }}</strong> ({{ legal_form }})<br>
+            {{ registered_office }}<br>
+            Enterprise number (BCE/CBE): {{ cbe_number }}<br>
+            VAT: {{ vat_number }}<br>
+            Email: <a href="mailto:{{ dpo_email }}">{{ dpo_email }}</a>
+        </p>
+
+        <h2>2. Data We Collect</h2>
+
+        <h3>2.1 Search Queries</h3>
+        <p>When you use the AI Search feature, your search queries are processed to generate responses. Query text, timestamps, and response quality metrics are stored in our analytics database to improve service quality.</p>
+
+        <h3>2.2 Session Cookies (Admin Only)</h3>
+        <p>If you access the administration interface, a session cookie (<code>admin_session</code>) is set to authenticate your session. This cookie is strictly necessary for admin functionality and does not track public users.</p>
+
+        <h3>2.3 Anonymized Support Data</h3>
+        <p>Our knowledge base includes anonymized support email threads. All personally identifiable information (names, email addresses, serial numbers) is replaced with placeholders before any AI processing occurs.</p>
+
+        <h3>2.4 Cookie Consent Preference</h3>
+        <p>Your cookie preference is stored in your browser's local storage to remember your choice.</p>
+
+        <h2>3. How We Use Your Data</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Purpose</th>
+                    <th>Legal Basis</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Search queries</td>
+                    <td>Generate AI responses, improve search quality</td>
+                    <td>Legitimate interest (Art. 6(1)(f) GDPR)</td>
+                </tr>
+                <tr>
+                    <td>Admin session cookie</td>
+                    <td>Authentication for admin interface</td>
+                    <td>Legitimate interest (security)</td>
+                </tr>
+                <tr>
+                    <td>Anonymized support data</td>
+                    <td>Build knowledge base for AI responses</td>
+                    <td>Legitimate interest (service improvement)</td>
+                </tr>
+                <tr>
+                    <td>Cookie consent preference</td>
+                    <td>Remember your cookie choices</td>
+                    <td>Legal obligation (ePrivacy)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4. Third-Party Processors</h2>
+        <p>Your search queries are processed by the following third-party services to generate responses:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Processor</th>
+                    <th>Purpose</th>
+                    <th>Location</th>
+                    <th>Safeguards</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Anthropic</strong> (Claude AI)</td>
+                    <td>AI response synthesis</td>
+                    <td>United States</td>
+                    <td>Standard Contractual Clauses (SCCs)</td>
+                </tr>
+                <tr>
+                    <td><strong>Voyage AI</strong></td>
+                    <td>Text embeddings and reranking</td>
+                    <td>United States</td>
+                    <td>Standard Contractual Clauses (SCCs)</td>
+                </tr>
+                <tr>
+                    <td><strong>Qdrant</strong></td>
+                    <td>Vector database (search index)</td>
+                    <td>Self-hosted (EU)</td>
+                    <td>No third-party transfer</td>
+                </tr>
+            </tbody>
+        </table>
+        <p>Your search queries are sent to these services via their commercial APIs. Under commercial API terms, your data is <strong>not used to train AI models</strong>.</p>
+
+        <h2>5. Data Retention</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Retention Period</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Search queries (analytics)</td>
+                    <td>{{ retention_analytics or '12 months' }}</td>
+                </tr>
+                <tr>
+                    <td>Admin session cookies</td>
+                    <td>Expires after {{ retention_session or '24 hours' }} or browser close</td>
+                </tr>
+                <tr>
+                    <td>Anonymized support data</td>
+                    <td>Retained as long as relevant to the knowledge base</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>6. Your Rights Under GDPR</h2>
+        <p>As a data subject in the European Economic Area, you have the following rights:</p>
+        <ul>
+            <li><strong>Right of access</strong> (Art. 15) — Request a copy of your personal data</li>
+            <li><strong>Right to rectification</strong> (Art. 16) — Correct inaccurate data</li>
+            <li><strong>Right to erasure</strong> (Art. 17) — Request deletion of your data</li>
+            <li><strong>Right to restrict processing</strong> (Art. 18) — Limit how we use your data</li>
+            <li><strong>Right to data portability</strong> (Art. 20) — Receive your data in a structured format</li>
+            <li><strong>Right to object</strong> (Art. 21) — Object to processing based on legitimate interest</li>
+        </ul>
+        <p>To exercise any of these rights, contact us at <a href="mailto:{{ dpo_email }}">{{ dpo_email }}</a>. We will respond within 30 days.</p>
+
+        <h2>7. Right to Complain</h2>
+        <p>If you believe your data protection rights have been violated, you have the right to lodge a complaint with the Belgian Data Protection Authority:</p>
+        <p>
+            <strong>Autorite de protection des donnees / Gegevensbeschermingsautoriteit</strong><br>
+            Rue de la Presse 35 / Drukpersstraat 35<br>
+            1000 Brussels, Belgium<br>
+            Tel: +32 (0)2 274 48 00<br>
+            Email: <a href="mailto:contact@apd-gba.be">contact@apd-gba.be</a><br>
+            Website: <a href="https://www.dataprotectionauthority.be" target="_blank" rel="noopener">www.dataprotectionauthority.be</a>
+        </p>
+
+        <h2>8. Artificial Intelligence Disclosures</h2>
+        <div class="highlight-box">
+            <strong>EU AI Act Transparency Notice</strong>
+        </div>
+        <ul>
+            <li>Responses on this site are <strong>generated by an artificial intelligence system</strong> (Claude AI using Retrieval-Augmented Generation).</li>
+            <li>AI-generated responses <strong>may contain inaccuracies</strong>. Always verify critical information against official documentation.</li>
+            <li>This service does <strong>not perform profiling</strong> or automated individual decision-making with legal or similarly significant effects (Art. 22 GDPR).</li>
+            <li>Your queries are used solely to generate the immediate response; they are not used to build user profiles.</li>
+        </ul>
+
+        <h2>9. International Data Transfers</h2>
+        <p>Search queries are transferred to processors in the United States (Anthropic, Voyage AI). These transfers are protected by Standard Contractual Clauses (SCCs) as approved by the European Commission (Decision 2021/914), ensuring an adequate level of data protection.</p>
+
+        <h2>10. Changes to This Policy</h2>
+        <p>We may update this privacy policy to reflect changes in our practices or legal requirements. The "Last updated" date at the top will be revised accordingly. We encourage you to review this page periodically.</p>
+
+        <h2>11. Contact</h2>
+        <p>
+            For privacy-related inquiries:<br>
+            <a href="mailto:{{ dpo_email }}">{{ dpo_email }}</a><br>
+            {{ company_name }}, {{ registered_office }}
+        </p>
+    </main>
+
+    {% include 'partials/_legal_footer.html' %}
+    {% include 'partials/_cookie_banner.html' %}
+</body>
+</html>
