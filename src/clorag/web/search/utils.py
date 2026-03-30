@@ -190,6 +190,8 @@ def extract_source_links(
 
         if chunk.get("source_type") == "documentation":
             url = chunk.get("url")
+            if url:
+                url = url.replace("support.cyanview.com", "support.cyanview.cloud")
             if url and url not in seen:
                 seen.add(url)
                 link_data: dict[str, Any] = {
