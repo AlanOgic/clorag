@@ -53,14 +53,7 @@ async def api_public_messages() -> list[dict[str, Any]]:
 async def robots_txt() -> Response:
     """Block search engine crawlers from indexing."""
     return Response(
-        content=(
-            "User-agent: *\n"
-            "Disallow: /\n"
-            "Allow: /privacy\n"
-            "Allow: /terms\n"
-            "Allow: /legal\n"
-            "Allow: /cookies\n"
-        ),
+        content="User-agent: *\nDisallow: /\n",
         media_type="text/plain",
     )
 
