@@ -9,7 +9,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 
 Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
-**Version**: 0.9.0 | **Python**: 3.10-3.13
+**Version**: 0.10.4 | **Python**: 3.10-3.13
 
 ## Commands
 
@@ -45,6 +45,7 @@ uv run init-settings                       # Initialize RAG settings with defaul
 uv run init-settings --list                # List all settings by category
 uv run init-settings --stats               # Show settings database stats
 uv run archive-collection                  # Archive a Qdrant collection
+uv run ingest-legacy-docs [path] --fresh   # Legacy docs from local markdown
 
 # MCP Server
 uv run clorag-mcp                          # MCP server (stdio transport)
@@ -83,13 +84,14 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Web** (`web/`): FastAPI application with modular router architecture
 - `app.py` - Middleware, lifespan, app initialization
-- `routers/` - API routes by domain: `cameras.py`, `pages.py`, `search.py`, `admin/` (13 routers: analytics, auth, cameras, chunks, debug, documents, drafts, graph, prompts, settings, support, terminology)
+- `routers/` - API routes by domain: `cameras.py`, `pages.py`, `search.py`, `legacy.py`, `admin/` (14 routers: analytics, auth, cameras, chunks, debug, documents, drafts, graph, messages, prompts, settings, support, terminology)
 - `auth/` - Authentication: `admin.py`, `csrf.py`, `sessions.py`
 - `schemas.py` - Request/response Pydantic models
 - `search/` - Search pipeline: `pipeline.py`, `synthesis.py`, `utils.py`
 - `dependencies.py` - FastAPI dependency injection
-- `templates/` - 34 Jinja2 templates including `/admin/docs` (11 doc pages)
+- `templates/` - 38 Jinja2 templates including `/admin/docs` (11 doc pages), legacy (3 pages)
 - Admin UI at `/admin/{cameras,cameras-list,knowledge,analytics,metrics,drafts,chunks,graph,support-cases,prompts,settings,ingestion,terminology-fixes,messages}`, REST APIs at `/api/`
+- Legacy UI at `/legacy`, `/legacy/manage` (admin-protected), `/legacy/help`
 
 **Models** (`models/`): `camera.py`, `custom_document.py` (10 categories), `support_case.py`
 
@@ -97,9 +99,11 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 ### Vector Collections
 
-Three Qdrant collections (`docusaurus_docs`, `gmail_cases`, `custom_docs`) each with:
-- `dense` - 1024-dim voyage-context-3 embeddings
-- `sparse` - BM25 vectors
+Four Qdrant collections each with `dense` (1024-dim voyage-context-3) + `sparse` (BM25) vectors:
+- `docusaurus_docs` - Main documentation (support.cyanview.cloud)
+- `gmail_cases` - Curated support threads
+- `custom_docs` - Admin-managed knowledge
+- `docusaurus_docs_legacy` - Legacy docs (support.cyanview.com), independent from main search
 
 ## Configuration
 
@@ -123,6 +127,7 @@ Environment variables (see `.env.example`):
 - `OPENAI_COMPAT_API_KEY` - Optional, enables `/v1/chat/completions` OpenAI-compatible API
 - `MCP_API_KEY` - Bearer token for MCP HTTP transport auth (required for HTTP, not needed for stdio). Docker secret: `/run/secrets/mcp_api_key`
 - `MCP_IMPORT_BASE_DIR` (default: `data/imports`) - Base directory for MCP document imports (path containment)
+- `QDRANT_LEGACY_DOCS_COLLECTION` (default: `docusaurus_docs_legacy`) - Separate collection for legacy site
 Settings via `clorag.config.get_settings()` (cached singleton).
 
 ## Key Patterns
@@ -252,6 +257,19 @@ Admin-managed announcements displayed on the public index page. Collapsible "Lat
 - **API usage**: `from clorag.services.settings_manager import get_setting; threshold = get_setting("retrieval.short_query_threshold")`
 - **Integration**: Wired into `retriever.py` (thresholds, overfetch, min results), `vectorstore.py` (prefetch, source diversity), `synthesis.py` (max_tokens), `utils.py` (context budgets), `pipeline.py` (overfetch), cache modules (sizes at init)
 
+### Legacy Docs System
+Completely independent RAG for `support.cyanview.com` (the existing production site), separate from the main CLORAG search engine. Used by David to search, review, and update the legacy support documentation.
+
+- **Separate collection**: `docusaurus_docs_legacy` — no interaction with `docusaurus_docs`, `gmail_cases`, or `custom_docs`
+- **Public search**: `/legacy` with streaming AI answers from Claude Sonnet, source links to `support.cyanview.com` (no URL rewriting)
+- **Manage page**: `/legacy/manage` (admin auth required) — scan sitemap for new pages, ingest single page by URL, full site re-crawl
+- **Help page**: `/legacy/help` — usage documentation
+- **Local markdown ingestion**: `uv run ingest-legacy-docs` reads `.md` files from Docusaurus sources, reconstructs URLs from file paths, preserves original text (no RIO terminology transforms)
+- **Live site ingestion**: "Full Re-ingest" and "Ingest Page" use the standard `DocusaurusIngestionPipeline` (Jina Reader + keyword extraction)
+- **Timeout exemption**: `/api/legacy/*` endpoints exempt from 60s middleware timeout (ingestion can take minutes)
+- **Router**: `web/routers/legacy.py` — scan, ingest-new, ingest-page, reingest-full, stats endpoints
+- **Templates**: `legacy.html`, `legacy_manage.html`, `legacy_help.html` — brown theme to distinguish from main blue UI
+
 ### RIO Product Terminology
 - **RIO**: Generic RIO hardware reference. Use when license is NOT relevant: physical dimensions, ports, grounding, power, wiring, mounting, weight
 - **RIO +WAN**: Full license. LAN & WAN connectivity, Cyanview cloud access, REMI mode, uses Internet, 1-128 cameras
@@ -276,7 +294,26 @@ Production:
 - Web: https://cyanview.cloud/ (Docker maps 8085→8080)
 - MCP HTTP: https://mcp.cyanview.cloud/ (Docker maps 8086→8080, Bearer auth required)
 
-## Recent Updates (2026-03-26)
+## Recent Updates (2026-03-31)
+
+### v0.10.4: Legacy Docs System
+
+- **Standalone legacy RAG**: Independent search engine for `support.cyanview.com` with its own Qdrant collection (`docusaurus_docs_legacy`)
+- **Public search page**: `/legacy` with streaming Claude synthesis, follow-up questions, source links to `.com` (no URL rewriting)
+- **Admin management**: `/legacy/manage` (password-protected) — scan sitemap for new pages, ingest by URL, full re-crawl
+- **Documentation**: `/legacy/help` with usage workflow and technical details
+- **Local markdown ingestion**: `ingest-legacy-docs` CLI reads Docusaurus `.md` sources directly, no web crawling needed
+- **Sitemap scanning**: Compares live sitemap against indexed URLs, shows new pages with checkbox selection for batch ingestion
+- **No text transforms**: Legacy ingestion preserves original text (e.g., "RIO-Live" stays as-is for content review)
+- **Brown theme**: Visual distinction from main blue CLORAG UI
+- **New config**: `QDRANT_LEGACY_DOCS_COLLECTION` (default: `docusaurus_docs_legacy`)
+- **New router**: `web/routers/legacy.py` with 6 endpoints (manage page, help page, stats, scan, ingest-new, ingest-page, reingest-full)
+- **New script**: `scripts/ingest_legacy_docs.py` with `ingest-legacy-docs` CLI entry point
+- **New templates**: `legacy.html`, `legacy_manage.html`, `legacy_help.html`
+- **Timeout exemption**: `/api/legacy/*` exempt from 60s middleware timeout
+- **`extract_source_links(rewrite_urls=False)`**: New parameter to skip `.com` → `.cloud` URL rewriting
+
+
 
 ### v0.10.3: User Feedback (Thumbs Up/Down)
 
