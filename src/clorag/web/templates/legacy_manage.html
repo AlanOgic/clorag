@@ -299,10 +299,10 @@
                 const response = await fetch('/api/admin/session', { credentials: 'include' });
                 const data = await response.json();
                 if (!data.authenticated) {
-                    window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
+                    window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
                 }
             } catch (error) {
-                window.location.href = '/admin/login?next=' + encodeURIComponent(window.location.pathname);
+                window.location.href = '/admin/login?redirect=' + encodeURIComponent(window.location.pathname);
             }
         }
         checkAuth();
