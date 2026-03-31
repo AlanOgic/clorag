@@ -170,6 +170,7 @@ def extract_source_links(
     chunks: list[dict[str, Any]],
     max_links: int = 3,
     as_model: bool = False,
+    rewrite_urls: bool = True,
 ) -> list[SourceLink] | list[dict[str, Any]]:
     """Extract unique source links from chunks.
 
@@ -190,7 +191,7 @@ def extract_source_links(
 
         if chunk.get("source_type") == "documentation":
             url = chunk.get("url")
-            if url:
+            if url and rewrite_urls:
                 url = url.replace("support.cyanview.com", "support.cyanview.cloud")
             if url and url not in seen:
                 seen.add(url)

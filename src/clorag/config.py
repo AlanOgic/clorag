@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     qdrant_custom_docs_collection: str = Field(
         default="custom_docs", description="Collection for custom knowledge documents"
     )
+    qdrant_legacy_docs_collection: str = Field(
+        default="docusaurus_docs_legacy",
+        description="Separate collection for legacy support.cyanview.com docs",
+    )
 
     # Voyage AI
     voyage_model: str = Field(default="voyage-context-3", description="Voyage embedding model")

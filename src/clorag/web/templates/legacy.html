@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Legacy Docs Search — Cyanview</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <!-- Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify for XSS protection -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.2/dist/purify.min.js"></script>
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #4a3728;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #fff;
+            padding-bottom: 40px;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo { height: 32px; }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover { color: var(--cyan-blue); }
+
+        /* Hero */
+        .hero {
+            background: var(--hero-bg);
+            padding: 2rem 1rem 3rem;
+            text-align: center;
+            color: white;
+        }
+
+        .hero h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+            font-weight: 700;
+        }
+
+        .hero p {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 1.25rem;
+        }
+
+        .legacy-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.75rem;
+        }
+
+        .search-box {
+            max-width: 650px;
+            margin: 0 auto;
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 0.7rem 1.2rem;
+            border: none;
+            font-size: 0.95rem;
+            outline: none;
+            background: transparent;
+            color: white;
+        }
+
+        .search-input::placeholder { color: rgba(255, 255, 255, 0.6); }
+
+        .search-button {
+            padding: 0.7rem 1.5rem;
+            background: #8B6914;
+            color: white;
+            border: none;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-button:hover { background: #a07a1a; }
+        .search-button:disabled { background: #999; cursor: not-allowed; }
+
+        /* Results */
+        .results-section {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            display: none;
+        }
+
+        .conversation-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .conversation-exchange {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .user-question {
+            align-self: flex-end;
+            max-width: 85%;
+            background: var(--hero-bg);
+            color: white;
+            padding: 0.875rem 1.25rem;
+            border-radius: 18px 18px 4px 18px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .ai-answer-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e8e0d4;
+        }
+
+        .answer-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #f0e8dc;
+        }
+
+        .answer-icon {
+            width: 20px;
+            height: 20px;
+            color: #8B6914;
+        }
+
+        .answer-title {
+            font-weight: 600;
+            color: var(--hero-bg);
+            font-size: 0.9rem;
+        }
+
+        .answer-content {
+            color: #333;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        .answer-content h1, .answer-content h2, .answer-content h3 {
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            color: #1c1e21;
+        }
+
+        .answer-content h2 { font-size: 1.1rem; }
+        .answer-content h3 { font-size: 1rem; }
+        .answer-content p { margin-bottom: 0.75rem; }
+
+        .answer-content ul, .answer-content ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .answer-content li { margin-bottom: 0.25rem; }
+
+        .answer-content code {
+            background: #f5efe6;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #8B6914;
+        }
+
+        .answer-content pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0.75rem 0;
+        }
+
+        .answer-content pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        /* Source links */
+        .source-links {
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #f0e8dc;
+        }
+
+        .source-links-title {
+            font-size: 0.8rem;
+            color: #999;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .source-link {
+            display: block;
+            color: #0d7e3f;
+            font-size: 0.85rem;
+            text-decoration: none;
+            padding: 0.25rem 0;
+            word-break: break-all;
+        }
+
+        .source-link:hover { text-decoration: underline; }
+
+        /* Follow-up */
+        .followup-input-container { margin-top: 1rem; }
+
+        .followup-form {
+            display: flex;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e0e0e0;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .followup-form:focus-within {
+            border-color: #8B6914;
+            box-shadow: 0 2px 12px rgba(139, 105, 20, 0.2);
+        }
+
+        .followup-input {
+            flex: 1;
+            padding: 0.75rem 1.25rem;
+            border: none;
+            font-size: 0.95rem;
+            outline: none;
+            background: transparent;
+        }
+
+        .followup-input::placeholder { color: #999; }
+
+        .followup-submit {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            background: var(--hero-bg);
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .followup-submit:hover { background: #5d4833; }
+        .followup-submit svg { width: 20px; height: 20px; color: white; }
+
+        /* New conversation */
+        .new-conversation-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.6rem 1rem;
+            background: white;
+            border: 1px solid #d4c8b0;
+            border-radius: 20px;
+            color: var(--hero-bg);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+        }
+
+        .new-conversation-btn:hover {
+            background: #f5efe6;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .new-conversation-btn svg { width: 16px; height: 16px; }
+        .new-conversation-btn.hidden { display: none; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 3rem; color: #666; display: none; }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #8B6914;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: #888;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a class="navbar__brand" href="/legacy">
+            <img class="navbar__logo" src="/static/images/cyanview-logo.webp" alt="Cyanview" onerror="this.style.display='none'">
+            <span>Legacy Docs</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">AI Search</a>
+            <a href="/legacy/manage" class="navbar__link">Manage</a>
+            <a href="/legacy/help" class="navbar__link">Help</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="legacy-badge">Legacy Documentation</div>
+        <h1>Search support.cyanview.com</h1>
+        <p>Search the existing documentation site — results link directly to live pages</p>
+        <p style="font-size: 0.75rem; color: rgba(255,255,255,0.45); margin-top: 0.5rem;">Same model, same prompts. (from support site only)</p>
+        <form id="search-form">
+            <div class="search-box">
+                <input type="text"
+                       class="search-input"
+                       id="search-input"
+                       placeholder="Search legacy documentation..."
+                       autocomplete="off"
+                       required>
+                <button type="submit" class="search-button" id="search-button">Search</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Searching documentation...</p>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section" id="results-section">
+        <div class="conversation-container" id="conversation-container"></div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="empty-state" style="display: none;">
+        No results found. Try rephrasing your query.
+    </div>
+
+    <!-- New Conversation Button -->
+    <button class="new-conversation-btn hidden" id="new-conversation-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        New search
+    </button>
+
+    <script nonce="{{ request.state.csp_nonce }}">
+        const searchForm = document.getElementById('search-form');
+        const searchInput = document.getElementById('search-input');
+        const searchButton = document.getElementById('search-button');
+        const loadingEl = document.getElementById('loading');
+        const resultsSection = document.getElementById('results-section');
+        const conversationContainer = document.getElementById('conversation-container');
+        const emptyState = document.getElementById('empty-state');
+        const newConversationBtn = document.getElementById('new-conversation-btn');
+
+        let currentSessionId = null;
+        let currentExchangeId = 0;
+
+        // CSRF token from cookie
+        const csrfToken = document.cookie.split('; ')
+            .find(row => row.startsWith('csrf_token='))
+            ?.split('=')[1];
+
+        // Safe markdown rendering
+        function safeMarkdown(text) {
+            const rawHtml = marked.parse(text);
+            return DOMPurify.sanitize(rawHtml, {
+                ALLOW_DATA_ATTR: false
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function createExchangeElement(query, exchangeId) {
+            const exchange = document.createElement('div');
+            exchange.className = 'conversation-exchange';
+            exchange.id = `exchange-${exchangeId}`;
+            exchange.innerHTML = `
+                <div class="user-question">${escapeHtml(query)}</div>
+                <div class="ai-answer-card">
+                    <div class="answer-header">
+                        <svg class="answer-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span class="answer-title">Legacy Docs Answer</span>
+                    </div>
+                    <div class="answer-content" id="answer-content-${exchangeId}"></div>
+                    <div class="source-links" id="source-links-${exchangeId}" style="display: none;">
+                        <div class="source-links-title">Sources</div>
+                        <div id="source-links-list-${exchangeId}"></div>
+                    </div>
+                </div>
+                <div class="followup-input-container" id="followup-container-${exchangeId}" style="display: none;">
+                    <form class="followup-form" data-action="followup-form" data-exchange="${exchangeId}">
+                        <input type="text"
+                               class="followup-input"
+                               id="followup-input-${exchangeId}"
+                               placeholder="Ask a follow-up question..."
+                               autocomplete="off">
+                        <button type="submit" class="followup-submit">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            `;
+            return exchange;
+        }
+
+        function handleFollowup(event, exchangeId) {
+            event.preventDefault();
+            const input = document.getElementById(`followup-input-${exchangeId}`);
+            const query = input.value.trim();
+            if (!query) return;
+            document.getElementById(`followup-container-${exchangeId}`).style.display = 'none';
+            performSearch(query);
+        }
+
+        async function performSearch(query) {
+            loadingEl.style.display = 'block';
+            emptyState.style.display = 'none';
+            searchButton.disabled = true;
+
+            try {
+                const requestBody = {
+                    query: query,
+                    source: 'docs',
+                    limit: 10
+                };
+                if (currentSessionId) {
+                    requestBody.session_id = currentSessionId;
+                }
+
+                const headers = { 'Content-Type': 'application/json' };
+                if (csrfToken) {
+                    headers['X-CSRF-Token'] = csrfToken;
+                }
+
+                const response = await fetch('/api/legacy/stream', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) throw new Error('Search failed');
+
+                loadingEl.style.display = 'none';
+                resultsSection.style.display = 'block';
+
+                const exchangeId = ++currentExchangeId;
+                const exchangeEl = createExchangeElement(query, exchangeId);
+                conversationContainer.appendChild(exchangeEl);
+
+                const answerContentEl = document.getElementById(`answer-content-${exchangeId}`);
+                exchangeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                let fullText = '';
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+
+                                if (data.type === 'session') {
+                                    currentSessionId = data.session_id;
+                                } else if (data.type === 'text') {
+                                    fullText += data.text;
+                                    answerContentEl.innerHTML = safeMarkdown(fullText);
+                                } else if (data.type === 'sources') {
+                                    // Render source links
+                                    const sources = data.sources || [];
+                                    if (sources.length > 0) {
+                                        const linksContainer = document.getElementById(`source-links-${exchangeId}`);
+                                        const linksList = document.getElementById(`source-links-list-${exchangeId}`);
+                                        linksContainer.style.display = 'block';
+                                        linksList.innerHTML = sources
+                                            .filter(s => s.url)
+                                            .map(s => `<a class="source-link" href="${escapeHtml(s.url)}" target="_blank">${escapeHtml(s.title)} — ${escapeHtml(s.url)}</a>`)
+                                            .join('');
+                                    }
+                                } else if (data.type === 'done') {
+                                    answerContentEl.innerHTML = safeMarkdown(fullText);
+
+                                    newConversationBtn.classList.remove('hidden');
+
+                                    document.querySelectorAll('.followup-input-container').forEach(el => {
+                                        el.style.display = 'none';
+                                    });
+
+                                    const followupContainer = document.getElementById(`followup-container-${exchangeId}`);
+                                    followupContainer.style.display = 'block';
+
+                                    searchInput.value = '';
+
+                                    setTimeout(() => {
+                                        followupContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                        document.getElementById(`followup-input-${exchangeId}`).focus();
+                                    }, 100);
+                                }
+                            } catch (e) {
+                                // Ignore parse errors for incomplete chunks
+                            }
+                        }
+                    }
+                }
+
+                if (!fullText) {
+                    exchangeEl.remove();
+                    if (conversationContainer.children.length === 0) {
+                        emptyState.style.display = 'block';
+                        resultsSection.style.display = 'none';
+                    }
+                }
+
+            } catch (error) {
+                console.error('Search error:', error);
+                loadingEl.style.display = 'none';
+                alert('Search failed. Please try again.');
+            } finally {
+                searchButton.disabled = false;
+            }
+        }
+
+        // Form handlers
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = searchInput.value.trim();
+            if (query) performSearch(query);
+        });
+
+        document.addEventListener('submit', (e) => {
+            const form = e.target.closest('[data-action="followup-form"]');
+            if (form) {
+                e.preventDefault();
+                const exchangeId = parseInt(form.dataset.exchange, 10);
+                handleFollowup(e, exchangeId);
+            }
+        });
+
+        // New conversation
+        newConversationBtn.addEventListener('click', () => {
+            conversationContainer.innerHTML = '';
+            resultsSection.style.display = 'none';
+            newConversationBtn.classList.add('hidden');
+            currentSessionId = null;
+            currentExchangeId = 0;
+            searchInput.value = '';
+            searchInput.focus();
+        });
+    </script>
+</body>
+</html>

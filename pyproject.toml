@@ -75,6 +75,7 @@ init-prompts = "clorag.scripts.init_prompts:main"
 init-settings = "clorag.scripts.init_settings:main"
 archive-collection = "clorag.scripts.archive_collection:main"
 ingest-local-docs = "clorag.scripts.ingest_local_docs:main"
+ingest-legacy-docs = "clorag.scripts.ingest_legacy_docs:main"
 clorag-mcp = "clorag.mcp.server:main"
 clorag-mcp-http = "clorag.mcp.server:main_http"
 

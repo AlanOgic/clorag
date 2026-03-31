@@ -78,8 +78,12 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 
         SSE streaming endpoints are exempt from timeout.
         """
-        # Skip timeout for SSE log streaming endpoints
-        if "/logs/stream" in request.url.path or "/v1/chat/completions" in request.url.path:
+        # Skip timeout for SSE streaming and long-running ingestion endpoints
+        if (
+            "/logs/stream" in request.url.path
+            or "/v1/chat/completions" in request.url.path
+            or "/api/legacy/" in request.url.path
+        ):
             return await call_next(request)
 
         try:

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Legacy Docs — Help</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            --hero-bg: #4a3728;
+            --hero-light: #5d4833;
+            --accent: #8B6914;
+            --cyan-dark: #0077b6;
+            --green: #2e7d32;
+            --red: #c62828;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.7;
+            color: #1c1e21;
+            background: #f9f7f4;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo { height: 32px; }
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover { color: var(--cyan-dark); }
+
+        .page-header {
+            background: var(--hero-bg);
+            color: white;
+            padding: 1.5rem 2rem;
+            text-align: center;
+        }
+
+        .page-header h1 { font-size: 1.3rem; margin-bottom: 0.25rem; }
+        .page-header p { font-size: 0.85rem; color: rgba(255,255,255,0.7); }
+
+        .container {
+            max-width: 800px;
+            margin: 1.5rem auto;
+            padding: 0 1rem;
+        }
+
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+
+        .section h2 {
+            font-size: 1.1rem;
+            color: var(--hero-bg);
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #f0ebe5;
+        }
+
+        .section h3 {
+            font-size: 0.95rem;
+            color: var(--hero-light);
+            margin-top: 1rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .section p {
+            font-size: 0.9rem;
+            color: #444;
+            margin-bottom: 0.6rem;
+        }
+
+        .section ul, .section ol {
+            font-size: 0.9rem;
+            color: #444;
+            margin-left: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .section li { margin-bottom: 0.35rem; }
+
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-page { background: #f0ebe5; color: var(--hero-bg); }
+        .badge-action { background: #e8f5e9; color: var(--green); }
+        .badge-warning { background: #fff3e0; color: #e65100; }
+
+        .page-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            background: var(--hero-bg);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: background 0.2s;
+            margin-top: 0.5rem;
+        }
+
+        .page-link:hover { background: var(--hero-light); }
+
+        code {
+            background: #f5efe6;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+            color: var(--accent);
+        }
+
+        .workflow-step {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            align-items: flex-start;
+        }
+
+        .step-num {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            background: var(--hero-bg);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .step-content {
+            font-size: 0.9rem;
+            color: #444;
+            padding-top: 0.2rem;
+        }
+
+        .step-content strong { color: var(--hero-bg); }
+
+        .note {
+            background: #fff8e1;
+            border-left: 3px solid var(--accent);
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
+            color: #555;
+            border-radius: 0 6px 6px 0;
+            margin: 0.75rem 0;
+        }
+
+        .tech-detail {
+            background: #f5f0eb;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            color: #555;
+            margin-top: 0.75rem;
+        }
+
+        .tech-detail strong { color: var(--hero-bg); }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a class="navbar__brand" href="/legacy">
+            <img class="navbar__logo" src="/static/images/cyanview-logo.webp" alt="Cyanview" onerror="this.style.display='none'">
+            <span>Legacy Docs</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/legacy" class="navbar__link">Search</a>
+            <a href="/legacy/manage" class="navbar__link">Manage</a>
+            <a href="/legacy/help" class="navbar__link" style="font-weight:600;">Help</a>
+        </div>
+    </nav>
+
+    <div class="page-header">
+        <h1>How to Use Legacy Docs</h1>
+        <p>Search, manage, and keep the legacy index up to date</p>
+    </div>
+
+    <div class="container">
+
+        <!-- Overview -->
+        <div class="section">
+            <h2>What is this?</h2>
+            <p>Legacy Docs is a standalone search engine for the existing <strong>support.cyanview.com</strong> documentation. It uses the same AI-powered RAG technology as the main Cyanview search, but operates on its own separate index.</p>
+            <p>Use it to search the current support site content, find pages that need improvement, and keep the index in sync as you update pages.</p>
+            <div class="note">This system is completely independent from the main CLORAG search engine. Nothing you do here affects the main search at <code>/</code>.</div>
+        </div>
+
+        <!-- Pages -->
+        <div class="section">
+            <h2>Pages</h2>
+
+            <h3><span class="badge badge-page">/legacy</span> Search</h3>
+            <p>Ask questions about the support documentation. The AI searches the indexed content and generates an answer with source links pointing directly to <strong>support.cyanview.com</strong>. You can ask follow-up questions to refine the answer.</p>
+            <a href="/legacy" class="page-link">Go to Search</a>
+
+            <h3 style="margin-top:1.25rem;"><span class="badge badge-page">/legacy/manage</span> Manage Index</h3>
+            <p>View index stats, scan for new pages, ingest individual pages, or do a full re-index of the entire site.</p>
+            <a href="/legacy/manage" class="page-link">Go to Manage</a>
+        </div>
+
+        <!-- Workflow -->
+        <div class="section">
+            <h2>Typical Workflow</h2>
+
+            <div class="workflow-step">
+                <div class="step-num">1</div>
+                <div class="step-content"><strong>Search</strong> the legacy docs to find content that needs updating</div>
+            </div>
+            <div class="workflow-step">
+                <div class="step-num">2</div>
+                <div class="step-content"><strong>Click the source link</strong> to go directly to the page on support.cyanview.com</div>
+            </div>
+            <div class="workflow-step">
+                <div class="step-num">3</div>
+                <div class="step-content"><strong>Edit the page</strong> on support.cyanview.com</div>
+            </div>
+            <div class="workflow-step">
+                <div class="step-num">4</div>
+                <div class="step-content"><strong>Re-ingest the page</strong> — go to Manage, paste the URL, click "Ingest". The index now reflects your changes.</div>
+            </div>
+            <div class="workflow-step">
+                <div class="step-num">5</div>
+                <div class="step-content"><strong>Search again</strong> to verify the updated content appears correctly</div>
+            </div>
+        </div>
+
+        <!-- Manage actions -->
+        <div class="section">
+            <h2>Manage Actions</h2>
+
+            <h3><span class="badge badge-action">Scan Sitemap</span></h3>
+            <p>Compares the live sitemap of support.cyanview.com against the index. Shows any <strong>new pages</strong> not yet indexed. You can select and ingest them in one click.</p>
+            <p>Use this when you've <strong>created new pages</strong> on the site.</p>
+
+            <h3><span class="badge badge-action">Ingest Single Page</span></h3>
+            <p>Paste the full URL of a page you just modified (e.g. <code>https://support.cyanview.com/docs/Configuration/REMI</code>). It deletes the old chunks for that page and re-indexes the fresh content.</p>
+            <p>Use this when you've <strong>modified an existing page</strong>.</p>
+
+            <h3><span class="badge badge-warning">Full Re-ingest</span></h3>
+            <p>Deletes everything in the index and re-crawls the entire site from scratch. Takes a few minutes. Use this when many pages have changed or as a periodic refresh.</p>
+            <div class="note">Rate limited to 2 per hour. The crawl uses Jina Reader for content extraction — for large batches this can take 3-5 minutes.</div>
+        </div>
+
+        <!-- Technical -->
+        <div class="section">
+            <h2>Technical Details</h2>
+            <div class="tech-detail">
+                <p><strong>Collection:</strong> <code>docusaurus_docs_legacy</code> (Qdrant) — separate from <code>docusaurus_docs</code></p>
+                <p><strong>Embeddings:</strong> Voyage AI <code>voyage-context-3</code> (1024-dim contextualized)</p>
+                <p><strong>Sparse vectors:</strong> BM25 for keyword matching</p>
+                <p><strong>Reranking:</strong> Voyage <code>rerank-2.5</code> (when enabled in settings)</p>
+                <p><strong>Synthesis:</strong> Claude Sonnet 4.6</p>
+                <p style="margin-bottom:0;"><strong>Source site:</strong> <code>https://support.cyanview.com</code></p>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>
