@@ -66,7 +66,7 @@ Use this as ground truth for product guidance. Retrieved sources supplement this
 </decision_points>
 </product_ecosystem>"""
 
-BASE_SYSTEM_PROMPT = """\
+BASE_IDENTITY = """\
 <base>
 
 <identity>
@@ -74,8 +74,6 @@ You are a senior Cyanview team member — knowledgeable, warm, and practical. Yo
 
 Always speak as part of the team: use "we", "us", "our". Never say "Cyanview says" or "the company recommends". Never say "contact Cyanview support" — you ARE the support.
 </identity>
-
-""" + PRODUCT_ECOSYSTEM_REFERENCE + """
 
 <response_rules>
 
@@ -106,7 +104,7 @@ Use `graph LR` for signal flows, `graph TB` for hierarchies. Keep simple and foc
 </diagrams>
 
 <source_handling>
-- Source hierarchy: product_ecosystem (above) > official documentation > support cases.
+- Source hierarchy: product knowledge > official documentation > support cases.
 - Frame documentation references naturally: "as described in our RIO configuration guide".
 - Frame support case knowledge as team experience: "We've seen this before — in a similar setup…"
 - Never expose internal case IDs, customer names, or email addresses.
@@ -115,7 +113,7 @@ Use `graph LR` for signal flows, `graph TB` for hierarchies. Keep simple and foc
 </source_handling>
 
 <honesty>
-- Use ONLY the product_ecosystem section and provided sources. Never invent features, specs, or behaviors.
+- Use ONLY the provided product knowledge and sources. Never invent features, specs, or behaviors.
 - If information is insufficient, say so clearly. "I don't have specific information about this" is always better than a hedged, possibly wrong answer.
 - Never fabricate configuration values, IP addresses, firmware behaviors, or compatibility claims.
 - For unknowns: suggest checking the specific product page on our website.
@@ -220,7 +218,7 @@ Action: search_docs only. Support cases add noise here.
 # ANALYSIS PROMPTS
 # =============================================================================
 
-# Condensed product snippets below — canonical source is base.system_prompt
+# Uses {product_reference} variable — canonical source is base.product_reference
 ANALYSIS_THREAD_ANALYZER = """Analyze this support email thread and extract structured information.
 
 IMPORTANT: The content has been pre-processed with placeholder tokens:
@@ -281,7 +279,7 @@ Analyze the thread and respond with a JSON object containing:
 
 Respond ONLY with valid JSON, no markdown formatting."""
 
-# Condensed product snippets below — canonical source is base.system_prompt
+# Uses {product_reference} variable — canonical source is base.product_reference
 ANALYSIS_QUALITY_CONTROLLER = """You are a quality controller for a support case documentation system.
 
 CRITICAL ANONYMIZATION REQUIREMENTS:
@@ -338,7 +336,7 @@ Respond ONLY with valid JSON."""
 
 ANALYSIS_CAMERA_EXTRACTOR = """Analyze this Cyanview documentation or support content and extract camera compatibility information.
 
-Cyanview makes camera control equipment (RCP, RIO, CI0, VP4). The documentation contains info about which cameras can be controlled and how.
+{product_reference}
 
 For each camera model mentioned with control/compatibility info, extract:
 - model: The camera model name ONLY, without manufacturer prefix (e.g., "HDC-5500", "C500 Mark II", "URSA Mini Pro 12K")
@@ -410,16 +408,7 @@ Content:
 
 ANALYSIS_RIO_TERMINOLOGY = """You are analyzing CyanView text to fix RIO terminology.
 
-**Product Definitions:**
-- **"RIO"** = Generic RIO hardware reference. Use when license is NOT relevant:
-  physical dimensions, ports, grounding, power, wiring, mounting, weight, etc.
-- **"RIO +WAN"** = Full license. LAN & WAN connectivity, Cyanview cloud access,
-  REMI mode, uses Internet connection, no limit on number of cameras (1-128).
-- **"RIO +LAN"** = Formerly "RIO-Live". LAN only, single camera companion (max 2).
-  Brings RIO technology robustness to LAN productions. No WAN/cloud/REMI.
-
-**Legacy Terms:**
-- **"RIO-Live"** / **"RIO Live"** / **"RIOLive"** / **"RIO +WAN Live"** = All map to **"RIO +LAN"**
+{product_reference}
 
 **CRITICAL: Context determines the fix:**
 
@@ -509,7 +498,7 @@ Respond ONLY with a JSON array of strings, no markdown:
 
 GRAPH_ENTITY_EXTRACTOR = """Analyze this Cyanview documentation or support content and extract entities and relationships for a knowledge graph.
 
-CONTEXT: Cyanview makes camera control equipment (RIO, RCP, CI0, VP4, Live Composer). This content discusses camera compatibility, configurations, issues, and solutions.
+{product_reference}
 
 Extract the following entity types:
 1. CAMERAS - Camera models mentioned (e.g., "HDC-5500", "C500 Mark II", "URSA Mini Pro")
@@ -579,7 +568,7 @@ Content to analyze:
 # DRAFTS PROMPTS
 # =============================================================================
 
-# Condensed product snippets below — canonical source is base.system_prompt
+# Uses {product_reference} variable — canonical source is base.product_reference
 DRAFTS_EMAIL_GENERATOR = """You are drafting a professional support email reply for Cyanview, specialists in broadcast camera control solutions.
 
 CONTEXT: You will receive:
@@ -599,7 +588,7 @@ EMAIL STRUCTURE:
 4. **Closing**: Offer further assistance and sign off professionally
 
 FORMAT RULES:
-- **Bold** product names: RCP, RIO, CI0, VP4, CVP, etc.
+- **Bold** product names: RCP, RIO, CI0, VP4, NIO, RSBM, etc.
 - Use code formatting for: IP addresses, firmware versions, menu paths, commands
 - Keep paragraphs short and scannable
 - Total length: 150-400 words (adapt to complexity)
@@ -630,7 +619,7 @@ Match the customer's language (English or French based on their message)."""
 # SYNTHESIS PROMPTS
 # =============================================================================
 
-# SYNTHESIS_WEB_ANSWER removed — replaced by composed base.system_prompt + synthesis.web_layer
+# SYNTHESIS_WEB_ANSWER removed — replaced by composed base.identity + base.product_reference + synthesis.web_layer
 
 
 # =============================================================================
@@ -670,14 +659,14 @@ JSON response:"""
 # =============================================================================
 
 DEFAULT_PROMPTS: list[PromptDefinition] = [
-    # Base prompt (shared foundation for web + CLI)
+    # Base identity (shared foundation for web + CLI, product-free)
     PromptDefinition(
-        key="base.system_prompt",
-        name="Base System Prompt",
-        description="Shared identity, product knowledge, and response rules for all interfaces",
+        key="base.identity",
+        name="Base Identity",
+        description="Shared identity, response rules, and formatting — no product knowledge",
         model="claude",
         category="base",
-        content=BASE_SYSTEM_PROMPT,
+        content=BASE_IDENTITY,
         variables=[],
     ),
     # Product ecosystem reference (shared by analysis/draft prompts)
@@ -736,7 +725,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         model="sonnet",
         category="analysis",
         content=ANALYSIS_CAMERA_EXTRACTOR,
-        variables=["content"],
+        variables=["content", "product_reference"],
     ),
     PromptDefinition(
         key="analysis.camera_enrichment",
@@ -754,7 +743,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         model="sonnet",
         category="analysis",
         content=ANALYSIS_RIO_TERMINOLOGY,
-        variables=["chunk_text", "matched_text"],
+        variables=["chunk_text", "matched_text", "product_reference"],
     ),
     # Keyword extraction prompts
     PromptDefinition(
@@ -774,7 +763,7 @@ DEFAULT_PROMPTS: list[PromptDefinition] = [
         model="sonnet",
         category="graph",
         content=GRAPH_ENTITY_EXTRACTOR,
-        variables=["content"],
+        variables=["content", "product_reference"],
     ),
     # Drafts prompts
     PromptDefinition(

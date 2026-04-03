@@ -29,11 +29,15 @@ def get_anthropic() -> anthropic.AsyncAnthropic:
     return _anthropic_client
 
 
+_DEFAULT_PROMPT_KEYS = ("base.identity", "base.product_reference", "synthesis.web_layer")
+
+
 async def synthesize_answer(
     query: str,
     chunks: list[dict[str, Any]],
     conversation_history: list[dict[str, Any]] | None = None,
     graph_context: str | None = None,
+    prompt_keys: tuple[str, ...] | None = None,
 ) -> str:
     """Use Claude to synthesize an answer from retrieved chunks.
 
@@ -42,6 +46,7 @@ async def synthesize_answer(
         chunks: Retrieved context chunks.
         conversation_history: Optional list of previous messages for follow-up context.
         graph_context: Optional graph enrichment context string.
+        prompt_keys: Prompt keys to compose. Defaults to identity + product + web layer.
 
     Returns:
         Synthesized answer string.
@@ -72,10 +77,11 @@ async def synthesize_answer(
     except (KeyError, Exception):
         max_tokens = 1500
 
+    keys = prompt_keys or _DEFAULT_PROMPT_KEYS
     response = await get_anthropic().messages.create(
         model=settings.sonnet_model,
         max_tokens=max_tokens,
-        system=get_composed_prompt("base.system_prompt", "synthesis.web_layer"),
+        system=get_composed_prompt(*keys),
         messages=messages,
     )
     # Extract text from response
@@ -90,6 +96,7 @@ async def synthesize_answer_stream(
     chunks: list[dict[str, Any]],
     conversation_history: list[dict[str, Any]] | None = None,
     graph_context: str | None = None,
+    prompt_keys: tuple[str, ...] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Stream answer synthesis using Claude.
 
@@ -98,6 +105,7 @@ async def synthesize_answer_stream(
         chunks: Retrieved context chunks.
         conversation_history: Optional list of previous messages for follow-up context.
         graph_context: Optional graph enrichment context string.
+        prompt_keys: Prompt keys to compose. Defaults to identity + product + web layer.
 
     Yields:
         Text chunks from the streaming response.
@@ -129,10 +137,11 @@ async def synthesize_answer_stream(
     except (KeyError, Exception):
         max_tokens = 1500
 
+    keys = prompt_keys or _DEFAULT_PROMPT_KEYS
     async with get_anthropic().messages.stream(
         model=settings.sonnet_model,
         max_tokens=max_tokens,
-        system=get_composed_prompt("base.system_prompt", "synthesis.web_layer"),
+        system=get_composed_prompt(*keys),
         messages=messages,
     ) as stream:
         async for text in stream.text_stream:

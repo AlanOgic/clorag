@@ -83,7 +83,11 @@ class EntityExtractor:
                 messages=[
                     {
                         "role": "user",
-                        "content": get_prompt("graph.entity_extractor", content=content),
+                        "content": get_prompt(
+                            "graph.entity_extractor",
+                            content=content,
+                            product_reference=get_prompt("base.product_reference"),
+                        ),
                     }
                 ],
             )

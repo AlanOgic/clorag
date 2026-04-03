@@ -152,7 +152,11 @@ class CameraExtractor:
                 messages=[
                     {
                         "role": "user",
-                        "content": get_prompt("analysis.camera_extractor", content=content),
+                        "content": get_prompt(
+                            "analysis.camera_extractor",
+                            content=content,
+                            product_reference=get_prompt("base.product_reference"),
+                        ),
                     }
                 ],
             )

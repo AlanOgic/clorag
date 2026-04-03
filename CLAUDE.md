@@ -9,7 +9,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 
 Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
-**Version**: 0.10.4 | **Python**: 3.10-3.13
+**Version**: 0.10.5 | **Python**: 3.10-3.13
 
 ## Commands
 
@@ -233,8 +233,15 @@ Admin-managed announcements displayed on the public index page. Collapsible "Lat
 
 ### Prompt Management
 - **Admin-editable prompts**: 13 LLM prompts stored in SQLite, editable via `/admin/prompts` without code changes
-- **Prompt composition**: `get_composed_prompt()` concatenates multiple prompt keys at runtime. Web = `base.system_prompt` + `synthesis.web_layer`, CLI = `base.system_prompt` + `agent.tools_layer`
-- **Shared product knowledge**: `base.product_reference` contains the canonical `<product_ecosystem>` block, injected via `{product_reference}` variable into `analysis.thread_analyzer`, `analysis.quality_controller`, and `drafts.email_generator`. Edit once at `/admin/prompts` to update product facts everywhere.
+- **Composable prompt architecture**: 3 base blocks composed at call time via `get_composed_prompt()`:
+  - `base.identity` — Cyanview team voice, response rules, formatting, language (product-free)
+  - `base.product_reference` — Product ecosystem, connection rules, decision points
+  - Interface layer: `synthesis.web_layer` (web) or `agent.tools_layer` (CLI)
+- **Composition per pipeline**:
+  - Main web/CLI: `base.identity` + `base.product_reference` + layer (full product knowledge)
+  - Legacy search: `base.identity` + `synthesis.web_layer` (no product knowledge — answers from docs only)
+  - Analysis/drafts: use `{product_reference}` variable injection from `base.product_reference`
+- **Shared product knowledge**: `base.product_reference` is the single source of truth for all product facts. Injected via `{product_reference}` variable into 6 prompts: `thread_analyzer`, `quality_controller`, `camera_extractor`, `rio_terminology`, `entity_extractor`, `email_generator`. Edit once at `/admin/prompts` to update everywhere.
 - **Version history**: Every content change creates a new version for audit and rollback
 - **Fallback to defaults**: If DB prompt not found, falls back to hardcoded defaults in `default_prompts.py`
 - **Backup/restore**: `init-prompts --backup` exports customized prompts to JSON; `--restore FILE` re-applies them. `--force` auto-backups before resetting
@@ -244,7 +251,7 @@ Admin-managed announcements displayed on the public index page. Collapsible "Lat
 - **Categories**: agent, analysis, base, synthesis, drafts, graph, scripts
 - **Configuration**: `PROMPTS_CACHE_TTL` (default: 300 seconds)
 - **API usage**: `pm = get_prompt_manager(); prompt = pm.get_prompt("analysis.thread_analyzer", thread_content="...")`
-- **Composed prompts**: `from clorag.services.prompt_manager import get_composed_prompt; system = get_composed_prompt("base.system_prompt", "synthesis.web_layer")`
+- **Composed prompts**: `get_composed_prompt("base.identity", "base.product_reference", "synthesis.web_layer")`
 
 ### RAG Settings
 - **Admin-editable settings**: 20 RAG tuning parameters stored in SQLite, editable via `/admin/settings` without code changes
@@ -294,7 +301,19 @@ Production:
 - Web: https://cyanview.cloud/ (Docker maps 8085→8080)
 - MCP HTTP: https://mcp.cyanview.cloud/ (Docker maps 8086→8080, Bearer auth required)
 
-## Recent Updates (2026-03-31)
+## Recent Updates (2026-04-03)
+
+### v0.10.5: Composable Prompt Architecture
+
+- **Split `base.system_prompt` → `base.identity` + `base.product_reference`**: Product knowledge is now a separate composable block, not baked into the base prompt
+- **Product-free legacy synthesis**: Legacy search uses `base.identity` + `synthesis.web_layer` (no product knowledge injection — answers grounded in retrieved docs only)
+- **6 prompts now use `{product_reference}`**: Extended from 3 to 6 — added `camera_extractor`, `rio_terminology`, `entity_extractor` alongside existing `thread_analyzer`, `quality_controller`, `email_generator`
+- **Eliminated hardcoded product lists**: Camera extractor and graph entity extractor no longer hardcode "Cyanview makes camera control equipment (RCP, RIO, CI0, VP4)" — product knowledge comes from the shared `base.product_reference`
+- **RIO terminology deduplication**: Removed inline product definitions from `rio_terminology` prompt, replaced with `{product_reference}` variable
+- **Fixed phantom `CVP` product**: Drafts email generator listed non-existent `CVP` in bold formatting rule — replaced with `NIO, RSBM`
+- **Configurable synthesis prompts**: `synthesize_answer()` and `synthesize_answer_stream()` accept `prompt_keys` parameter for per-pipeline prompt composition
+- **Removed key**: `base.system_prompt` (split into `base.identity` + `base.product_reference`)
+- **New key**: `base.identity` (identity, response rules, formatting, language — product-free)
 
 ### v0.10.4: Legacy Docs System
 
@@ -340,14 +359,14 @@ Production:
 
 ### v0.10.1: Prompt Composition (base + layer)
 
-- **Prompt composition**: Extracted shared identity, product knowledge, and response rules into `base.system_prompt`. Web and CLI compose thin layers on top via `get_composed_prompt()`
-- **Web pipeline**: `base.system_prompt` + `synthesis.web_layer` (replaces monolithic `synthesis.web_answer`)
-- **CLI agent**: `base.system_prompt` + `agent.tools_layer` (replaces `agent.system_prompt_en/fr`, adds product knowledge)
-- **XML-structured prompts**: All 3 composition blocks use XML tags optimized for Sonnet 4.6
+- **Prompt composition**: Extracted shared identity, product knowledge, and response rules into composable blocks. Web and CLI compose thin layers on top via `get_composed_prompt()`
+- **Web pipeline**: `base.identity` + `base.product_reference` + `synthesis.web_layer` (replaces monolithic `synthesis.web_answer`)
+- **CLI agent**: `base.identity` + `base.product_reference` + `agent.tools_layer` (replaces `agent.system_prompt_en/fr`, adds product knowledge)
+- **XML-structured prompts**: All composition blocks use XML tags optimized for Sonnet 4.6
 - **Orphan cleanup**: `init-prompts --force` now removes DB prompts no longer in the default registry
 - **New prompt category**: "base" added for shared foundation prompts
 - **Removed keys**: `agent.system_prompt_en`, `agent.system_prompt_fr`, `synthesis.web_answer`
-- **New keys**: `base.system_prompt`, `synthesis.web_layer`, `agent.tools_layer`
+- **New keys**: `base.identity`, `base.product_reference`, `synthesis.web_layer`, `agent.tools_layer`
 
 ### v0.10.0: Admin UI for RAG Settings
 

@@ -179,6 +179,7 @@ class RIOTerminologyAnalyzer:
                             "analysis.rio_terminology",
                             chunk_text=chunk_text[:3000],  # Limit context size
                             matched_text=matched_text,
+                            product_reference=get_prompt("base.product_reference"),
                         ),
                     }
                 ],

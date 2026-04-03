@@ -151,7 +151,8 @@ class PromptManager:
         Guards against duplicate keys in the composition.
 
         Args:
-            *keys: Prompt keys to compose (e.g., "base.system_prompt", "synthesis.web_layer").
+            *keys: Prompt keys to compose (e.g., "base.identity",
+                "base.product_reference", "synthesis.web_layer").
 
         Returns:
             The composed prompt text.

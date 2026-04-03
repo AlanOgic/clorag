@@ -8,4 +8,4 @@ from clorag.services.prompt_manager import get_composed_prompt
 
 def get_system_prompt() -> str:
     """Get the composed system prompt for the CLORAG agent."""
-    return get_composed_prompt("base.system_prompt", "agent.tools_layer")
+    return get_composed_prompt("base.identity", "base.product_reference", "agent.tools_layer")

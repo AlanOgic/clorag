@@ -154,7 +154,8 @@ async def legacy_search_stream(request: Request, req: SearchRequest) -> Streamin
             yield f"data: {json.dumps({'type': 'session', 'session_id': session.session_id})}\n\n"
 
             async for chunk in synthesize_answer_stream(
-                req.query, chunks_for_synthesis, conversation_history, None
+                req.query, chunks_for_synthesis, conversation_history, None,
+                prompt_keys=("base.identity", "synthesis.web_layer"),
             ):
                 collected_response.append(chunk)
                 yield f"data: {json.dumps({'type': 'text', 'text': chunk})}\n\n"

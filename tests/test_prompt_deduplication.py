@@ -35,10 +35,18 @@ class TestProductEcosystemReference:
         assert prompt.category == "base"
         assert prompt.content == PRODUCT_ECOSYSTEM_REFERENCE
 
-    def test_base_system_prompt_embeds_same_content(self) -> None:
-        base = get_default_prompt("base.system_prompt")
+    def test_base_identity_has_no_product_knowledge(self) -> None:
+        base = get_default_prompt("base.identity")
         assert base is not None
-        assert PRODUCT_ECOSYSTEM_REFERENCE in base.content
+        assert PRODUCT_ECOSYSTEM_REFERENCE not in base.content
+        assert "<product_ecosystem>" not in base.content
+
+    def test_base_identity_has_core_sections(self) -> None:
+        base = get_default_prompt("base.identity")
+        assert base is not None
+        assert "<identity>" in base.content
+        assert "<response_rules>" in base.content
+        assert "<language>" in base.content
 
 
 class TestPromptsUseProductReferenceVariable:
@@ -49,6 +57,9 @@ class TestPromptsUseProductReferenceVariable:
         [
             "analysis.thread_analyzer",
             "analysis.quality_controller",
+            "analysis.camera_extractor",
+            "analysis.rio_terminology",
+            "graph.entity_extractor",
             "drafts.email_generator",
         ],
     )
@@ -63,6 +74,9 @@ class TestPromptsUseProductReferenceVariable:
         [
             "analysis.thread_analyzer",
             "analysis.quality_controller",
+            "analysis.camera_extractor",
+            "analysis.rio_terminology",
+            "graph.entity_extractor",
             "drafts.email_generator",
         ],
     )
@@ -74,35 +88,46 @@ class TestPromptsUseProductReferenceVariable:
         assert "CI0: serial-to-IP" not in prompt.content
         assert "CI0: Serial-to-IP converter" not in prompt.content
         assert "RIO: autonomous" not in prompt.content
+        # Hardcoded product list that should come from product_reference
+        assert "Cyanview makes camera control equipment" not in prompt.content
 
 
 class TestPromptVariableSubstitution:
     """Test that {product_reference} substitutes correctly in prompts."""
+
+    # Dummy values for all known prompt variables
+    _DUMMY_VARS: dict[str, str] = {
+        "product_reference": PRODUCT_ECOSYSTEM_REFERENCE,
+        "thread_content": "test thread",
+        "problem_summary": "test problem",
+        "solution_summary": "test solution",
+        "keywords": "test",
+        "category": "RCP",
+        "product": "RCP",
+        "resolution_quality": "5",
+        "anonymized_subject": "test subject",
+        "content": "test content",
+        "chunk_text": "test chunk",
+        "matched_text": "RIO Live",
+    }
 
     @pytest.mark.parametrize(
         "key",
         [
             "analysis.thread_analyzer",
             "analysis.quality_controller",
+            "analysis.camera_extractor",
+            "analysis.rio_terminology",
+            "graph.entity_extractor",
             "drafts.email_generator",
         ],
     )
     def test_product_reference_substitution(self, key: str) -> None:
         prompt = get_default_prompt(key)
         assert prompt is not None
-        # Simulate what PromptManager._substitute_variables does
-        result = prompt.content.format(
-            product_reference=PRODUCT_ECOSYSTEM_REFERENCE,
-            # Provide dummy values for other variables
-            thread_content="test thread",
-            problem_summary="test problem",
-            solution_summary="test solution",
-            keywords="test",
-            category="RCP",
-            product="RCP",
-            resolution_quality="5",
-            anonymized_subject="test subject",
-        )
+        # Build kwargs from declared variables only
+        kwargs = {v: self._DUMMY_VARS[v] for v in prompt.variables}
+        result = prompt.content.format(**kwargs)
         assert "<product_ecosystem>" in result
         assert "{product_reference}" not in result
 
