@@ -4,6 +4,7 @@ This module provides search functionality including the search pipeline,
 answer synthesis, and utility functions.
 """
 
+from clorag.core.retriever import calculate_dynamic_threshold
 from clorag.web.search.pipeline import (
     generate_embeddings_parallel,
     get_embeddings,
@@ -18,7 +19,6 @@ from clorag.web.search.synthesis import (
     synthesize_answer,
     synthesize_answer_stream,
 )
-from clorag.core.retriever import calculate_dynamic_threshold
 from clorag.web.search.utils import (
     build_context,
     extract_source_links,

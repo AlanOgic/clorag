@@ -164,9 +164,18 @@ def cli() -> None:
     parser = argparse.ArgumentParser(description="Extract cameras from existing data")
     parser.add_argument("--docs-only", action="store_true", help="Only extract from docs (Qdrant)")
     parser.add_argument("--cases-only", action="store_true", help="Only extract from support cases")
-    parser.add_argument("--from-sqlite", action="store_true", help="Read cases from SQLite instead of Qdrant")
-    parser.add_argument("--limit", type=int, default=1000, help="Max documents to process")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be extracted without saving")
+    parser.add_argument(
+        "--from-sqlite", action="store_true",
+        help="Read cases from SQLite instead of Qdrant",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=1000,
+        help="Max documents to process",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Show what would be extracted without saving",
+    )
     args = parser.parse_args()
 
     async def run() -> None:

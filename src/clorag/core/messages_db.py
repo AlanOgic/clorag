@@ -189,7 +189,7 @@ class MessagesDatabase:
         if message_type is not None:
             fields.append("message_type = ?")
             values.append(message_type)
-        if link_url is not ...:
+        if link_url is not ...:  # type: ignore[comparison-overlap]
             fields.append("link_url = ?")
             values.append(link_url)
         if is_active is not None:
@@ -198,7 +198,7 @@ class MessagesDatabase:
         if sort_order is not None:
             fields.append("sort_order = ?")
             values.append(sort_order)
-        if expires_at is not ...:
+        if expires_at is not ...:  # type: ignore[comparison-overlap]
             fields.append("expires_at = ?")
             values.append(expires_at)
         if not fields:

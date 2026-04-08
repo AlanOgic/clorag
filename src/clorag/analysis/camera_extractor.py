@@ -105,7 +105,8 @@ class CameraExtractor:
     def __init__(self) -> None:
         """Initialize the extractor with Anthropic client."""
         settings = get_settings()
-        self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value())
+        api_key = settings.anthropic_api_key.get_secret_value()
+        self._client = anthropic.AsyncAnthropic(api_key=api_key)
         self._http_client: httpx.AsyncClient | None = None
 
     async def _get_http_client(self) -> httpx.AsyncClient:
@@ -161,7 +162,7 @@ class CameraExtractor:
                 ],
             )
 
-            result_text = response.content[0].text.strip()
+            result_text = response.content[0].text.strip()  # type: ignore[union-attr]
 
             # Extract JSON from response (handle markdown code blocks)
             json_match = re.search(r"\[[\s\S]*\]", result_text)
@@ -260,14 +261,17 @@ class CameraExtractor:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         all_cameras: dict[str, CameraCreate] = {}
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning("Extraction task failed", error=str(result))
+        for raw_result in results:
+            if isinstance(raw_result, BaseException):
+                logger.warning("Extraction task failed", error=str(raw_result))
                 continue
-            for camera in result:
+            for camera in raw_result:
                 # Create deduplication key: manufacturer + normalized model name
                 # This handles cases like "HDC-5500" vs "hdc-5500" vs "HDC 5500"
-                model_normalized = camera.name.lower().replace("-", "").replace(" ", "").replace("_", "")
+                model_normalized = (
+                    camera.name.lower()
+                    .replace("-", "").replace(" ", "").replace("_", "")
+                )
                 mfr_normalized = (camera.manufacturer or "unknown").lower()
                 key = f"{mfr_normalized}:{model_normalized}"
 
@@ -275,7 +279,11 @@ class CameraExtractor:
                     existing = all_cameras[key]
                     # Merge arrays, keeping first non-empty values
                     all_cameras[key] = CameraCreate(
-                        name=camera.name if len(camera.name) > len(existing.name) else existing.name,
+                        name=(
+                            camera.name
+                            if len(camera.name) > len(existing.name)
+                            else existing.name
+                        ),
                         manufacturer=camera.manufacturer or existing.manufacturer,
                         ports=list(set(existing.ports + camera.ports)),
                         protocols=list(set(existing.protocols + camera.protocols)),
@@ -292,7 +300,9 @@ class CameraExtractor:
         logger.info("Batch extraction complete", total_cameras=len(all_cameras))
         return list(all_cameras.values())
 
-    async def enrich_from_manufacturer(self, camera_name: str, manufacturer_url: str) -> CameraEnrichment | None:
+    async def enrich_from_manufacturer(
+        self, camera_name: str, manufacturer_url: str,
+    ) -> CameraEnrichment | None:
         """Scrape manufacturer website for additional camera specs.
 
         Args:
@@ -333,7 +343,7 @@ class CameraExtractor:
                 ],
             )
 
-            result_text = llm_response.content[0].text.strip()
+            result_text = llm_response.content[0].text.strip()  # type: ignore[union-attr]
 
             # Extract JSON
             json_match = re.search(r"\{[\s\S]*\}", result_text)
@@ -371,7 +381,9 @@ class CameraExtractor:
             logger.error("Anthropic API error during enrichment", error=str(e))
             return None
 
-    async def search_manufacturer_url(self, camera_name: str, manufacturer: str | None = None) -> str | None:
+    async def search_manufacturer_url(
+        self, camera_name: str, manufacturer: str | None = None,
+    ) -> str | None:
         """Try to find the manufacturer product page URL for a camera.
 
         This uses a simple heuristic based on known manufacturer URL patterns.

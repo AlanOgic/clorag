@@ -113,12 +113,12 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
         # Load existing token (with encryption support)
         token_data = load_encrypted_token(self._token_path)
         if token_data:
-            creds = Credentials.from_authorized_user_info(token_data, SCOPES)
+            creds = Credentials.from_authorized_user_info(token_data, SCOPES)  # type: ignore[no-untyped-call]
 
         # Refresh or get new credentials
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                creds.refresh(Request())  # type: ignore[no-untyped-call]
             else:
                 if not self._credentials_path.exists():
                     raise FileNotFoundError(
@@ -135,9 +135,9 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
             token_data = json.loads(creds.to_json())
             save_encrypted_token(self._token_path, token_data)
 
-        return creds
+        return creds  # type: ignore[no-any-return]
 
-    def _get_service(self):
+    def _get_service(self) -> Any:
         """Get Gmail API service.
 
         Returns:
@@ -233,7 +233,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
         logger.info("Fetched Gmail threads", count=len(documents))
         return documents
 
-    async def _get_label_id(self, service, label_name: str) -> str | None:
+    async def _get_label_id(self, service: Any, label_name: str) -> str | None:
         """Get label ID by name.
 
         Args:
@@ -248,7 +248,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
 
         for label in labels:
             if label["name"].lower() == label_name.lower():
-                return label["id"]
+                return str(label["id"])
 
         return None
 
@@ -276,7 +276,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
 
         return False
 
-    async def _fetch_thread(self, service, thread_id: str) -> Document | None:
+    async def _fetch_thread(self, service: Any, thread_id: str) -> Document | None:
         """Fetch a single thread and format as document.
 
         Args:
@@ -332,7 +332,7 @@ class GmailIngestionPipeline(BaseIngestionPipeline):
             },
         )
 
-    def _extract_body(self, payload) -> str:
+    def _extract_body(self, payload: dict[str, Any]) -> str:
         """Extract text body from message payload.
 
         Args:

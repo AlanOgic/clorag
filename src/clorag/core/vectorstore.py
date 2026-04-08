@@ -57,7 +57,10 @@ class VectorStore:
         """
         settings = get_settings()
         self._url = url or settings.qdrant_url
-        self._api_key = api_key or (settings.qdrant_api_key.get_secret_value() if settings.qdrant_api_key else None)
+        self._api_key = api_key or (
+            settings.qdrant_api_key.get_secret_value()
+            if settings.qdrant_api_key else None
+        )
         self._dimensions = dimensions or settings.voyage_dimensions
         self._docs_collection = settings.qdrant_docs_collection
         self._cases_collection = settings.qdrant_cases_collection
@@ -308,7 +311,7 @@ class VectorStore:
                 )
                 for key, value in filter_conditions.items()
             ]
-            query_filter = models.Filter(must=must_conditions)
+            query_filter = models.Filter(must=must_conditions)  # type: ignore[arg-type]  # type: ignore[arg-type]
 
         # Execute search using query_points (qdrant-client 1.16+)
         response = await self._client.query_points(
@@ -454,7 +457,7 @@ class VectorStore:
                 )
                 for key, value in match_filters.items()
             ]
-            query_filter = models.Filter(must=must_conditions)
+            query_filter = models.Filter(must=must_conditions)  # type: ignore[arg-type]
 
         response = await self._client.query_points(
             collection_name=collection,
@@ -673,7 +676,7 @@ class VectorStore:
         snapshot = await self._client.create_snapshot(
             collection_name=collection, wait=True
         )
-        return snapshot.name
+        return snapshot.name  # type: ignore[union-attr]
 
     async def list_snapshots(self, collection: str) -> list[dict[str, Any]]:
         """List existing snapshots for a collection.
@@ -793,7 +796,7 @@ class VectorStore:
                 )
                 for key, value in filter_conditions.items()
             ]
-            query_filter = models.Filter(must=must_conditions)
+            query_filter = models.Filter(must=must_conditions)  # type: ignore[arg-type]
 
         records, next_offset = await self._client.scroll(
             collection_name=collection,

@@ -1,5 +1,6 @@
 """Draft creation pipeline orchestrating the full flow."""
 
+from typing import Any
 
 from clorag.analysis.thread_analyzer import ThreadAnalyzer
 from clorag.config import get_settings
@@ -86,7 +87,7 @@ class DraftCreationPipeline:
         existing_drafts = await self._gmail.get_draft_thread_ids()
 
         # Step 3: Fetch full thread content and analyze
-        pending_threads: list[tuple[PendingThread, dict, str]] = []
+        pending_threads: list[tuple[PendingThread, dict[str, Any], str]] = []
         errors: list[str] = []
 
         for thread_info in threads:
@@ -119,9 +120,9 @@ class DraftCreationPipeline:
         logger.info("Threads to analyze", count=len(pending_threads))
 
         # Step 4: Analyze threads to find unanswered ones
-        unanswered: list[tuple[PendingThread, dict, str, str]] = []
+        unanswered: list[tuple[PendingThread, dict[str, Any], str, str]] = []
 
-        for thread_info, thread, content in pending_threads:
+        for pending_info, thread, content in pending_threads:
             if len(unanswered) >= max_drafts:
                 break
 
@@ -132,27 +133,30 @@ class DraftCreationPipeline:
 
                 # Analyze with Sonnet
                 analysis = await self._analyzer.analyze_thread(
-                    thread_id=thread_info.thread_id,
+                    thread_id=pending_info.thread_id,
                     thread_content=anonymized,
                 )
+
+                if not analysis:
+                    continue
 
                 # Filter: only process threads where Cyanview hasn't responded
                 if not analysis.is_cyanview_response:
                     unanswered.append((
-                        thread_info,
+                        pending_info,
                         thread,
                         content,
                         analysis.problem_summary,
                     ))
                     logger.info(
                         "Found unanswered thread",
-                        thread_id=thread_info.thread_id,
-                        subject=thread_info.subject[:50],
+                        thread_id=pending_info.thread_id,
+                        subject=pending_info.subject[:50],
                         problem=analysis.problem_summary[:100],
                     )
 
             except Exception as e:
-                error_msg = f"Analysis failed for {thread_info.thread_id}: {e}"
+                error_msg = f"Analysis failed for {pending_info.thread_id}: {e}"
                 errors.append(error_msg)
                 logger.warning(error_msg)
 
@@ -162,21 +166,21 @@ class DraftCreationPipeline:
         results: list[DraftResult] = []
         skipped = 0
 
-        for thread_info, thread, content, problem_summary in unanswered:
+        for unanswered_info, thread, content, problem_summary in unanswered:
             try:
                 # Generate draft response
                 preview = await self._generator.generate_draft(
                     problem_summary=problem_summary,
                     thread_content=content,
-                    subject=thread_info.subject,
-                    to_address=thread_info.from_address,
-                    thread_id=thread_info.thread_id,
+                    subject=unanswered_info.subject,
+                    to_address=unanswered_info.from_address,
+                    thread_id=unanswered_info.thread_id,
                 )
 
                 if preview_only:
                     logger.info(
                         "Preview generated (not creating draft)",
-                        thread_id=thread_info.thread_id,
+                        thread_id=unanswered_info.thread_id,
                         confidence=preview.confidence,
                     )
                     skipped += 1
@@ -184,10 +188,10 @@ class DraftCreationPipeline:
 
                 # Create draft in Gmail
                 result = await self._gmail.create_draft_reply(
-                    thread_id=thread_info.thread_id,
-                    original_message_id=thread_info.last_message_id,
-                    to_address=thread_info.from_address,
-                    subject=thread_info.subject,
+                    thread_id=unanswered_info.thread_id,
+                    original_message_id=unanswered_info.last_message_id,
+                    to_address=unanswered_info.from_address,
+                    subject=unanswered_info.subject,
                     content=preview.content,
                 )
 
@@ -199,7 +203,7 @@ class DraftCreationPipeline:
                 )
 
             except Exception as e:
-                error_msg = f"Draft creation failed for {thread_info.thread_id}: {e}"
+                error_msg = f"Draft creation failed for {unanswered_info.thread_id}: {e}"
                 errors.append(error_msg)
                 logger.error(error_msg)
 
@@ -297,6 +301,10 @@ class DraftCreationPipeline:
             thread_id=thread_id,
             thread_content=anonymized,
         )
+
+        if not analysis:
+            logger.warning("Analysis returned None", thread_id=thread_id)
+            return None
 
         # Generate draft response
         preview = await self._generator.generate_draft(

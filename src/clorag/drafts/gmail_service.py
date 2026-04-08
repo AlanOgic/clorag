@@ -75,12 +75,12 @@ class GmailDraftService:
         # Load existing token (with encryption support)
         token_data = load_encrypted_token(self._token_path)
         if token_data:
-            creds = Credentials.from_authorized_user_info(token_data, DRAFT_SCOPES)
+            creds = Credentials.from_authorized_user_info(token_data, DRAFT_SCOPES)  # type: ignore[no-untyped-call]
 
         # Refresh or get new credentials
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                creds.refresh(Request())  # type: ignore[no-untyped-call]
             else:
                 if not self._credentials_path.exists():
                     raise FileNotFoundError(
@@ -97,9 +97,9 @@ class GmailDraftService:
             token_data = json.loads(creds.to_json())
             save_encrypted_token(self._token_path, token_data)
 
-        return creds
+        return creds  # type: ignore[no-any-return]
 
-    def _get_service(self):
+    def _get_service(self) -> Any:
         """Get Gmail API service.
 
         Returns:
@@ -110,7 +110,7 @@ class GmailDraftService:
             self._service = build("gmail", "v1", credentials=creds)
         return self._service
 
-    async def get_thread(self, thread_id: str) -> dict | None:
+    async def get_thread(self, thread_id: str) -> dict[str, Any] | None:
         """Fetch a single thread by ID.
 
         Args:
@@ -132,7 +132,7 @@ class GmailDraftService:
         self,
         label: str,
         max_results: int = 100,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Fetch threads with a specific label.
 
         Args:
@@ -151,7 +151,7 @@ class GmailDraftService:
             return []
 
         # List threads with this label
-        threads = []
+        threads: list[dict[str, Any]] = []
         page_token = None
 
         while len(threads) < max_results:
@@ -190,7 +190,7 @@ class GmailDraftService:
 
         for label in labels:
             if label["name"].lower() == label_name.lower():
-                return label["id"]
+                return str(label["id"])
 
         return None
 
@@ -234,7 +234,7 @@ class GmailDraftService:
 
         return thread_ids
 
-    def extract_thread_info(self, thread: dict) -> PendingThread | None:
+    def extract_thread_info(self, thread: dict[str, Any]) -> PendingThread | None:
         """Extract relevant info from a thread for draft creation.
 
         Args:
@@ -283,7 +283,7 @@ class GmailDraftService:
             snippet=thread.get("snippet", "")[:200],
         )
 
-    def extract_thread_content(self, thread: dict) -> str:
+    def extract_thread_content(self, thread: dict[str, Any]) -> str:
         """Extract full text content from a thread.
 
         Args:
@@ -310,7 +310,7 @@ class GmailDraftService:
 
         return "\n\n---\n\n".join(formatted_messages)
 
-    def _extract_body(self, payload: dict) -> str:
+    def _extract_body(self, payload: dict[str, Any]) -> str:
         """Extract text body from message payload.
 
         Args:
@@ -335,7 +335,7 @@ class GmailDraftService:
 
         return raw_text.strip() if raw_text else ""
 
-    def extract_thread_detail(self, thread: dict) -> ThreadDetail | None:
+    def extract_thread_detail(self, thread: dict[str, Any]) -> ThreadDetail | None:
         """Extract full thread details with individual messages.
 
         Args:

@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 
 class CaseStatus(str, Enum):
@@ -81,14 +82,16 @@ class SupportCase:
         ]
         return "\n".join(parts)
 
-    def to_metadata(self) -> dict:
+    def to_metadata(self) -> dict[str, Any]:
         """Generate metadata for Qdrant storage."""
         return {
             "source": "gmail",
             "thread_id": self.thread_id,
             "subject": self.subject,
             "status": self.status.value,
-            "resolution_quality": self.resolution_quality.value if self.resolution_quality else None,
+            "resolution_quality": (
+                self.resolution_quality.value if self.resolution_quality else None
+            ),
             "problem_summary": self.problem_summary,
             "solution_summary": self.solution_summary,
             "category": self.category,

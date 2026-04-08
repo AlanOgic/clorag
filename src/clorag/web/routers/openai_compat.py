@@ -12,12 +12,12 @@ import secrets
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from clorag.config import get_settings
 from clorag.web.schemas import SearchRequest, SearchSource
@@ -81,7 +81,10 @@ def _verify_api_key(authorization: str | None) -> JSONResponse | None:
             status_code=503,
             content={
                 "error": {
-                    "message": "OpenAI-compatible API is not configured. Set OPENAI_COMPAT_API_KEY.",
+                    "message": (
+                        "OpenAI-compatible API is not configured."
+                        " Set OPENAI_COMPAT_API_KEY."
+                    ),
                     "type": "server_error",
                     "code": "api_not_configured",
                 }
@@ -196,11 +199,15 @@ async def chat_completions(
             conversation_history.append({"role": msg.role, "content": msg.content})
 
     # Perform RAG search
-    search_req = SearchRequest(query=query, source=SearchSource.BOTH, limit=10)
+    search_req = SearchRequest(
+        query=query, source=SearchSource.BOTH, limit=10, session_id=None,
+    )
     _, chunks_for_synthesis, graph_context, _ = await perform_search(search_req)
 
     # Extract sources for appending to response
-    source_links = extract_source_links(chunks_for_synthesis)
+    source_links = cast(
+        list[dict[str, Any]], extract_source_links(chunks_for_synthesis),
+    )
 
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
 

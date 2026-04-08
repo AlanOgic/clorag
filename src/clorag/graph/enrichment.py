@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 import structlog
 
@@ -51,10 +52,11 @@ class GraphEnrichmentService:
         seen_issues: set[str] = set()
         seen_solutions: set[str] = set()
 
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning("graph_enrichment_chunk_failed", error=str(result))
+        for raw_result in results:
+            if isinstance(raw_result, BaseException):
+                logger.warning("graph_enrichment_chunk_failed", error=str(raw_result))
                 continue
+            result = raw_result
 
             # Deduplicate cameras
             for camera in result.related_cameras:
@@ -168,7 +170,7 @@ class GraphEnrichmentService:
                                 description=sol,
                             ))
 
-    async def get_camera_context(self, camera_name: str) -> dict:
+    async def get_camera_context(self, camera_name: str) -> dict[str, Any]:
         """Get full context for a specific camera.
 
         Args:

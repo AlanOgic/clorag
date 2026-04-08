@@ -383,7 +383,7 @@ def register_ingestion_tools(mcp: FastMCP[MCPServices]) -> None:
             saved = 0
             for fix in fixes:
                 try:
-                    db.save_fix(fix)
+                    db.save_fix(fix)  # type: ignore[attr-defined]
                     saved += 1
                 except Exception:
                     pass  # Skip duplicates

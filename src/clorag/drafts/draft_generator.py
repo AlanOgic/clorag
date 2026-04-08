@@ -1,5 +1,7 @@
 """RAG-based response generator for support draft emails."""
 
+from typing import Any
+
 import anthropic
 
 from clorag.config import get_settings
@@ -95,7 +97,7 @@ class DraftResponseGenerator:
         self,
         query: str,
         limit: int = 8,
-    ) -> tuple[list[dict], list[dict]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Perform hybrid search for relevant context.
 
         Args:
@@ -160,7 +162,7 @@ class DraftResponseGenerator:
 
         return chunks, sources[:5]  # Limit to 5 sources
 
-    def _build_context(self, chunks: list[dict], max_chunks: int = 8) -> str:
+    def _build_context(self, chunks: list[dict[str, Any]], max_chunks: int = 8) -> str:
         """Build context string from chunks for Claude synthesis."""
         parts = []
         for i, chunk in enumerate(chunks[:max_chunks], 1):
@@ -175,7 +177,7 @@ class DraftResponseGenerator:
         self,
         problem_summary: str,
         thread_content: str,
-        chunks: list[dict],
+        chunks: list[dict[str, Any]],
     ) -> str:
         """Synthesize an email response using Claude.
 
@@ -193,7 +195,8 @@ class DraftResponseGenerator:
 
 Thank you for reaching out to Cyanview Support.
 
-I've received your message and I'm looking into your question. I'll need to investigate this further to provide you with the most accurate information.
+I've received your message and I'm looking into your question. I'll need to investigate \
+this further to provide you with the most accurate information.
 
 I'll get back to you shortly with more details.
 
@@ -213,7 +216,8 @@ Original Email Thread:
 Retrieved Context (documentation and past support cases):
 {context}
 
-Write a professional email reply addressing this customer's issue. Use the retrieved context to provide accurate, helpful information."""
+Write a professional email reply addressing this customer's issue. \
+Use the retrieved context to provide accurate, helpful information."""
 
         response = await self._client.messages.create(
             model=self._model,
@@ -225,9 +229,9 @@ Write a professional email reply addressing this customer's issue. Use the retri
             messages=[{"role": "user", "content": user_content}],
         )
 
-        return response.content[0].text
+        return response.content[0].text  # type: ignore[union-attr]
 
-    def _calculate_confidence(self, chunks: list[dict]) -> float:
+    def _calculate_confidence(self, chunks: list[dict[str, Any]]) -> float:
         """Calculate confidence score based on retrieved chunks and their scores.
 
         Uses reranker scores (when available) as the primary signal, since they

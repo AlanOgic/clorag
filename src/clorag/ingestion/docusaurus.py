@@ -1,9 +1,15 @@
 """Docusaurus documentation ingestion pipeline."""
 
+from __future__ import annotations
+
 import asyncio
 import json
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 from uuid import uuid4
+
+if TYPE_CHECKING:
+    from bs4 import Tag
 
 import anthropic
 import httpx
@@ -395,7 +401,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
 
         return text
 
-    def _convert_tables_to_markdown(self, element: "Tag") -> None:
+    def _convert_tables_to_markdown(self, element: Tag) -> None:
         """Convert HTML tables to markdown format in-place.
 
         Replaces <table> elements with their markdown representation
@@ -404,7 +410,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         Args:
             element: BeautifulSoup element containing tables.
         """
-        from bs4 import NavigableString
+        from bs4 import NavigableString  # type: ignore[attr-defined]
 
         tables = element.find_all("table")
 
@@ -510,7 +516,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         """
         return apply_product_name_transforms(text)
 
-    async def process(self, documents: list[Document]) -> list[tuple[Document, list[Document]]]:
+    async def process(self, documents: list[Document]) -> list[tuple[Document, list[Document]]]:  # type: ignore[override]
         """Chunk documents for contextualized embedding.
 
         Applies RIO terminology fixes and keyword extraction before chunking.
@@ -567,7 +573,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
         logger.info("Processed documents into chunks", original=len(documents), chunks=total_chunks)
         return processed
 
-    async def ingest(self, doc_chunks: list[tuple[Document, list[Document]]]) -> int:
+    async def ingest(self, doc_chunks: list[tuple[Document, list[Document]]]) -> int:  # type: ignore[override]
         """Embed and store documents using contextualized embeddings and hybrid search.
 
         Uses voyage-context-3 for dense vectors and BM25 for sparse vectors.
@@ -741,7 +747,7 @@ class DocusaurusIngestionPipeline(BaseIngestionPipeline):
                         max_tokens=256,
                         messages=[{"role": "user", "content": prompt}],
                     )
-                    text = response.content[0].text if response.content else "[]"
+                    text = response.content[0].text if response.content else "[]"  # type: ignore[union-attr]
                     # Parse JSON array from response
                     try:
                         keywords = json.loads(text)

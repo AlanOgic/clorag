@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import time
 from collections import deque
-from contextlib import contextmanager
+from collections.abc import Generator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from threading import Lock
-from typing import Generator
+from typing import Any
 
 import structlog
 
@@ -25,7 +26,7 @@ class TimingMetric:
     name: str
     duration_ms: float
     timestamp: float = field(default_factory=time.time)
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class MetricsCollector:
@@ -46,7 +47,7 @@ class MetricsCollector:
         self,
         name: str,
         duration_ms: float,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record a timing measurement.
 
@@ -80,7 +81,7 @@ class MetricsCollector:
     def measure(
         self,
         name: str,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
         log_slow_threshold_ms: float | None = None,
         log_always: bool = False,
     ) -> Generator[None, None, None]:
@@ -118,7 +119,7 @@ class MetricsCollector:
                     metadata=metadata,
                 )
 
-    def get_stats(self, name: str) -> dict | None:
+    def get_stats(self, name: str) -> dict[str, Any] | None:
         """Get statistics for a specific metric.
 
         Args:
@@ -151,7 +152,7 @@ class MetricsCollector:
 
         return stats
 
-    def get_all_stats(self) -> dict:
+    def get_all_stats(self) -> dict[str, Any]:
         """Get statistics for all metrics.
 
         Returns:
@@ -162,7 +163,7 @@ class MetricsCollector:
             total_queries = self._total_queries
             error_count = self._error_count
 
-        result = {
+        result: dict[str, Any] = {
             "total_queries": total_queries,
             "error_count": error_count,
             "error_rate_percent": (
@@ -178,7 +179,7 @@ class MetricsCollector:
 
         return result
 
-    def get_recent(self, name: str, count: int = 10) -> list[dict]:
+    def get_recent(self, name: str, count: int = 10) -> list[dict[str, Any]]:
         """Get recent measurements for a metric.
 
         Args:
@@ -224,7 +225,9 @@ def get_metrics_collector() -> MetricsCollector:
 
 
 # Convenience functions for common metrics
-def measure_embedding_generation(metadata: dict | None = None):
+def measure_embedding_generation(
+    metadata: dict[str, Any] | None = None,
+) -> AbstractContextManager[None]:
     """Measure embedding generation time (target: <200ms)."""
     return get_metrics_collector().measure(
         "embedding_generation",
@@ -233,7 +236,7 @@ def measure_embedding_generation(metadata: dict | None = None):
     )
 
 
-def measure_vector_search(metadata: dict | None = None):
+def measure_vector_search(metadata: dict[str, Any] | None = None) -> AbstractContextManager[None]:
     """Measure vector search time (target: <100ms)."""
     return get_metrics_collector().measure(
         "vector_search",
@@ -242,7 +245,9 @@ def measure_vector_search(metadata: dict | None = None):
     )
 
 
-def measure_graph_enrichment(metadata: dict | None = None):
+def measure_graph_enrichment(
+    metadata: dict[str, Any] | None = None,
+) -> AbstractContextManager[None]:
     """Measure graph enrichment time (target: <50ms)."""
     return get_metrics_collector().measure(
         "graph_enrichment",
@@ -251,7 +256,7 @@ def measure_graph_enrichment(metadata: dict | None = None):
     )
 
 
-def measure_total_search(metadata: dict | None = None):
+def measure_total_search(metadata: dict[str, Any] | None = None) -> AbstractContextManager[None]:
     """Measure total search pipeline time (target: <500ms)."""
     return get_metrics_collector().measure(
         "total_search",
@@ -260,7 +265,7 @@ def measure_total_search(metadata: dict | None = None):
     )
 
 
-def measure_llm_synthesis(metadata: dict | None = None):
+def measure_llm_synthesis(metadata: dict[str, Any] | None = None) -> AbstractContextManager[None]:
     """Measure LLM synthesis time (TTFB target: <2s)."""
     return get_metrics_collector().measure(
         "llm_synthesis",

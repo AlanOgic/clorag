@@ -69,7 +69,7 @@ class ThreadAnalyzer:
             )
 
             # Extract text content
-            content = response.content[0].text if response.content else ""
+            content = response.content[0].text if response.content else ""  # type: ignore[union-attr]
 
             # Parse JSON response
             try:

@@ -70,7 +70,7 @@ class TextAnonymizer:
     # Cyanview email domain to preserve
     CYANVIEW_DOMAIN = "@cyanview.com"
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the anonymizer."""
         pass
 
@@ -111,7 +111,7 @@ class TextAnonymizer:
         context: AnonymizationContext,
     ) -> str:
         """Replace Cyanview serial numbers with placeholders."""
-        def replace_serial(match: re.Match) -> str:
+        def replace_serial(match: re.Match[str]) -> str:
             full_serial = match.group(0).upper()
             device_type = match.group(2).upper()
             return context.get_serial_placeholder(full_serial, device_type)
@@ -124,7 +124,7 @@ class TextAnonymizer:
         context: AnonymizationContext,
     ) -> str:
         """Replace email addresses with placeholders, preserving Cyanview emails."""
-        def replace_email(match: re.Match) -> str:
+        def replace_email(match: re.Match[str]) -> str:
             email = match.group(0)
             # Preserve Cyanview emails
             if email.lower().endswith(self.CYANVIEW_DOMAIN):
@@ -143,7 +143,7 @@ class TextAnonymizer:
         Only matches sequences that look like phone numbers
         (at least 7 digits to avoid false positives).
         """
-        def replace_phone(match: re.Match) -> str:
+        def replace_phone(match: re.Match[str]) -> str:
             phone = match.group(0)
             # Only replace if it has at least 7 digits (to avoid version numbers, etc.)
             digits = re.sub(r"\D", "", phone)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from neo4j import AsyncDriver, AsyncGraphDatabase
@@ -824,7 +824,7 @@ class GraphStore:
 
         return context
 
-    async def find_camera_compatibility(self, camera_name: str) -> dict:
+    async def find_camera_compatibility(self, camera_name: str) -> dict[str, Any]:
         """Find all products, protocols, and ports compatible with a camera."""
         query = """
         MATCH (c:Camera {name: $camera_name})
@@ -850,7 +850,7 @@ class GraphStore:
                 }
         return {"products": [], "protocols": [], "ports": [], "controls": []}
 
-    async def find_issues_for_product(self, product_name: str) -> list[dict]:
+    async def find_issues_for_product(self, product_name: str) -> list[dict[str, Any]]:
         """Find all issues affecting a product with their solutions."""
         query = """
         MATCH (p:Product {name: $product_name})<-[:AFFECTS]-(i:Issue)
@@ -867,7 +867,7 @@ class GraphStore:
                 })
         return issues
 
-    async def search_entities(self, query_text: str, limit: int = 10) -> list[dict]:
+    async def search_entities(self, query_text: str, limit: int = 10) -> list[dict[str, Any]]:
         """Full-text search across issues and solutions."""
         query = """
         CALL db.index.fulltext.queryNodes('issue_description', $query) YIELD node, score
@@ -881,7 +881,7 @@ class GraphStore:
         results = []
         async with await self._session() as session:
             try:
-                result = await session.run(query, query=query_text, limit=limit)
+                result = await session.run(query, query=query_text, limit=limit)  # type: ignore[misc]
                 async for record in result:
                     results.append({
                         "type": record["type"],
@@ -896,7 +896,7 @@ class GraphStore:
     # Admin Browser Operations
     # =========================================================================
 
-    async def get_entity_type_counts(self) -> list[dict]:
+    async def get_entity_type_counts(self) -> list[dict[str, Any]]:
         """Get counts for each entity type.
 
         Returns:
@@ -938,7 +938,7 @@ class GraphStore:
         page: int = 1,
         page_size: int = 20,
         search: str | None = None,
-    ) -> tuple[list[dict], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """List entities of a specific type with pagination.
 
         Args:
@@ -1041,7 +1041,7 @@ class GraphStore:
         self,
         entity_type: str,
         entity_id: str,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         """Get entity details with all its relationships.
 
         Args:
@@ -1105,7 +1105,7 @@ class GraphStore:
         source_name: str | None = None,
         relationship_type: str | None = None,
         limit: int = 50,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """List relationships with optional filtering.
 
         Args:
@@ -1119,7 +1119,7 @@ class GraphStore:
         """
         # Build dynamic query
         where_clauses = []
-        params: dict = {"limit": limit}
+        params: dict[str, Any] = {"limit": limit}
 
         # Whitelist of valid entity types (Cypher injection protection)
         valid_entity_types = {
@@ -1179,7 +1179,7 @@ class GraphStore:
                 })
         return results
 
-    async def get_relationship_type_counts(self) -> list[dict]:
+    async def get_relationship_type_counts(self) -> list[dict[str, Any]]:
         """Get counts for each relationship type.
 
         Returns:

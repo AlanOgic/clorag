@@ -5,7 +5,7 @@ import argparse
 import anyio
 import structlog
 
-from clorag.drafts import DraftCreationPipeline, DraftPreview, DraftResult
+from clorag.drafts import DraftCreationPipeline, DraftPreview, DraftResult, PipelineRunResult
 from clorag.utils.logger import setup_logging
 
 logger = structlog.get_logger(__name__)
@@ -70,7 +70,7 @@ async def run_draft_creation(
 
     else:
         # Run full pipeline
-        result = await pipeline.run(
+        pipeline_result: PipelineRunResult = await pipeline.run(
             max_drafts=max_drafts,
             preview_only=preview_only,
         )
@@ -78,23 +78,23 @@ async def run_draft_creation(
         print(f"\n{'='*60}")
         print("DRAFT CREATION PIPELINE RESULTS")
         print(f"{'='*60}")
-        print(f"Threads checked: {result.threads_checked}")
-        print(f"Drafts created: {result.drafts_created}")
-        print(f"Skipped: {result.skipped}")
+        print(f"Threads checked: {pipeline_result.threads_checked}")
+        print(f"Drafts created: {pipeline_result.drafts_created}")
+        print(f"Skipped: {pipeline_result.skipped}")
 
-        if result.errors:
-            print(f"\nErrors ({len(result.errors)}):")
-            for error in result.errors:
+        if pipeline_result.errors:
+            print(f"\nErrors ({len(pipeline_result.errors)}):")
+            for error in pipeline_result.errors:
                 print(f"  - {error}")
 
-        if result.results:
+        if pipeline_result.results:
             print("\nCreated drafts:")
-            for draft in result.results:
+            for draft in pipeline_result.results:
                 print(f"  - {draft.draft_id}: Re: {draft.subject[:50]}...")
 
         print(f"{'='*60}\n")
 
-        return result.drafts_created
+        return pipeline_result.drafts_created
 
 
 def main() -> None:

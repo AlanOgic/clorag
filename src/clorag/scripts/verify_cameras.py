@@ -17,14 +17,13 @@ import anthropic
 import httpx
 
 from clorag.config import get_settings
-from clorag.core.database import CameraDatabase, get_camera_database
+from clorag.core.database import get_camera_database
 from clorag.models.camera import Camera, CameraUpdate
 from clorag.scripts.enrich_model_codes import (
     _fetch_with_jina,
     _get_manufacturer_domains,
     _pick_best_urls,
 )
-from clorag.services.prompt_manager import get_prompt
 from clorag.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -195,7 +194,7 @@ If unsure, keep the current value. Return ONLY the JSON object."""
             messages=[{"role": "user", "content": prompt}],
         )
 
-        response_text = llm_response.content[0].text.strip()
+        response_text = llm_response.content[0].text.strip()  # type: ignore[union-attr]
         if "```" in response_text:
             response_text = re.sub(r"```json?\s*", "", response_text)
             response_text = re.sub(r"```\s*", "", response_text)
@@ -211,7 +210,10 @@ If unsure, keep the current value. Return ONLY the JSON object."""
                 result.corrections["code_model"] = parsed["code_model"]
             if parsed.get("name") and parsed["name"] != camera.name:
                 result.corrections["name"] = parsed["name"]
-            if parsed.get("manufacturer_url") and parsed["manufacturer_url"] != camera.manufacturer_url:
+            if (
+                parsed.get("manufacturer_url")
+                and parsed["manufacturer_url"] != camera.manufacturer_url
+            ):
                 result.corrections["manufacturer_url"] = parsed["manufacturer_url"]
 
             result.verified = True
@@ -312,7 +314,7 @@ async def verify_cameras(
                         source=result.source,
                     )
                 else:
-                    update = CameraUpdate(**result.corrections)
+                    update = CameraUpdate(**result.corrections)  # type: ignore[arg-type]
                     db.update_camera(camera.id, update)  # type: ignore[arg-type]
                     logger.info(
                         "Corrected camera",

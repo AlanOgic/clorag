@@ -255,7 +255,7 @@ def register_chunk_tools(mcp: FastMCP[MCPServices]) -> None:
             dense_results, sparse_results = await asyncio.gather(
                 dense_task, sparse_task,
             )
-            dense_vector = dense_results[0]
+            dense_vector = dense_results.vectors[0]
             sparse_vector = sparse_results[0]
 
         success = await services.vectorstore.update_chunk(

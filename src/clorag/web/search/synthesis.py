@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import anthropic
+from anthropic.types import MessageParam
 
 from clorag.config import get_settings
 from clorag.services.prompt_manager import get_composed_prompt
@@ -58,9 +59,10 @@ async def synthesize_answer(
     context = build_context(chunks, graph_context=graph_context)
 
     # Build messages with conversation history
-    messages: list[dict[str, Any]] = []
+    messages: list[MessageParam] = []
     if conversation_history:
-        messages.extend(conversation_history)
+        for msg in conversation_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
         # Ground Claude: history is for intent only, not as a fact source
         messages.append({"role": "user", "content": (
             "New question follows. Answer ONLY using the Context provided below. "
@@ -118,9 +120,10 @@ async def synthesize_answer_stream(
     context = build_context(chunks, graph_context=graph_context)
 
     # Build messages with conversation history
-    messages: list[dict[str, Any]] = []
+    messages: list[MessageParam] = []
     if conversation_history:
-        messages.extend(conversation_history)
+        for msg in conversation_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
         # Ground Claude: history is for intent only, not as a fact source
         messages.append({"role": "user", "content": (
             "New question follows. Answer ONLY using the Context provided below. "

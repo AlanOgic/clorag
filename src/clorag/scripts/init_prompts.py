@@ -173,7 +173,10 @@ def restore_prompts(backup_file: str) -> None:
     # Clear cache after restore
     pm.reload_all()
 
-    print(f"\nRestore complete: {restored} restored, {skipped} skipped, {not_found} removed from registry")
+    print(
+        f"\nRestore complete: {restored} restored,"
+        f" {skipped} skipped, {not_found} removed from registry"
+    )
     print(f"Source: {backup_file}")
     print(f"Backed up at: {backup_data.get('backed_up_at', 'unknown')}")
 
@@ -247,8 +250,8 @@ def show_stats() -> None:
 
     if customized:
         print("\n=== CUSTOMIZED PROMPTS ===")
-        for p in customized:
-            print(f"  {p['key']}")
+        for cp in customized:
+            print(f"  {cp['key']}")
 
     print("\n=== CACHE STATS ===")
     print(f"Hits:       {cache_stats['hits']}")

@@ -59,11 +59,11 @@ def _group_key(chunk: dict[str, Any]) -> str:
     """Get grouping key for a chunk (same page/thread/doc grouped together)."""
     source_type = chunk.get("source_type")
     if source_type == "documentation":
-        return chunk.get("url") or chunk.get("title", "unknown")
+        return str(chunk.get("url") or chunk.get("title", "unknown"))
     elif source_type == "custom_docs":
-        return chunk.get("url") or chunk.get("title", "unknown")
+        return str(chunk.get("url") or chunk.get("title", "unknown"))
     else:
-        return chunk.get("subject") or "Support Case"
+        return str(chunk.get("subject") or "Support Case")
 
 
 def _get_synthesis_defaults() -> tuple[int, int, int]:

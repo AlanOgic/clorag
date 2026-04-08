@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
 @dataclass
@@ -16,7 +17,7 @@ class ThreadMessage:
     body: str
     is_cyanview: bool = False
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "message_id": self.message_id,
@@ -39,7 +40,7 @@ class ThreadDetail:
     messages: list[ThreadMessage] = field(default_factory=list)
     problem_summary: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "thread_id": self.thread_id,
@@ -62,7 +63,7 @@ class PendingThread:
     received_at: datetime | None
     snippet: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "thread_id": self.thread_id,
@@ -83,11 +84,11 @@ class DraftPreview:
     subject: str
     to_address: str
     content: str
-    sources: list[dict] = field(default_factory=list)
+    sources: list[dict[str, Any]] = field(default_factory=list)
     confidence: float = 0.0
     problem_summary: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "thread_id": self.thread_id,
@@ -110,7 +111,7 @@ class DraftResult:
     to_address: str
     created_at: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "thread_id": self.thread_id,
@@ -131,7 +132,7 @@ class PipelineRunResult:
     errors: list[str] = field(default_factory=list)
     results: list[DraftResult] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "threads_checked": self.threads_checked,

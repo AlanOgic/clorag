@@ -1,6 +1,7 @@
 """FastAPI web application for AI Search with Claude synthesis."""
 
 import secrets
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -171,7 +172,7 @@ def get_scheduler() -> AsyncIOScheduler | None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan with background scheduler for draft creation."""
     global _scheduler
     settings = get_settings()

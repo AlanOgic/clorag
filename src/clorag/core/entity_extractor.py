@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from typing import Any
 
 import anthropic
 import structlog
@@ -92,7 +93,7 @@ class EntityExtractor:
                 ],
             )
 
-            result_text = response.content[0].text.strip()
+            result_text = response.content[0].text.strip()  # type: ignore[union-attr]
 
             # Extract JSON from response (handle markdown code blocks)
             json_match = re.search(r"\{[\s\S]*\}", result_text)
@@ -119,7 +120,7 @@ class EntityExtractor:
             return EntityExtractionResult()
 
     def _parse_extraction_result(
-        self, data: dict, source_chunk_id: str | None
+        self, data: dict[str, Any], source_chunk_id: str | None
     ) -> EntityExtractionResult:
         """Parse raw LLM output into structured entities."""
         result = EntityExtractionResult()
@@ -324,10 +325,11 @@ class EntityExtractor:
         seen_ports: set[str] = set()
         seen_controls: set[str] = set()
 
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning("batch_extraction_task_failed", error=str(result))
+        for raw_result in results:
+            if isinstance(raw_result, BaseException):
+                logger.warning("batch_extraction_task_failed", error=str(raw_result))
                 continue
+            result = raw_result
 
             # Deduplicate entities
             for camera in result.cameras:

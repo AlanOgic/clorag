@@ -168,8 +168,14 @@ class CameraDatabase:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_cameras_manufacturer ON cameras(manufacturer)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_cameras_name ON cameras(name COLLATE NOCASE)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS"
+                " idx_cameras_manufacturer ON cameras(manufacturer)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS"
+                " idx_cameras_name ON cameras(name COLLATE NOCASE)"
+            )
 
             # Add code_model column if it doesn't exist (migration)
             try:
@@ -207,7 +213,10 @@ class CameraDatabase:
                 pass  # Column already exists
 
             # Index on needs_review for fast filtering of review queue
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_cameras_needs_review ON cameras(needs_review)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS"
+                " idx_cameras_needs_review ON cameras(needs_review)"
+            )
 
             # Covering index for common list queries (manufacturer + name sort)
             conn.execute("""
@@ -232,25 +241,48 @@ class CameraDatabase:
 
             # Triggers to keep FTS index in sync
             conn.execute("""
-                CREATE TRIGGER IF NOT EXISTS cameras_ai AFTER INSERT ON cameras BEGIN
-                    INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
-                    VALUES (new.id, new.name, new.manufacturer, new.code_model, new.ports, new.protocols, new.notes);
+                CREATE TRIGGER IF NOT EXISTS cameras_ai
+                AFTER INSERT ON cameras BEGIN
+                    INSERT INTO cameras_fts(
+                        rowid, name, manufacturer, code_model,
+                        ports, protocols, notes)
+                    VALUES (
+                        new.id, new.name, new.manufacturer,
+                        new.code_model, new.ports,
+                        new.protocols, new.notes);
                 END
             """)
 
             conn.execute("""
-                CREATE TRIGGER IF NOT EXISTS cameras_ad AFTER DELETE ON cameras BEGIN
-                    INSERT INTO cameras_fts(cameras_fts, rowid, name, manufacturer, code_model, ports, protocols, notes)
-                    VALUES ('delete', old.id, old.name, old.manufacturer, old.code_model, old.ports, old.protocols, old.notes);
+                CREATE TRIGGER IF NOT EXISTS cameras_ad
+                AFTER DELETE ON cameras BEGIN
+                    INSERT INTO cameras_fts(
+                        cameras_fts, rowid, name, manufacturer,
+                        code_model, ports, protocols, notes)
+                    VALUES (
+                        'delete', old.id, old.name,
+                        old.manufacturer, old.code_model,
+                        old.ports, old.protocols, old.notes);
                 END
             """)
 
             conn.execute("""
-                CREATE TRIGGER IF NOT EXISTS cameras_au AFTER UPDATE ON cameras BEGIN
-                    INSERT INTO cameras_fts(cameras_fts, rowid, name, manufacturer, code_model, ports, protocols, notes)
-                    VALUES ('delete', old.id, old.name, old.manufacturer, old.code_model, old.ports, old.protocols, old.notes);
-                    INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
-                    VALUES (new.id, new.name, new.manufacturer, new.code_model, new.ports, new.protocols, new.notes);
+                CREATE TRIGGER IF NOT EXISTS cameras_au
+                AFTER UPDATE ON cameras BEGIN
+                    INSERT INTO cameras_fts(
+                        cameras_fts, rowid, name, manufacturer,
+                        code_model, ports, protocols, notes)
+                    VALUES (
+                        'delete', old.id, old.name,
+                        old.manufacturer, old.code_model,
+                        old.ports, old.protocols, old.notes);
+                    INSERT INTO cameras_fts(
+                        rowid, name, manufacturer, code_model,
+                        ports, protocols, notes)
+                    VALUES (
+                        new.id, new.name, new.manufacturer,
+                        new.code_model, new.ports,
+                        new.protocols, new.notes);
                 END
             """)
 
@@ -285,7 +317,10 @@ class CameraDatabase:
             device_type=device_type,
             ports=json.loads(row["ports"]) if row["ports"] else [],
             protocols=json.loads(row["protocols"]) if row["protocols"] else [],
-            supported_controls=json.loads(row["supported_controls"]) if row["supported_controls"] else [],
+            supported_controls=(
+                json.loads(row["supported_controls"])
+                if row["supported_controls"] else []
+            ),
             notes=json.loads(row["notes"]) if row["notes"] else [],
             source=CameraSource(row["source"]) if row["source"] else CameraSource.MANUAL,
             doc_url=row["doc_url"],
@@ -305,7 +340,7 @@ class CameraDatabase:
         offset: int = 0,
         limit: int | None = None,
     ) -> list[Camera]:
-        """List all cameras, optionally filtered by manufacturer, device_type, port, and/or protocol.
+        """List cameras, optionally filtered by manufacturer, device_type, port, and/or protocol.
 
         Args:
             manufacturer: Filter by manufacturer name (case-insensitive).
@@ -626,8 +661,12 @@ class CameraDatabase:
                 port_likes = [f'%"{p}"%' for p in camera.ports]
                 match_expr = " + ".join(["(ports LIKE ?)"] * len(port_likes))
                 where_expr = " OR ".join(["ports LIKE ?"] * len(port_likes))
+                sql = (
+                    f"SELECT id, ({match_expr}) as match_count"
+                    f" FROM cameras WHERE ({where_expr}) AND id != ?"
+                )
                 cursor = conn.execute(
-                    f"SELECT id, ({match_expr}) as match_count FROM cameras WHERE ({where_expr}) AND id != ?",
+                    sql,
                     port_likes + port_likes + [camera_id],
                 )
                 for row in cursor.fetchall():
@@ -638,8 +677,12 @@ class CameraDatabase:
                 proto_likes = [f'%"{p}"%' for p in camera.protocols]
                 match_expr = " + ".join(["(protocols LIKE ?)"] * len(proto_likes))
                 where_expr = " OR ".join(["protocols LIKE ?"] * len(proto_likes))
+                sql = (
+                    f"SELECT id, ({match_expr}) as match_count"
+                    f" FROM cameras WHERE ({where_expr}) AND id != ?"
+                )
                 cursor = conn.execute(
-                    f"SELECT id, ({match_expr}) as match_count FROM cameras WHERE ({where_expr}) AND id != ?",
+                    sql,
                     proto_likes + proto_likes + [camera_id],
                 )
                 for row in cursor.fetchall():
@@ -652,7 +695,10 @@ class CameraDatabase:
             sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)[:limit]
             return self.get_cameras_by_ids(sorted_ids)
 
-    def create_camera(self, camera: CameraCreate, source: CameraSource = CameraSource.MANUAL) -> Camera:
+    def create_camera(
+        self, camera: CameraCreate,
+        source: CameraSource = CameraSource.MANUAL,
+    ) -> Camera:
         """Create a new camera entry.
 
         Args:
@@ -665,8 +711,11 @@ class CameraDatabase:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO cameras (name, manufacturer, code_model, device_type, ports, protocols,
-                    supported_controls, notes, source, doc_url, manufacturer_url, confidence, needs_review)
+                INSERT INTO cameras (
+                    name, manufacturer, code_model, device_type,
+                    ports, protocols, supported_controls, notes,
+                    source, doc_url, manufacturer_url,
+                    confidence, needs_review)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -838,7 +887,10 @@ class CameraDatabase:
             logger.info("Merging camera data", name=camera.name, source=source.value)
             return self.update_camera(existing.id, updates)  # type: ignore
         else:
-            logger.info("Creating new camera from extraction", name=camera.name, source=source.value)
+            logger.info(
+                "Creating new camera from extraction",
+                name=camera.name, source=source.value,
+            )
             return self.create_camera(camera, source)
 
     def get_manufacturers(self) -> list[str]:
@@ -849,7 +901,9 @@ class CameraDatabase:
         """
         with self._get_connection() as conn:
             cursor = conn.execute(
-                "SELECT DISTINCT manufacturer FROM cameras WHERE manufacturer IS NOT NULL ORDER BY manufacturer"
+                "SELECT DISTINCT manufacturer FROM cameras"
+                " WHERE manufacturer IS NOT NULL"
+                " ORDER BY manufacturer"
             )
             return [row["manufacturer"] for row in cursor.fetchall()]
 
@@ -861,7 +915,9 @@ class CameraDatabase:
         """
         with self._get_connection() as conn:
             cursor = conn.execute(
-                "SELECT DISTINCT device_type FROM cameras WHERE device_type IS NOT NULL ORDER BY device_type"
+                "SELECT DISTINCT device_type FROM cameras"
+                " WHERE device_type IS NOT NULL"
+                " ORDER BY device_type"
             )
             return [row["device_type"] for row in cursor.fetchall()]
 
@@ -1038,33 +1094,61 @@ class CameraDatabase:
 
                 # Recreate triggers
                 conn.execute("""
-                    CREATE TRIGGER cameras_ai AFTER INSERT ON cameras BEGIN
-                        INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
-                        VALUES (new.id, new.name, new.manufacturer, new.code_model, new.ports, new.protocols, new.notes);
+                    CREATE TRIGGER cameras_ai
+                    AFTER INSERT ON cameras BEGIN
+                        INSERT INTO cameras_fts(
+                            rowid, name, manufacturer,
+                            code_model, ports, protocols, notes)
+                        VALUES (
+                            new.id, new.name, new.manufacturer,
+                            new.code_model, new.ports,
+                            new.protocols, new.notes);
                     END
                 """)
 
                 conn.execute("""
-                    CREATE TRIGGER cameras_ad AFTER DELETE ON cameras BEGIN
-                        INSERT INTO cameras_fts(cameras_fts, rowid, name, manufacturer, code_model, ports, protocols, notes)
-                        VALUES ('delete', old.id, old.name, old.manufacturer, old.code_model, old.ports, old.protocols, old.notes);
+                    CREATE TRIGGER cameras_ad
+                    AFTER DELETE ON cameras BEGIN
+                        INSERT INTO cameras_fts(
+                            cameras_fts, rowid, name,
+                            manufacturer, code_model,
+                            ports, protocols, notes)
+                        VALUES (
+                            'delete', old.id, old.name,
+                            old.manufacturer, old.code_model,
+                            old.ports, old.protocols, old.notes);
                     END
                 """)
 
                 conn.execute("""
-                    CREATE TRIGGER cameras_au AFTER UPDATE ON cameras BEGIN
-                        INSERT INTO cameras_fts(cameras_fts, rowid, name, manufacturer, code_model, ports, protocols, notes)
-                        VALUES ('delete', old.id, old.name, old.manufacturer, old.code_model, old.ports, old.protocols, old.notes);
-                        INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
-                        VALUES (new.id, new.name, new.manufacturer, new.code_model, new.ports, new.protocols, new.notes);
+                    CREATE TRIGGER cameras_au
+                    AFTER UPDATE ON cameras BEGIN
+                        INSERT INTO cameras_fts(
+                            cameras_fts, rowid, name,
+                            manufacturer, code_model,
+                            ports, protocols, notes)
+                        VALUES (
+                            'delete', old.id, old.name,
+                            old.manufacturer, old.code_model,
+                            old.ports, old.protocols, old.notes);
+                        INSERT INTO cameras_fts(
+                            rowid, name, manufacturer,
+                            code_model, ports, protocols, notes)
+                        VALUES (
+                            new.id, new.name, new.manufacturer,
+                            new.code_model, new.ports,
+                            new.protocols, new.notes);
                     END
                 """)
                 conn.commit()
 
             # Rebuild from cameras table
             conn.execute("""
-                INSERT INTO cameras_fts(rowid, name, manufacturer, code_model, ports, protocols, notes)
-                SELECT id, name, manufacturer, code_model, ports, protocols, notes
+                INSERT INTO cameras_fts(
+                    rowid, name, manufacturer,
+                    code_model, ports, protocols, notes)
+                SELECT id, name, manufacturer,
+                    code_model, ports, protocols, notes
                 FROM cameras
             """)
             conn.commit()
@@ -1149,7 +1233,10 @@ class CameraDatabase:
                         # Merge arrays
                         merged_ports = list(set(existing.ports + camera.ports))
                         merged_protocols = list(set(existing.protocols + camera.protocols))
-                        merged_controls = list(set(existing.supported_controls + camera.supported_controls))
+                        merged_controls = list(set(
+                            existing.supported_controls
+                            + camera.supported_controls
+                        ))
                         merged_notes = list(set(existing.notes + camera.notes))
 
                         updates = CameraUpdate(
@@ -1160,7 +1247,7 @@ class CameraDatabase:
                             doc_url=camera.doc_url or existing.doc_url,
                             manufacturer_url=camera.manufacturer_url or existing.manufacturer_url,
                         )
-                        self.update_camera(existing.id, updates)
+                        self.update_camera(existing.id, updates)  # type: ignore[arg-type]
                         self.delete_camera(camera.id)
                     else:
                         # Safe to rename
@@ -1219,7 +1306,10 @@ class CameraDatabase:
                 name_lower = c.name.lower()
                 code_lower = code_model.lower()
                 # Higher score = keep this one
-                is_code_name = name_lower == code_lower or name_lower.replace("-", "") == code_lower.replace("-", "")
+                is_code_name = (
+                    name_lower == code_lower
+                    or name_lower.replace("-", "") == code_lower.replace("-", "")
+                )
                 return (
                     0 if is_code_name else 1,  # Prefer non-code names
                     -len(c.name),  # Prefer shorter names
@@ -1261,14 +1351,23 @@ class CameraDatabase:
                     protocols=merged_protocols,
                     supported_controls=merged_controls,
                     notes=merged_notes,
-                    doc_url=keep_camera.doc_url or next((c.doc_url for c in delete_cameras if c.doc_url), None),
-                    manufacturer_url=keep_camera.manufacturer_url or next((c.manufacturer_url for c in delete_cameras if c.manufacturer_url), None),
+                    doc_url=(
+                        keep_camera.doc_url
+                        or next((c.doc_url for c in delete_cameras if c.doc_url), None)
+                    ),
+                    manufacturer_url=(
+                        keep_camera.manufacturer_url
+                        or next(
+                            (c.manufacturer_url for c in delete_cameras if c.manufacturer_url),
+                            None,
+                        )
+                    ),
                 )
-                self.update_camera(keep_camera.id, updates)
+                self.update_camera(keep_camera.id, updates)  # type: ignore[arg-type]
 
                 # Delete duplicates
                 for dup in delete_cameras:
-                    self.delete_camera(dup.id)
+                    self.delete_camera(dup.id)  # type: ignore[arg-type]
                     deleted_count += 1
 
                 logger.info(

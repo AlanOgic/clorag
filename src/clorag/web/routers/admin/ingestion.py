@@ -7,13 +7,12 @@ for ingestion processes.
 import asyncio
 import json
 from collections.abc import AsyncGenerator
-from typing import Annotated, Any
+from typing import Any
 
 import structlog
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
-from starlette.responses import StreamingResponse
-
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from starlette.responses import StreamingResponse
 
 from clorag.web.auth import verify_admin, verify_csrf
 from clorag.web.dependencies import limiter

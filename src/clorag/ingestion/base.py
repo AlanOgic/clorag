@@ -16,7 +16,7 @@ class Document:
     @property
     def source(self) -> str:
         """Get the document source."""
-        return self.metadata.get("source", "unknown")
+        return str(self.metadata.get("source", "unknown"))
 
 
 class BaseIngestionPipeline(ABC):

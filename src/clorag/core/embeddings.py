@@ -96,7 +96,7 @@ class EmbeddingsClient:
         self._dimensions = dimensions or settings.voyage_dimensions
 
         # Initialize Voyage AI async client for non-blocking API calls
-        self._client = voyageai.AsyncClient(api_key=self._api_key)
+        self._client = voyageai.AsyncClient(api_key=self._api_key)  # type: ignore[attr-defined]
 
     @property
     def model(self) -> str:
@@ -145,7 +145,7 @@ class EmbeddingsClient:
         )
 
         # Extract the single embedding from each document result
-        vectors = [doc_result.embeddings[0] for doc_result in result.results]
+        vectors: list[list[float]] = [doc_result.embeddings[0] for doc_result in result.results]  # type: ignore[misc]
 
         return EmbeddingResult(
             vectors=vectors,
@@ -186,7 +186,7 @@ class EmbeddingsClient:
         )
 
         # result.results[0].embeddings[0] = the query embedding
-        embedding = result.results[0].embeddings[0]
+        embedding: list[float] = result.results[0].embeddings[0]  # type: ignore[assignment]
 
         # Cache the result
         if use_cache:
@@ -268,7 +268,7 @@ class EmbeddingsClient:
         # result.results[doc_idx].embeddings[chunk_idx] = vector
         all_embeddings: list[list[list[float]]] = []
         for doc_result in result.results:
-            all_embeddings.append(doc_result.embeddings)
+            all_embeddings.append(doc_result.embeddings)  # type: ignore[arg-type]
 
         return all_embeddings
 

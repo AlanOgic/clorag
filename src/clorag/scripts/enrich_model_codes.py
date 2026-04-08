@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 import anthropic
 import httpx
+from anthropic.types import TextBlock
 
 from clorag.config import get_settings
 from clorag.core.database import get_camera_database
@@ -524,7 +525,12 @@ async def search_enrichment(
             ],
         )
 
-        response_text = llm_response.content[0].text.strip()
+        first_block = llm_response.content[0]
+        response_text = (
+            first_block.text.strip()
+            if isinstance(first_block, TextBlock)
+            else str(first_block)
+        )
 
         # Parse JSON response
         try:
@@ -628,7 +634,8 @@ async def enrich_cameras(
 
     # Initialize clients
     http_client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
-    anthropic_client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value())
+    api_key = settings.anthropic_api_key.get_secret_value()
+    anthropic_client = anthropic.AsyncAnthropic(api_key=api_key)
 
     enriched_count = 0
     processed_count = 0
@@ -641,7 +648,10 @@ async def enrich_cameras(
 
             # Filter cameras needing enrichment (missing code_model or manufacturer_url)
             if enrich_urls:
-                cameras_to_enrich = [c for c in cameras if not c.code_model or not c.manufacturer_url]
+                cameras_to_enrich = [
+                    c for c in cameras
+                    if not c.code_model or not c.manufacturer_url
+                ]
             else:
                 cameras_to_enrich = [c for c in cameras if not c.code_model]
 
@@ -698,7 +708,8 @@ async def enrich_cameras(
                         )
                     else:
                         # Update database
-                        db.update_camera(camera.id, CameraUpdate(**update_data))
+                        assert camera.id is not None
+                        db.update_camera(camera.id, CameraUpdate(**update_data))  # type: ignore[arg-type]
                         logger.info(
                             "Updated camera",
                             camera=camera.name,

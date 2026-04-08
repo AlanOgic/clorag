@@ -9,12 +9,9 @@ import re
 from pathlib import Path
 from uuid import uuid4
 
-from clorag.config import get_settings
 from clorag.core.embeddings import EmbeddingsClient
-from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import VectorStore
 from clorag.ingestion.base import Document
-from clorag.ingestion.chunker import ContentType, SemanticChunker
 from clorag.ingestion.docusaurus import DocusaurusIngestionPipeline
 from clorag.utils.logger import get_logger
 from clorag.utils.text_transforms import apply_product_name_transforms
@@ -161,7 +158,7 @@ class LocalDocsIngestionPipeline(DocusaurusIngestionPipeline):
             if title:
                 title = apply_product_name_transforms(title)
 
-            metadata = {
+            metadata: dict[str, str | list[str]] = {
                 "source": "docusaurus",
                 "url": url,
                 "title": title or path.stem,

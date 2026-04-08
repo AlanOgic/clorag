@@ -465,10 +465,18 @@ class Camera(BaseModel):
     id: int | None = None
     name: str = Field(..., description="Camera model name (e.g., 'HDC-5500')")
     manufacturer: str | None = Field(None, description="Camera manufacturer (e.g., 'Sony')")
-    code_model: str | None = Field(None, description="Official model code from manufacturer (e.g., 'ILME-FX6V')")
-    device_type: DeviceType | None = Field(None, description="Device category (camera_cinema, camera_ptz, lens, etc.)")
-    ports: list[str] = Field(default_factory=list, description="Control ports (RS-422, Ethernet, etc.)")
-    protocols: list[str] = Field(default_factory=list, description="Control protocols (VISCA, Sony RCP, etc.)")
+    code_model: str | None = Field(
+        None, description="Official model code from manufacturer (e.g., 'ILME-FX6V')",
+    )
+    device_type: DeviceType | None = Field(
+        None, description="Device category (camera_cinema, camera_ptz, lens, etc.)",
+    )
+    ports: list[str] = Field(
+        default_factory=list, description="Control ports (RS-422, Ethernet, etc.)",
+    )
+    protocols: list[str] = Field(
+        default_factory=list, description="Control protocols (VISCA, Sony RCP, etc.)",
+    )
     supported_controls: list[str] = Field(
         default_factory=list, description="Supported controls (Iris, Gain, Shutter, etc.)"
     )
@@ -476,7 +484,10 @@ class Camera(BaseModel):
     source: CameraSource = Field(CameraSource.MANUAL, description="Source of the information")
     doc_url: str | None = Field(None, description="Link to documentation page")
     manufacturer_url: str | None = Field(None, description="Link to manufacturer product page")
-    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Extraction confidence score (0-1)")
+    confidence: float = Field(
+        default=1.0, ge=0.0, le=1.0,
+        description="Extraction confidence score (0-1)",
+    )
     needs_review: bool = Field(default=False, description="Flag for human review")
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -522,7 +533,9 @@ class CameraEnrichment(BaseModel):
     specs: dict[str, str] = Field(default_factory=dict, description="Technical specifications")
     features: list[str] = Field(default_factory=list, description="Product features")
     connectivity: list[str] = Field(default_factory=list, description="Connectivity options")
-    remote_control: list[str] = Field(default_factory=list, description="Remote control capabilities")
+    remote_control: list[str] = Field(
+        default_factory=list, description="Remote control capabilities",
+    )
     source_url: str | None = None
 
 

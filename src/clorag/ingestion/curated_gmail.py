@@ -190,8 +190,8 @@ class CuratedGmailPipeline:
         logger.info("Step 5: Building support cases")
         support_cases: list[SupportCase] = []
         for analysis, qc_result in qc_results:
-            doc = doc_by_thread.get(analysis.thread_id)
-            if not doc:
+            thread_doc = doc_by_thread.get(analysis.thread_id)
+            if not thread_doc:
                 continue
 
             # Use anonymized title from QC, falling back to analysis, then original subject
@@ -241,9 +241,9 @@ class CuratedGmailPipeline:
         logger.info("Step 5.5: Storing full documents in SQLite")
         support_case_db = get_support_case_database()
         for case in support_cases:
-            doc = doc_by_thread.get(case.thread_id)
+            doc_or_none = doc_by_thread.get(case.thread_id)
             # Clean raw thread: remove quoted replies and signatures
-            raw_thread = clean_thread_quotes(doc.text) if doc else None
+            raw_thread = clean_thread_quotes(doc_or_none.text) if doc_or_none else None
             support_case_db.upsert_case(case, raw_thread=raw_thread)
         logger.info("Stored support cases in SQLite", count=len(support_cases))
 

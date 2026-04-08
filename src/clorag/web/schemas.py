@@ -160,6 +160,8 @@ class ChunkListItem(BaseModel):
     url: str | None = None
     chunk_index: int | None = None
     source: str | None = None
+    thread_id: str | None = None
+    parent_case_id: str | None = None
 
 
 class ChunkListResponse(BaseModel):

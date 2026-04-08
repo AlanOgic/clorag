@@ -10,7 +10,7 @@ import sys
 
 logging.basicConfig(format="%(message)s", stream=sys.stderr, level=logging.INFO, force=True)
 
-import structlog
+import structlog  # noqa: E402
 
 structlog.configure(
     processors=[
@@ -24,22 +24,22 @@ structlog.configure(
     cache_logger_on_first_use=False,
 )
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator  # noqa: E402
+from contextlib import asynccontextmanager  # noqa: E402
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP  # noqa: E402
 
-from clorag.core.analytics_db import AnalyticsDatabase
-from clorag.core.database import get_camera_database
-from clorag.core.embeddings import EmbeddingsClient
-from clorag.core.reranker import RerankerClient
-from clorag.core.retriever import MultiSourceRetriever
-from clorag.core.sparse_embeddings import SparseEmbeddingsClient
-from clorag.core.support_case_db import get_support_case_database
-from clorag.core.vectorstore import VectorStore
-from clorag.mcp.prompts import register_prompts
-from clorag.mcp.resources import register_resources
-from clorag.mcp.tools import (
+from clorag.core.analytics_db import AnalyticsDatabase  # noqa: E402
+from clorag.core.database import get_camera_database  # noqa: E402
+from clorag.core.embeddings import EmbeddingsClient  # noqa: E402
+from clorag.core.reranker import RerankerClient  # noqa: E402
+from clorag.core.retriever import MultiSourceRetriever  # noqa: E402
+from clorag.core.sparse_embeddings import SparseEmbeddingsClient  # noqa: E402
+from clorag.core.support_case_db import get_support_case_database  # noqa: E402
+from clorag.core.vectorstore import VectorStore  # noqa: E402
+from clorag.mcp.prompts import register_prompts  # noqa: E402
+from clorag.mcp.resources import register_resources  # noqa: E402
+from clorag.mcp.tools import (  # noqa: E402
     register_analytics_tools,
     register_camera_tools,
     register_chunk_tools,
@@ -50,8 +50,8 @@ from clorag.mcp.tools import (
     register_settings_tools,
     register_support_tools,
 )
-from clorag.services.custom_docs import CustomDocumentService
-from clorag.services.prompt_manager import get_prompt_manager
+from clorag.services.custom_docs import CustomDocumentService  # noqa: E402
+from clorag.services.prompt_manager import get_prompt_manager  # noqa: E402
 
 
 class MCPServices:
@@ -193,7 +193,7 @@ def main_http() -> None:
     if settings.mcp_api_key:
         from clorag.mcp.auth import apply_bearer_auth
 
-        app = apply_bearer_auth(app, settings.mcp_api_key.get_secret_value())
+        app = apply_bearer_auth(app, settings.mcp_api_key.get_secret_value())  # type: ignore[assignment]
         structlog.get_logger().info("mcp_http_auth_enabled")
     else:
         structlog.get_logger().warning(

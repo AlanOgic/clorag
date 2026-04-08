@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime
+from typing import Any
 from uuid import uuid4
 
 import anthropic
@@ -226,7 +227,7 @@ class CustomDocumentService:
                 max_tokens=256,
                 messages=[{"role": "user", "content": prompt}],
             )
-            text = response.content[0].text if response.content else "[]"
+            text = response.content[0].text if response.content else "[]"  # type: ignore[union-attr]
             try:
                 keywords = json.loads(text)
             except json.JSONDecodeError:
@@ -322,7 +323,7 @@ class CustomDocumentService:
         """
         # Scroll through chunks incrementally to find unique documents
         # Only fetch first chunks (chunk_index=0) to get document metadata
-        docs_map: dict[str, dict] = {}
+        docs_map: dict[str, dict[str, Any]] = {}
         scroll_offset: str | None = None
         batch_size = 100  # Scroll in batches instead of loading all
 

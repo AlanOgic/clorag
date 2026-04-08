@@ -74,6 +74,7 @@ fix-rio-terminology = "clorag.scripts.fix_rio_terminology:main"
 init-prompts = "clorag.scripts.init_prompts:main"
 init-settings = "clorag.scripts.init_settings:main"
 archive-collection = "clorag.scripts.archive_collection:main"
+backfill-support-cases = "clorag.scripts.backfill_support_cases:main"
 ingest-local-docs = "clorag.scripts.ingest_local_docs:main"
 ingest-legacy-docs = "clorag.scripts.ingest_legacy_docs:main"
 clorag-mcp = "clorag.mcp.server:main"
@@ -96,10 +97,29 @@ select = ["E", "F", "I", "N", "W", "UP"]
 [tool.ruff.lint.per-file-ignores]
 # Prompt content strings are intentionally long
 "src/clorag/services/default_prompts.py" = ["E501"]
+# Imports must come after logging.basicConfig for stdio transport
+"src/clorag/mcp/server.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.10"
 strict = true
+
+[[tool.mypy.overrides]]
+module = [
+    "structlog.*",
+    "fastembed.*",
+    "voyageai.*",
+    "qdrant_client.*",
+    "crawl4ai.*",
+    "google.*",
+    "googleapiclient.*",
+    "google_auth_oauthlib.*",
+    "neo4j.*",
+    "apscheduler.*",
+    "tiktoken.*",
+    "jinja2.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
