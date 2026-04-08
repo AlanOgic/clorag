@@ -282,10 +282,18 @@
             } else {
                 // Gmail cases
                 if (chunk.thread_id) {
-                    metadataItems.push({ label: 'Thread ID', value: chunk.thread_id });
+                    metadataItems.push({
+                        label: 'Thread ID',
+                        value: `<a href="/admin/chunks?collection=gmail_cases&thread_id=${encodeURIComponent(chunk.thread_id)}">${escapeHtml(chunk.thread_id)}</a>`,
+                        isHtml: true
+                    });
                 }
                 if (chunk.parent_case_id) {
-                    metadataItems.push({ label: 'Parent Case ID', value: chunk.parent_case_id });
+                    metadataItems.push({
+                        label: 'Parent Case',
+                        value: `<a href="/admin/support-cases#view=${encodeURIComponent(chunk.parent_case_id)}">${escapeHtml(chunk.parent_case_id)}</a>`,
+                        isHtml: true
+                    });
                 }
                 if (chunk.category) {
                     metadataItems.push({ label: 'Category', value: chunk.category });

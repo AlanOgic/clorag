@@ -68,6 +68,17 @@
             background: #fee;
         }
 
+        .btn-edit {
+            background: #f8f9fa;
+            color: var(--cyan-dark);
+            border: 1px solid #ddd;
+            text-decoration: none;
+        }
+
+        .btn-edit:hover {
+            background: #e8f4fd;
+        }
+
         /* Page-specific: Cases table */
         .cases-table {
             width: 100%;
@@ -382,6 +393,7 @@
             </div>
 
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                <a id="modalChunksLink" href="#" class="btn btn-edit" target="_blank">View Chunks</a>
                 <button class="btn btn-delete" onclick="deleteCase(currentCaseId)">Delete Case</button>
                 <button class="btn btn-secondary" onclick="closeModal()">Close</button>
             </div>
@@ -512,6 +524,7 @@
                         <td>${c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}</td>
                         <td class="actions">
                             <button class="btn btn-sm btn-view" onclick="viewCase('${c.id}')">View</button>
+                            <a href="/admin/chunks?collection=gmail_cases&thread_id=${encodeURIComponent(c.thread_id)}" class="btn btn-sm btn-edit" title="View related chunks">Chunks</a>
                         </td>
                     </tr>
                 `).join('');
@@ -610,6 +623,10 @@
                 document.querySelector('.modal-tab[data-tab="summary"]').classList.add('active');
                 document.getElementById('tab-summary').classList.add('active');
 
+                // Set chunks cross-reference link
+                document.getElementById('modalChunksLink').href =
+                    `/admin/chunks?collection=gmail_cases&thread_id=${encodeURIComponent(c.thread_id)}`;
+
                 document.getElementById('caseModal').classList.add('active');
             } catch (error) {
                 showAlert('Failed to load case: ' + error.message, 'error');
@@ -691,9 +708,15 @@
         });
 
         // Initialize
-        checkSession().then(() => {
+        checkSession().then(async () => {
             loadStats();
-            loadCases();
+            await loadCases();
+            // Auto-open case from URL hash (e.g. #view=case_id)
+            const hash = window.location.hash;
+            if (hash.startsWith('#view=')) {
+                const caseId = hash.substring(6);
+                if (caseId) viewCase(caseId);
+            }
         });
     </script>
 </body>

@@ -27,10 +27,41 @@ async def api_chunks_list(
     limit: int = 20,
     offset: str | None = None,
     search: str | None = None,
+    thread_id: str | None = None,
     _: bool = Depends(verify_admin),
 ) -> ChunkListResponse:
-    """List chunks with pagination and optional text search."""
+    """List chunks with pagination and optional text search or field filter."""
     vs = get_vectorstore()
+
+    # If thread_id filter provided, use field-based scroll
+    if thread_id:
+        raw_chunks, next_off = await vs.scroll_chunks(
+            collection=collection.value,
+            limit=limit,
+            offset=offset,
+            filter_conditions={"thread_id": thread_id},
+        )
+
+        chunks = [
+            ChunkListItem(
+                id=c["id"],
+                collection=collection.value,
+                text_preview=(
+                    c["payload"].get("text", "")[:200] + "..."
+                    if len(c["payload"].get("text", "")) > 200
+                    else c["payload"].get("text", "")
+                ),
+                title=c["payload"].get("title"),
+                subject=c["payload"].get("subject"),
+                url=c["payload"].get("url"),
+                chunk_index=c["payload"].get("chunk_index"),
+                source=c["payload"].get("source"),
+                thread_id=c["payload"].get("thread_id"),
+                parent_case_id=c["payload"].get("parent_case_id"),
+            )
+            for c in raw_chunks
+        ]
+        return ChunkListResponse(chunks=chunks, next_offset=next_off, total=len(chunks))
 
     # If search query provided, use hybrid search
     if search:
@@ -54,6 +85,8 @@ async def api_chunks_list(
                 url=r.payload.get("url"),
                 chunk_index=r.payload.get("chunk_index"),
                 source=r.payload.get("source"),
+                thread_id=r.payload.get("thread_id"),
+                parent_case_id=r.payload.get("parent_case_id"),
             )
             for r in results
         ]
@@ -80,6 +113,8 @@ async def api_chunks_list(
             url=c["payload"].get("url"),
             chunk_index=c["payload"].get("chunk_index"),
             source=c["payload"].get("source"),
+            thread_id=c["payload"].get("thread_id"),
+            parent_case_id=c["payload"].get("parent_case_id"),
         )
         for c in raw_chunks
     ]

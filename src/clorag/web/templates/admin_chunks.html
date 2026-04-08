@@ -128,6 +128,37 @@
             background: #fee;
         }
 
+        .btn-view {
+            background: #e8f4fd;
+            color: var(--cyan-dark);
+            border: 1px solid #d0e8f8;
+            text-decoration: none;
+        }
+
+        .btn-view:hover {
+            background: #d0e8f8;
+        }
+
+        .filter-banner {
+            display: none;
+            padding: 0.75rem 1rem;
+            background: #e8f4fd;
+            border: 1px solid #d0e8f8;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filter-banner.visible {
+            display: flex;
+        }
+
+        .filter-banner a {
+            margin-left: auto;
+            color: var(--cyan-dark);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .chunks-table {
@@ -187,7 +218,13 @@
                 <option value="gmail_cases">Support Cases</option>
             </select>
             <button class="btn btn-primary" onclick="searchChunks()">Search</button>
-            <button class="btn btn-secondary" onclick="loadChunks()">Browse All</button>
+            <button class="btn btn-secondary" onclick="clearFilter()">Browse All</button>
+        </div>
+
+        <!-- Thread filter banner -->
+        <div class="filter-banner" id="filterBanner">
+            <span>Filtered by thread: <strong id="filterThreadDisplay"></strong></span>
+            <a href="/admin/chunks">Clear filter</a>
         </div>
 
         <!-- Table -->
@@ -221,6 +258,7 @@
         let currentOffset = null;
         let currentCollection = 'docusaurus_docs';
         let isSearchMode = false;
+        let filterThreadId = null;
 
         // Check session on load
         async function checkSession() {
@@ -269,6 +307,9 @@
                 let url = `/api/admin/chunks?collection=${currentCollection}&limit=20`;
                 if (currentOffset) {
                     url += `&offset=${currentOffset}`;
+                }
+                if (filterThreadId) {
+                    url += `&thread_id=${encodeURIComponent(filterThreadId)}`;
                 }
 
                 const response = await fetch(url, { credentials: 'include' });
@@ -347,6 +388,11 @@
                     previewHtml += `<a href="${escapeHtml(chunk.url)}" target="_blank" class="chunk-preview__link" title="${escapeHtml(chunk.url)}">${escapeHtml(chunk.url)}</a>`;
                 }
 
+                // Build case link for gmail_cases chunks
+                const caseLink = (chunk.collection === 'gmail_cases' && chunk.parent_case_id)
+                    ? `<a href="/admin/support-cases#view=${chunk.parent_case_id}" class="btn btn-sm btn-view" title="View parent support case">Case</a>`
+                    : '';
+
                 row.innerHTML = `
                     <td><span class="chunk-id" title="${chunk.id}">${chunk.id.substring(0, 8)}...</span></td>
                     <td><span class="chunk-title">${escapeHtml(displayTitle)}</span></td>
@@ -354,6 +400,7 @@
                     <td>${collectionTag}</td>
                     <td>
                         <div class="actions">
+                            ${caseLink}
                             <a href="/admin/chunks/${chunk.collection}/${chunk.id}" class="btn btn-sm btn-edit">Edit</a>
                             <button class="btn btn-sm btn-delete" onclick="deleteChunk('${chunk.collection}', '${chunk.id}')">Delete</button>
                         </div>
@@ -410,7 +457,31 @@
             }
         });
 
+        // Initialize from URL params
+        function initFromUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const col = params.get('collection');
+            if (col) {
+                document.getElementById('collectionFilter').value = col;
+                currentCollection = col;
+            }
+            filterThreadId = params.get('thread_id');
+            if (filterThreadId) {
+                const banner = document.getElementById('filterBanner');
+                banner.classList.add('visible');
+                document.getElementById('filterThreadDisplay').textContent = filterThreadId;
+            }
+        }
+
+        function clearFilter() {
+            filterThreadId = null;
+            document.getElementById('filterBanner').classList.remove('visible');
+            window.history.replaceState({}, '', '/admin/chunks');
+            loadChunks();
+        }
+
         // Initialize
+        initFromUrlParams();
         checkSession().then(() => {
             loadStats();
             loadChunks();
