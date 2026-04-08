@@ -43,8 +43,15 @@ token_drafts.json
 # Scraped site data
 cyanview-web/
 
-# Superpowers plans/specs (local working docs)
+# Superpowers artifacts
 docs/superpowers/
+.superpowers/
+
+# Benchmarks (local reports)
+benchmarks/
+
+# Sensitive config docs
+odoo-mcp-*-config.md
 
 # Logs
 *.log
