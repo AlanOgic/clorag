@@ -111,6 +111,11 @@
                         <li><a href="#analytics" class="docs-nav__link">Analytics</a></li>
                         <li><a href="#performance" class="docs-nav__link">Performance Monitoring</a></li>
                         <li><a href="#dark-mode" class="docs-nav__link">Dark Mode</a></li>
+                        <li><a href="#answer-export" class="docs-nav__link">Answer Export</a></li>
+                        <li><a href="#feedback" class="docs-nav__link">User Feedback</a></li>
+                        <li><a href="#grounding" class="docs-nav__link">Conversation Grounding</a></li>
+                        <li><a href="#messages" class="docs-nav__link">Messages</a></li>
+                        <li><a href="#legacy" class="docs-nav__link">Legacy Docs</a></li>
                     </ul>
                 </div>
             </nav>
@@ -523,6 +528,53 @@ GET /api/admin/metrics/recent/{metric_name}?count=10</code></pre>
                     <li><strong>Running badges</strong> &mdash; Pulse animation for active ingestion jobs</li>
                 </ul>
                 <p>All animations are disabled when the user has <code>prefers-reduced-motion: reduce</code> set in their OS accessibility settings.</p>
+
+                <h2 id="answer-export">Answer Export</h2>
+                <p>Users can export AI responses in multiple formats directly from the search results:</p>
+                <ul>
+                    <li><strong>Markdown</strong> &mdash; Original formatted response with source links</li>
+                    <li><strong>Plain Text</strong> &mdash; Stripped formatting for pasting into emails or tickets</li>
+                    <li><strong>HTML</strong> &mdash; Rendered HTML for sharing or embedding</li>
+                    <li><strong>PDF</strong> &mdash; Downloadable document for offline use or printing</li>
+                </ul>
+
+                <h2 id="feedback">User Feedback</h2>
+                <p>Thumbs up/down buttons appear on every AI answer after streaming completes:</p>
+                <ul>
+                    <li><strong>Thumbs up</strong> &mdash; One-click positive feedback</li>
+                    <li><strong>Thumbs down</strong> &mdash; Opens optional text field for "What could be improved?"</li>
+                    <li><strong>Upsert logic</strong> &mdash; One vote per search (linked via <code>search_id</code>), can change your vote</li>
+                    <li><strong>Rate limited</strong> &mdash; 10 submissions per minute</li>
+                </ul>
+                <p>Admin dashboard at <a href="/admin/analytics">/admin/analytics</a> shows satisfaction rate, total feedback count, and recent feedback with comments.</p>
+
+                <h2 id="grounding">Conversation Grounding</h2>
+                <p>Multi-turn conversations use a strict grounding protocol to prevent answer contamination:</p>
+                <ul>
+                    <li><strong>Intent resolution</strong> &mdash; History helps resolve follow-up intent (e.g., "and the FX6?" &rarr; "connect the FX6")</li>
+                    <li><strong>Fact isolation</strong> &mdash; Each answer is grounded exclusively in the current retrieved context &mdash; facts from previous answers are never mixed in</li>
+                    <li><strong>Enforcement</strong> &mdash; Message-level separator between history and new question, plus <code>&lt;conversation_grounding&gt;</code> rule in the synthesis prompt</li>
+                </ul>
+
+                <h2 id="messages">Admin Messages</h2>
+                <p>Admin-managed announcements displayed on the public index page in a collapsible "Latest Updates" panel:</p>
+                <ul>
+                    <li><strong>4 types</strong> &mdash; Info (blue), Warning (orange), Feature (green), Fix (red)</li>
+                    <li><strong>Expiration</strong> &mdash; Auto-hides expired messages, panel hidden when 0 active</li>
+                    <li><strong>Admin CRUD</strong> &mdash; Manage at <a href="/admin/messages">/admin/messages</a></li>
+                </ul>
+
+                <h2 id="legacy">Legacy Docs System</h2>
+                <p>A completely independent RAG system for the legacy documentation site at <code>support.cyanview.com</code>:</p>
+                <ul>
+                    <li><strong>Separate collection</strong> &mdash; <code>docusaurus_docs_legacy</code> has no interaction with the main 3 collections</li>
+                    <li><strong>Public search</strong> &mdash; <a href="/legacy">/legacy</a> with streaming Claude synthesis, source links to <code>.com</code> (no URL rewriting)</li>
+                    <li><strong>Admin management</strong> &mdash; <a href="/legacy/manage">/legacy/manage</a> (password-protected) for sitemap scanning, single-page ingest, full re-crawl</li>
+                    <li><strong>Help page</strong> &mdash; <a href="/legacy/help">/legacy/help</a> with usage documentation</li>
+                    <li><strong>Local markdown ingestion</strong> &mdash; <code>uv run ingest-legacy-docs</code> reads Docusaurus <code>.md</code> sources directly</li>
+                    <li><strong>No text transforms</strong> &mdash; Legacy content preserves original terminology (e.g., "RIO-Live" stays as-is)</li>
+                    <li><strong>Brown theme</strong> &mdash; Visual distinction from the main blue CLORAG UI</li>
+                </ul>
 
                 <div class="page-nav">
                     <a href="/admin/docs/content" class="page-nav__link">

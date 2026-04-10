@@ -108,6 +108,7 @@
                         <li><a href="#gmail" class="docs-nav__link">Gmail Pipeline</a></li>
                         <li><a href="#incremental" class="docs-nav__link">Incremental Ingestion</a></li>
                         <li><a href="#embedding-flow" class="docs-nav__link">Embedding Flow</a></li>
+                        <li><a href="#legacy" class="docs-nav__link">Legacy Docs</a></li>
                     </ul>
                 </div>
             </nav>
@@ -129,23 +130,28 @@
 │    FETCH      │────▶│  (primary)    │────▶│  EXTRACTION   │
 │  sitemap.xml  │     │ + BS4 fallback│     │   markdown    │
 └───────────────┘     └───────────────┘     └───────────────┘
-                                                    │
-        ┌───────────────────────────────────────────┘
+        │
         ▼
 ┌───────────────┐     ┌───────────────┐     ┌───────────────┐
-│    TEXT       │     │    DENSE      │     │    SPARSE     │
-│   CHUNKING    │────▶│  EMBEDDINGS   │────▶│  EMBEDDINGS   │
-│  1000 chars   │     │ voyage-ctx-3  │     │     BM25      │
+│    TEXT       │     │   KEYWORD     │     │ RIO TERM FIX  │
+│   CHUNKING    │────▶│  EXTRACTION   │────▶│  (pre-embed)  │
+│ token-based   │     │ Claude Sonnet │     │  auto-apply   │
 └───────────────┘     └───────────────┘     └───────────────┘
-                                                    │
-        ┌───────────────────────────────────────────┘
+        │
         ▼
-┌───────────────┐     ┌───────────────┐
-│    QDRANT     │     │    CAMERA     │
-│    UPSERT     │────▶│  EXTRACTION   │
-│ docusaurus_   │     │ Claude Sonnet  │
-│    docs       │     └───────────────┘
-└───────────────┘</code></pre>
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│    DENSE      │     │    SPARSE     │     │    QDRANT     │
+│  EMBEDDINGS   │────▶│  EMBEDDINGS   │────▶│    UPSERT     │
+│ voyage-ctx-3  │     │     BM25      │     │ docusaurus_   │
+└───────────────┘     └───────────────┘     │    docs       │
+                                            └───────────────┘
+                                                    │
+                                                    ▼
+                                            ┌───────────────┐
+                                            │    CAMERA     │
+                                            │  EXTRACTION   │
+                                            │ Claude Sonnet │
+                                            └───────────────┘</code></pre>
 
                 <table>
                     <tr><th>Stage</th><th>Description</th><th>Output</th></tr>
@@ -166,8 +172,18 @@
                     </tr>
                     <tr>
                         <td>4. Text Chunking</td>
-                        <td>Split into 1000-char chunks with 100-char overlap</td>
+                        <td>Token-based chunking via <code>tiktoken</code> (cl100k_base). Docs: 450 tokens, cases: 350, default: 400. Adaptive threshold: short content (&lt;200 tokens) stays as single chunk. Code blocks, tables, and headings preserved as atomic units.</td>
                         <td>Document chunks</td>
+                    </tr>
+                    <tr>
+                        <td>4.5. Keyword Extraction</td>
+                        <td>Claude Sonnet extracts 5-10 technical keywords per page. Runs in parallel (10 concurrent). Samples first 2000 + last 2000 chars for full page coverage. Keywords stored on all chunks of the page.</td>
+                        <td>Keywords per chunk</td>
+                    </tr>
+                    <tr>
+                        <td>4.6. RIO Terminology Fixes</td>
+                        <td>High-confidence fixes (&ge;0.85) auto-applied before embedding. Legacy terms like "RIO-Live" normalized to "RIO +LAN". Configurable via <code>RIO_FIX_ON_INGEST</code> (default: true) and <code>RIO_FIX_MIN_CONFIDENCE</code> (default: 0.85).</td>
+                        <td>Corrected text</td>
                     </tr>
                     <tr>
                         <td>5. Dense Embeddings</td>
@@ -318,6 +334,26 @@ uv run ingest-curated --offset 600 --max-threads 300</code></pre>
                         <td>Reciprocal Rank Fusion combines both at query time</td>
                     </tr>
                 </table>
+
+                <h2 id="legacy">Legacy Docs Ingestion</h2>
+                <p>A separate ingestion pipeline for the legacy documentation site (<code>support.cyanview.com</code>), completely independent from the main CLORAG search engine.</p>
+
+                <h3>Local Markdown Ingestion</h3>
+                <p>Command: <code>uv run ingest-legacy-docs [path] --fresh</code></p>
+                <p>Reads <code>.md</code> files directly from Docusaurus source directories, reconstructs URLs from file paths, and stores in the <code>docusaurus_docs_legacy</code> collection. Preserves original text &mdash; no RIO terminology transforms are applied.</p>
+
+                <h3>Live Site Ingestion</h3>
+                <p>Available via the <a href="/legacy/manage">Legacy Manage</a> admin page:</p>
+                <ul>
+                    <li><strong>Scan Sitemap</strong> &mdash; Compares live sitemap against indexed URLs, shows new pages for batch ingestion</li>
+                    <li><strong>Ingest Page</strong> &mdash; Ingest a single page by URL using Jina Reader + keyword extraction</li>
+                    <li><strong>Full Re-ingest</strong> &mdash; Re-crawl entire site using the standard Docusaurus pipeline</li>
+                </ul>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">No Text Transforms</div>
+                    <p>Legacy ingestion preserves original terminology (e.g., "RIO-Live" stays as-is). This is intentional &mdash; the legacy docs are for reviewing and updating the existing production documentation, not the new site.</p>
+                </div>
 
                 <div class="page-nav">
                     <a href="/admin/docs/retrieval" class="page-nav__link">

@@ -129,6 +129,8 @@
                         <li><a href="#tools-chunks" class="docs-nav__link">Chunk Tools</a></li>
                         <li><a href="#tools-ingestion" class="docs-nav__link">Ingestion Tools</a></li>
                         <li><a href="#tools-prompts" class="docs-nav__link">Prompt Tools</a></li>
+                        <li><a href="#tools-settings" class="docs-nav__link">Settings Tools</a></li>
+                        <li><a href="#tools-analytics" class="docs-nav__link">Analytics Tools</a></li>
                         <li><a href="#resources" class="docs-nav__link">Resources</a></li>
                         <li><a href="#templates" class="docs-nav__link">Resource Templates</a></li>
                         <li><a href="#prompts" class="docs-nav__link">Prompts</a></li>
@@ -144,7 +146,7 @@
                 <p>
                     The CLORAG MCP (Model Context Protocol) server exposes the full RAG knowledge base to
                     AI assistants like Claude Desktop, Claude Code, and any MCP-compatible client. It provides
-                    <strong>33 tools</strong>, <strong>8 resources</strong>, <strong>5 resource templates</strong>,
+                    <strong>39 tools</strong>, <strong>1 resource</strong>, <strong>1 resource template</strong>,
                     and <strong>6 prompt templates</strong> for searching, managing, and ingesting Cyanview support data.
                 </p>
 
@@ -162,9 +164,9 @@
                         <tr><th>Type</th><th>Count</th><th>Description</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td><span class="badge badge--tool">Tools</span></td><td>33</td><td>Actions: search, CRUD, ingestion, prompts, maintenance</td></tr>
-                        <tr><td><span class="badge badge--resource">Resources</span></td><td>8</td><td>Static data: stats, products, categories, prompts, search quality</td></tr>
-                        <tr><td><span class="badge badge--template">Templates</span></td><td>5</td><td>Parameterized: camera, document, case, prompt by key/versions</td></tr>
+                        <tr><td><span class="badge badge--tool">Tools</span></td><td>39</td><td>Actions: search, CRUD, ingestion, prompts, settings, analytics</td></tr>
+                        <tr><td><span class="badge badge--resource">Resources</span></td><td>1</td><td>Static data: product ecosystem reference</td></tr>
+                        <tr><td><span class="badge badge--template">Templates</span></td><td>1</td><td>Parameterized: prompt version history</td></tr>
                         <tr><td><span class="badge badge--prompt">Prompts</span></td><td>6</td><td>Guided workflows: troubleshoot, compare, integrate</td></tr>
                     </tbody>
                 </table>
@@ -219,6 +221,39 @@ services:
                     </tbody>
                 </table>
 
+                <h3>HTTP Transport Authentication</h3>
+                <p>The HTTP transport requires Bearer token authentication via <code>MCP_API_KEY</code>:</p>
+                <pre><code># Production
+MCP_API_KEY=your_secret_key uv run clorag-mcp-http
+# Accessible at https://mcp.cyanview.cloud/ (Docker 8086→8080)
+
+# Docker secret support
+# Key loaded from /run/secrets/mcp_api_key if file exists</code></pre>
+
+                <h3>Claude Desktop Configuration</h3>
+                <pre><code>// stdio (local)
+{
+  "mcpServers": {
+    "clorag": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/clorag", "run", "clorag-mcp"]
+    }
+  }
+}
+
+// HTTP (remote)
+{
+  "mcpServers": {
+    "clorag": {
+      "type": "streamable-http",
+      "url": "https://mcp.cyanview.cloud/mcp",
+      "headers": {
+        "Authorization": "Bearer your_mcp_api_key"
+      }
+    }
+  }
+}</code></pre>
+
                 <!-- ==================== TOOLS: SEARCH ==================== -->
                 <h2 id="tools-search">Search Tools</h2>
                 <p>Hybrid RAG search across all three vector collections with RRF fusion and Voyage reranking.</p>
@@ -234,32 +269,6 @@ services:
                         <code>query</code>: str &middot;
                         <code>source</code>: "docs" | "cases" | "custom" | "both" &middot;
                         <code>limit</code>: 1-20
-                    </div>
-                </div>
-
-                <div class="tool-card">
-                    <div class="tool-card__header">
-                        <span class="badge badge--tool">Tool</span>
-                        <span class="badge badge--async">async</span>
-                        <span class="tool-card__name">search_docs</span>
-                    </div>
-                    <div class="tool-card__desc">Search official Docusaurus documentation only. Best for product features, how-to guides, and specs.</div>
-                    <div class="tool-card__params">
-                        <code>query</code>: str &middot;
-                        <code>limit</code>: 1-10
-                    </div>
-                </div>
-
-                <div class="tool-card">
-                    <div class="tool-card__header">
-                        <span class="badge badge--tool">Tool</span>
-                        <span class="badge badge--async">async</span>
-                        <span class="tool-card__name">search_cases</span>
-                    </div>
-                    <div class="tool-card__desc">Search past Gmail support cases. Best for similar issues, resolutions, and real-world examples.</div>
-                    <div class="tool-card__params">
-                        <code>query</code>: str &middot;
-                        <code>limit</code>: 1-10
                     </div>
                 </div>
 
@@ -362,15 +371,6 @@ services:
                     </div>
                     <div class="tool-card__desc">Get full content and metadata of a custom document.</div>
                     <div class="tool-card__params"><code>doc_id</code>: str (UUID)</div>
-                </div>
-
-                <div class="tool-card">
-                    <div class="tool-card__header">
-                        <span class="badge badge--tool">Tool</span>
-                        <span class="badge badge--async">async</span>
-                        <span class="tool-card__name">get_document_categories</span>
-                    </div>
-                    <div class="tool-card__desc">Get all 10 available document categories.</div>
                 </div>
 
                 <!-- ==================== TOOLS: SUPPORT ==================== -->
@@ -703,6 +703,24 @@ services:
                 </div>
 
                 <!-- ==================== RESOURCES ==================== -->
+                <h2 id="tools-settings">Settings Tools</h2>
+                <p>Manage RAG tuning parameters at runtime:</p>
+                <table>
+                    <tr><th>Tool</th><th>Description</th></tr>
+                    <tr><td><code>list_settings</code></td><td>List all settings, optionally filtered by category</td></tr>
+                    <tr><td><code>get_setting</code></td><td>Get a setting by key with current value and metadata</td></tr>
+                    <tr><td><code>update_setting</code></td><td>Update a setting value (creates version for audit)</td></tr>
+                    <tr><td><code>rollback_setting</code></td><td>Rollback a setting to a specific version</td></tr>
+                </table>
+
+                <h2 id="tools-analytics">Analytics Tools</h2>
+                <p>Access search quality and usage analytics:</p>
+                <table>
+                    <tr><th>Tool</th><th>Description</th></tr>
+                    <tr><td><code>get_search_quality</code></td><td>Get low-scoring searches for quality review</td></tr>
+                    <tr><td><code>get_search_stats</code></td><td>Get search usage statistics for a given period</td></tr>
+                </table>
+
                 <h2 id="resources">Resources</h2>
                 <p>Static data readable by MCP clients. Updated on each access.</p>
 
@@ -712,13 +730,6 @@ services:
                     </thead>
                     <tbody>
                         <tr><td><code>clorag://products</code></td><td>Cyanview product catalog: RCP, RIO, CI0, VP4, NIO, RSBM with variants and features</td></tr>
-                        <tr><td><code>clorag://categories</code></td><td>Available document categories (10 categories with labels)</td></tr>
-                        <tr><td><code>clorag://stats</code></td><td>System stats: camera totals, support case totals, source distribution</td></tr>
-                        <tr><td><code>clorag://camera-stats</code></td><td>Camera database: counts, manufacturers, device types, ports, protocols</td></tr>
-                        <tr><td><code>clorag://support-stats</code></td><td>Support cases: totals by category, product, resolution quality</td></tr>
-                        <tr><td><code>clorag://prompts</code></td><td>All LLM prompts with metadata, source (database or default), and variable counts</td></tr>
-                        <tr><td><code>clorag://search-quality</code></td><td>Recent low-quality searches (avg score &lt; 0.3) for review and improvement</td></tr>
-                        <tr><td><code>clorag://search-stats</code></td><td>Search analytics: total queries, response times, popular queries, daily trends</td></tr>
                     </tbody>
                 </table>
 
@@ -731,10 +742,6 @@ services:
                         <tr><th>URI Template</th><th>Parameter</th><th>Description</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td><code>clorag://camera/{camera_id}</code></td><td>int</td><td>Full camera details with ports, protocols, compatibility notes</td></tr>
-                        <tr><td><code>clorag://document/{doc_id}</code></td><td>str (UUID)</td><td>Full custom document content and metadata</td></tr>
-                        <tr><td><code>clorag://support-case/{case_id}</code></td><td>str</td><td>Full support case with document and summaries</td></tr>
-                        <tr><td><code>clorag://prompt/{key}</code></td><td>str</td><td>Prompt content and metadata by key (e.g. <code>base.system_prompt</code>, <code>synthesis.web_layer</code>)</td></tr>
                         <tr><td><code>clorag://prompt/{prompt_id}/versions</code></td><td>str (UUID)</td><td>Version history of a prompt (newest first)</td></tr>
                     </tbody>
                 </table>
@@ -821,7 +828,7 @@ services:
   prompts.py           # 6 prompt templates
   tools/
     __init__.py        # Registration exports
-    search.py          # search, search_docs, search_cases
+    search.py          # search
     cameras.py         # search/get/list/compare/related cameras
     documents.py       # list/get documents, categories
     support.py         # search/get/list cases, raw thread, stats

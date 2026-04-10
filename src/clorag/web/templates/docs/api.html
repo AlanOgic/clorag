@@ -121,6 +121,13 @@
                         <li><a href="#analytics-api" class="docs-nav__link">Analytics API</a></li>
                         <li><a href="#draft-api" class="docs-nav__link">Draft API</a></li>
                         <li><a href="#openai-api" class="docs-nav__link">OpenAI-Compatible API</a></li>
+                        <li><a href="#feedback-api" class="docs-nav__link">Feedback API</a></li>
+                        <li><a href="#messages-api" class="docs-nav__link">Messages API</a></li>
+                        <li><a href="#prompts-api" class="docs-nav__link">Prompts API</a></li>
+                        <li><a href="#settings-api" class="docs-nav__link">Settings API</a></li>
+                        <li><a href="#terminology-api" class="docs-nav__link">Terminology API</a></li>
+                        <li><a href="#ingestion-api" class="docs-nav__link">Ingestion API</a></li>
+                        <li><a href="#legacy-api" class="docs-nav__link">Legacy API</a></li>
                         <li><a href="#errors" class="docs-nav__link">Error Handling</a></li>
                     </ul>
                 </div>
@@ -490,6 +497,217 @@ print(response.choices[0].message.content)</code></pre>
                     <div class="info-box__title">Accepted but Ignored Parameters</div>
                     <p><code>temperature</code>, <code>top_p</code>, <code>max_tokens</code>, <code>max_completion_tokens</code>, <code>frequency_penalty</code>, <code>presence_penalty</code>, <code>n</code>, and <code>user</code> are accepted without error but have no effect — CLORAG controls its own RAG synthesis parameters.</p>
                 </div>
+
+                <h2 id="feedback-api">Feedback API</h2>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/feedback</span>
+                </div>
+                <p>Submit thumbs up/down feedback for a search result. Rate-limited to 10/minute. Upserts per <code>search_id</code>.</p>
+                <pre><code>{
+  "search_id": "uuid-from-search-response",
+  "rating": "up",       // "up" or "down"
+  "comment": "optional improvement suggestion"
+}</code></pre>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/feedback-stats</span>
+                </div>
+                <p>Get feedback statistics: satisfaction rate, total count, up/down breakdown.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/feedback/recent?limit=20</span>
+                </div>
+                <p>Get recent feedback entries with comments.</p>
+
+                <h2 id="messages-api">Messages API</h2>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/messages</span>
+                </div>
+                <p>Public endpoint. Get active (non-expired) messages for display on the index page.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/messages</span>
+                </div>
+                <p>List all messages including expired. Admin auth required.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/messages</span>
+                </div>
+                <p>Create a new message. Types: <code>info</code>, <code>warning</code>, <code>feature</code>, <code>fix</code>.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--put">PUT</span>
+                    <span class="endpoint__path">/api/admin/messages/{message_id}</span>
+                </div>
+                <p>Update an existing message.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--delete">DELETE</span>
+                    <span class="endpoint__path">/api/admin/messages/{message_id}</span>
+                </div>
+                <p>Delete a message.</p>
+
+                <h2 id="prompts-api">Prompts API</h2>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/prompts</span>
+                </div>
+                <p>List all LLM prompts. Optional query param: <code>category</code>.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/prompts/{key}</span>
+                </div>
+                <p>Get a prompt by key (e.g., <code>base.system_prompt</code>).</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/prompts/{key}/versions</span>
+                </div>
+                <p>Get version history for a prompt.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--put">PUT</span>
+                    <span class="endpoint__path">/api/admin/prompts/{key}</span>
+                </div>
+                <p>Update prompt content. Creates a new version automatically.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/prompts/{key}/rollback</span>
+                </div>
+                <p>Rollback a prompt to a specific version.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/prompts/reload</span>
+                </div>
+                <p>Clear prompt cache and reload from database.</p>
+
+                <h2 id="settings-api">Settings API</h2>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/settings</span>
+                </div>
+                <p>List all RAG settings. Optional query param: <code>category</code>.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/settings/{key}</span>
+                </div>
+                <p>Get a setting by key (e.g., <code>retrieval.short_query_threshold</code>).</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--put">PUT</span>
+                    <span class="endpoint__path">/api/admin/settings/{key}</span>
+                </div>
+                <p>Update a setting value. Creates a new version for audit trail.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/settings/{key}/rollback</span>
+                </div>
+                <p>Rollback a setting to a specific version.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/settings/reload</span>
+                </div>
+                <p>Clear settings cache and reload from database.</p>
+
+                <h2 id="terminology-api">Terminology API</h2>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/terminology</span>
+                </div>
+                <p>List RIO terminology fix suggestions. Query params: <code>status</code>, <code>limit</code>, <code>offset</code>.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/terminology/stats</span>
+                </div>
+                <p>Get fix statistics by status (pending, approved, rejected, applied).</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/terminology/scan</span>
+                </div>
+                <p>Scan chunks for RIO terminology issues. Returns new suggestions.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/terminology/apply</span>
+                </div>
+                <p>Apply approved fixes to chunks. Re-embeds affected chunks with document context.</p>
+
+                <h2 id="ingestion-api">Ingestion API</h2>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/ingestion/job-types</span>
+                </div>
+                <p>List available ingestion job types with descriptions and parameters.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/admin/ingestion/start</span>
+                </div>
+                <p>Start an ingestion job. Returns job ID for status polling.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/ingestion/jobs</span>
+                </div>
+                <p>List ingestion job history with status and timing.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/ingestion/status</span>
+                </div>
+                <p>Get current running job status.</p>
+
+                <h2 id="legacy-api">Legacy API</h2>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/legacy/search/stream</span>
+                </div>
+                <p>Public endpoint. Streaming search against the legacy docs collection. SSE format.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/legacy/stats</span>
+                </div>
+                <p>Get legacy collection statistics (document count, etc.).</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/legacy/scan</span>
+                </div>
+                <p>Scan legacy site sitemap for new pages not yet indexed. Admin auth required.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/legacy/ingest-page</span>
+                </div>
+                <p>Ingest a single legacy page by URL. Admin auth required.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--post">POST</span>
+                    <span class="endpoint__path">/api/legacy/reingest-full</span>
+                </div>
+                <p>Full re-crawl and re-ingest of the legacy site. Admin auth required. Exempt from 60s timeout.</p>
 
                 <h2 id="errors">Error Handling</h2>
                 <table>

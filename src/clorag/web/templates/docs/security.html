@@ -111,6 +111,8 @@
                         <li><a href="#anonymization" class="docs-nav__link">Data Anonymization</a></li>
                         <li><a href="#oauth" class="docs-nav__link">OAuth Token Security</a></li>
                         <li><a href="#sql" class="docs-nav__link">SQL Injection Prevention</a></li>
+                        <li><a href="#csp" class="docs-nav__link">CSP Policy</a></li>
+                        <li><a href="#mcp-auth" class="docs-nav__link">MCP Authentication</a></li>
                         <li><a href="#checklist" class="docs-nav__link">Security Checklist</a></li>
                     </ul>
                 </div>
@@ -275,6 +277,27 @@ ADMIN_PASSWORD=strong_random_password_here    # Required, 16+ chars recommended
 SECURE_COOKIES=true                           # Set false for local HTTP dev
 QDRANT_API_KEY=your_qdrant_key               # Secures vector database</code></pre>
 
+                <h2 id="csp">Content Security Policy</h2>
+                <p>CSP is differentiated per page type to balance security with functionality:</p>
+                <table>
+                    <tr><th>Page Type</th><th>Policy</th><th>Reason</th></tr>
+                    <tr><td>Public pages</td><td>Strict nonce-only (<code>script-src 'nonce-...'</code>)</td><td>Maximum protection for end users</td></tr>
+                    <tr><td>Admin pages</td><td>Allows <code>unsafe-inline</code></td><td>Transitional &mdash; templates migrating to <code>data-action</code> attributes</td></tr>
+                </table>
+                <p><strong>Event Delegation</strong>: <code>AdminActions</code> in <code>admin.js</code> handles <code>data-action</code> attributes globally, replacing inline <code>onclick</code> handlers for stricter CSP compliance.</p>
+
+                <h2 id="mcp-auth">MCP Authentication</h2>
+                <p>The MCP server supports two transport modes with different auth requirements:</p>
+                <table>
+                    <tr><th>Transport</th><th>Auth</th><th>Use Case</th></tr>
+                    <tr><td>stdio</td><td>None (local only)</td><td>Claude Desktop integration</td></tr>
+                    <tr><td>HTTP (StreamableHTTP)</td><td>Bearer token via <code>MCP_API_KEY</code></td><td>Remote clients, Docker deployment</td></tr>
+                </table>
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Docker Secret Support</div>
+                    <p><code>MCP_API_KEY</code> can be loaded from <code>/run/secrets/mcp_api_key</code> for secure Docker deployments.</p>
+                </div>
+
                 <h2 id="checklist">Security Checklist</h2>
                 <table>
                     <tr><th>Check</th><th>Status</th><th>Notes</th></tr>
@@ -288,6 +311,9 @@ QDRANT_API_KEY=your_qdrant_key               # Secures vector database</code></p
                     <tr><td>SQL injection prevention</td><td>✅</td><td>Parameterized queries</td></tr>
                     <tr><td>PII anonymization</td><td>✅</td><td>Before LLM processing</td></tr>
                     <tr><td>Rate limiting</td><td>✅</td><td>slowapi integration</td></tr>
+                    <tr><td>CSP nonces</td><td>✅</td><td>Nonce-based on public, transitional on admin</td></tr>
+                    <tr><td>CORS validation</td><td>✅</td><td>Origin allowlist with double-submit CSRF</td></tr>
+                    <tr><td>MCP HTTP auth</td><td>✅</td><td>Bearer token + Docker secret support</td></tr>
                 </table>
 
                 <div class="info-box info-box--warning">

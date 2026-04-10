@@ -110,6 +110,8 @@
                         <li><a href="#bulk-import" class="docs-nav__link">Bulk Import CLI</a></li>
                         <li><a href="#chunk-editor" class="docs-nav__link">Chunk Editor</a></li>
                         <li><a href="#conversations" class="docs-nav__link">Conversations</a></li>
+                        <li><a href="#prompts" class="docs-nav__link">Prompt Management</a></li>
+                        <li><a href="#settings" class="docs-nav__link">RAG Settings</a></li>
                     </ul>
                 </div>
             </nav>
@@ -278,6 +280,62 @@ uv run import-docs ./your-folder</code></pre>
                     <li><strong>Natural flow</strong> - Conversation stacks vertically, scrolling to show new exchanges</li>
                     <li><strong>New conversation</strong> - Floating button resets session and clears history</li>
                 </ul>
+
+                <h2 id="prompts">Prompt Management System</h2>
+                <p>13 LLM prompts stored in SQLite, editable at <a href="/admin/prompts">/admin/prompts</a> without code changes or redeployment.</p>
+
+                <table>
+                    <tr><th>Category</th><th>Prompts</th><th>Purpose</th></tr>
+                    <tr><td>base</td><td>system_prompt, product_reference</td><td>Shared identity, product knowledge</td></tr>
+                    <tr><td>synthesis</td><td>web_layer</td><td>Web search response rules</td></tr>
+                    <tr><td>agent</td><td>tools_layer</td><td>CLI agent tool instructions</td></tr>
+                    <tr><td>analysis</td><td>thread_analyzer, quality_controller</td><td>Gmail thread classification &amp; QC</td></tr>
+                    <tr><td>drafts</td><td>email_generator</td><td>Auto-reply draft generation</td></tr>
+                    <tr><td>graph</td><td>entity_extractor</td><td>Neo4j entity extraction</td></tr>
+                    <tr><td>scripts</td><td>keyword_extractor, camera_extractor</td><td>Ingestion-time extraction</td></tr>
+                </table>
+
+                <h3>Prompt Composition</h3>
+                <p><code>get_composed_prompt()</code> concatenates multiple prompt keys at runtime:</p>
+                <ul>
+                    <li><strong>Web pipeline</strong>: <code>base.system_prompt</code> + <code>synthesis.web_layer</code></li>
+                    <li><strong>CLI agent</strong>: <code>base.system_prompt</code> + <code>agent.tools_layer</code></li>
+                </ul>
+                <p>Shared product knowledge in <code>base.product_reference</code> is injected via <code>{product_reference}</code> variable into analysis, QC, and draft prompts &mdash; edit once to update everywhere.</p>
+
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>Version history</strong> &mdash; Every content change creates a new version for audit and rollback</li>
+                    <li><strong>Backup/restore</strong> &mdash; <code>init-prompts --backup</code> exports customized prompts; <code>--restore FILE</code> re-applies</li>
+                    <li><strong>Variable substitution</strong> &mdash; <code>{variable}</code> placeholders auto-detected and substituted at runtime</li>
+                    <li><strong>Caching</strong> &mdash; In-memory cache with TTL (default 300s), hot reload via API</li>
+                    <li><strong>Fallback</strong> &mdash; If DB prompt not found, falls back to hardcoded defaults</li>
+                </ul>
+
+                <h2 id="settings">RAG Settings System</h2>
+                <p>20 tuning parameters editable at <a href="/admin/settings">/admin/settings</a> without code changes or redeployment.</p>
+
+                <table>
+                    <tr><th>Category</th><th>Count</th><th>Parameters</th></tr>
+                    <tr><td>Retrieval</td><td>7</td><td>Thresholds, overfetch multiplier, min results, technical term bonus</td></tr>
+                    <tr><td>Reranking</td><td>2</td><td>Top-K, source diversity ratio</td></tr>
+                    <tr><td>Synthesis</td><td>4</td><td>Max tokens, context budgets per group/total</td></tr>
+                    <tr><td>Caches</td><td>5</td><td>Embedding, sparse, reranker, camera DB cache sizes</td></tr>
+                    <tr><td>Prefetch</td><td>2</td><td>Multiplier, max limit for dynamic prefetch</td></tr>
+                </table>
+
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>Version history</strong> &mdash; Every value change creates a new version for audit and rollback</li>
+                    <li><strong>Typed getters</strong> &mdash; <code>get_setting(key)</code> returns typed values (int/float/bool) with validation</li>
+                    <li><strong>Caching</strong> &mdash; In-memory cache with TTL (default 300s), hot reload via API</li>
+                    <li><strong>Fallback</strong> &mdash; If DB setting not found, falls back to hardcoded defaults</li>
+                </ul>
+
+                <div class="info-box info-box--warning">
+                    <div class="info-box__title">Restart Required</div>
+                    <p>Cache size settings (query embedding, sparse, reranker, camera DB) are read at initialization time. Changes require a server restart to take effect, marked with a badge in the admin UI.</p>
+                </div>
 
                 <div class="page-nav">
                     <a href="/admin/docs/ingestion" class="page-nav__link">

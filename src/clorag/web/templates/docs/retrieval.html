@@ -120,6 +120,9 @@
                         <li><a href="#graphrag" class="docs-nav__link">GraphRAG</a></li>
                         <li><a href="#optimizations" class="docs-nav__link">Optimizations</a></li>
                         <li><a href="#mermaid" class="docs-nav__link">Excalidraw Diagrams</a></li>
+                        <li><a href="#contextualized" class="docs-nav__link">Contextualized Embeddings</a></li>
+                        <li><a href="#grounding" class="docs-nav__link">Conversation Grounding</a></li>
+                        <li><a href="#feedback" class="docs-nav__link">User Feedback</a></li>
                     </ul>
                 </div>
             </nav>
@@ -496,6 +499,31 @@ NEO4J_URI=bolt://localhost:7687</code></pre>
                         <code>app.py:_synthesize_response()</code> - Claude streaming
                     </p>
                 </div>
+
+                <h2 id="contextualized">Contextualized Embeddings</h2>
+                <p><code>voyage-context-3</code> uses the <code>/v1/contextualizedembeddings</code> API (not <code>/v1/embeddings</code>) to encode each chunk together with its full document context. This produces richer semantic representations that understand each chunk's role within its parent document.</p>
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Document-Context Re-embedding</div>
+                    <p>When chunk content is edited post-ingestion (e.g., terminology fixes), ALL sibling chunks from the same document are re-embedded together to maintain contextual consistency. Siblings are grouped by <code>url</code> (docs), <code>thread_id</code> (cases), or <code>parent_doc_id</code> (custom docs).</p>
+                </div>
+
+                <h2 id="grounding">Conversation Grounding</h2>
+                <p>Multi-turn conversations follow strict grounding rules to prevent answer contamination across turns:</p>
+                <ul>
+                    <li><strong>Intent resolution</strong> &mdash; Conversation history helps resolve ambiguous follow-ups (e.g., "and the FX6?" &rarr; "how to connect the FX6")</li>
+                    <li><strong>Fact isolation</strong> &mdash; Each answer is grounded exclusively in the currently retrieved context. Facts from previous answers are never mixed into the current response.</li>
+                    <li><strong>Enforcement</strong> &mdash; A message-level separator is injected between history and the new question in <code>synthesis.py</code>. A <code>&lt;conversation_grounding&gt;</code> rule in the <code>synthesis.web_layer</code> prompt reinforces this boundary.</li>
+                </ul>
+
+                <h2 id="feedback">User Feedback</h2>
+                <p>Every AI answer includes thumbs up/down buttons (enabled after streaming completes):</p>
+                <ul>
+                    <li><strong>Thumbs up</strong> &mdash; One-click positive signal</li>
+                    <li><strong>Thumbs down</strong> &mdash; Opens an optional text field for improvement suggestions</li>
+                    <li><strong>Storage</strong> &mdash; <code>search_feedback</code> table with upsert per <code>search_id</code> (one vote per search)</li>
+                    <li><strong>Admin visibility</strong> &mdash; Satisfaction rate, total counts, and recent feedback with comments at <a href="/admin/analytics">/admin/analytics</a></li>
+                    <li><strong>Rate limit</strong> &mdash; 10 submissions per minute via <code>POST /api/feedback</code></li>
+                </ul>
 
                 <div class="page-nav">
                     <a href="/admin/docs/architecture" class="page-nav__link">

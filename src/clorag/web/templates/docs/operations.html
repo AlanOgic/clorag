@@ -123,6 +123,31 @@ ssh root@server "cd /opt/clorag && docker compose build && docker compose up -d"
 
                 <p>Web UI is accessible at https://cyanview.cloud/ (reverse proxy to port 8085).</p>
 
+                <h3>Docker Services</h3>
+                <table>
+                    <tr><th>Service</th><th>Port Mapping</th><th>URL</th></tr>
+                    <tr><td>Web (FastAPI)</td><td>8085 &rarr; 8080</td><td>https://cyanview.cloud/</td></tr>
+                    <tr><td>MCP (StreamableHTTP)</td><td>8086 &rarr; 8080</td><td>https://mcp.cyanview.cloud/</td></tr>
+                </table>
+
+                <h3>MCP Server Deployment</h3>
+                <p>The MCP server supports two transport modes:</p>
+                <ul>
+                    <li><strong>stdio</strong> (<code>clorag-mcp</code>) &mdash; For Claude Desktop local integration. No auth needed.</li>
+                    <li><strong>HTTP</strong> (<code>clorag-mcp-http</code>) &mdash; StreamableHTTP on port 8080. Requires <code>MCP_API_KEY</code> Bearer token auth.</li>
+                </ul>
+                <pre><code># stdio (Claude Desktop)
+uv run clorag-mcp
+
+# HTTP (remote clients)
+uv run clorag-mcp-http
+# Production: https://mcp.cyanview.cloud/ (Docker 8086&rarr;8080)</code></pre>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Docker Secret Support</div>
+                    <p><code>MCP_API_KEY</code> can also be loaded from Docker secret at <code>/run/secrets/mcp_api_key</code>.</p>
+                </div>
+
                 <h2 id="environment">Environment Variables</h2>
                 <table>
                     <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
@@ -143,6 +168,10 @@ ssh root@server "cd /opt/clorag && docker compose build && docker compose up -d"
                     <tr><td><code>RERANK_ENABLED</code></td><td>No</td><td>Enable reranking after hybrid search (default: true)</td></tr>
                     <tr><td><code>VOYAGE_RERANK_MODEL</code></td><td>No</td><td>Voyage AI reranker model (default: rerank-2.5)</td></tr>
                     <tr><td><code>RERANK_TOP_K</code></td><td>No</td><td>Number of results after reranking (default: 5)</td></tr>
+                    <tr><td><code>OPENAI_COMPAT_API_KEY</code></td><td>No</td><td>Enables /v1/chat/completions OpenAI-compatible API</td></tr>
+                    <tr><td><code>MCP_API_KEY</code></td><td>No</td><td>Bearer token for MCP HTTP transport auth (required for HTTP, not stdio)</td></tr>
+                    <tr><td><code>MCP_IMPORT_BASE_DIR</code></td><td>No</td><td>Base directory for MCP document imports (default: data/imports)</td></tr>
+                    <tr><td><code>QDRANT_LEGACY_DOCS_COLLECTION</code></td><td>No</td><td>Collection name for legacy docs (default: docusaurus_docs_legacy)</td></tr>
                 </table>
 
                 <h2 id="commands">CLI Commands</h2>
@@ -204,6 +233,14 @@ uv run pytest tests/test_file.py::test_name -v  # Single test</code></pre>
                     <li><code>data/clorag.db</code> - Camera compatibility database</li>
                     <li><code>data/analytics.db</code> - Search analytics database</li>
                     <li><code>data/.token_salt</code> - Salt file for OAuth token encryption</li>
+                </ul>
+
+                <h3>Database Recovery</h3>
+                <ul>
+                    <li><strong>WAL mode</strong> &mdash; Write-Ahead Logging for concurrent read/write access</li>
+                    <li><strong>64MB cache</strong> &mdash; Large page cache for fast queries</li>
+                    <li><strong>Connection pool</strong> &mdash; 5 connections with automatic reuse</li>
+                    <li><strong>Corruption recovery</strong> &mdash; Automatic detection and recovery on pool initialization</li>
                 </ul>
 
                 <div class="info-box info-box--warning">

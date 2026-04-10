@@ -114,6 +114,8 @@
                         <li><a href="#ingestion" class="docs-nav__link">Data Ingestion</a></li>
                         <li><a href="#maintenance" class="docs-nav__link">Maintenance</a></li>
                         <li><a href="#drafts" class="docs-nav__link">Draft Support</a></li>
+                        <li><a href="#config" class="docs-nav__link">Configuration</a></li>
+                        <li><a href="#mcp-commands" class="docs-nav__link">MCP Server</a></li>
                         <li><a href="#quality" class="docs-nav__link">Quality & Dev</a></li>
                     </ul>
                 </div>
@@ -136,6 +138,17 @@
                     <tr><td><code>populate-graph</code></td><td>Build Neo4j knowledge graph</td></tr>
                     <tr><td><code>fix-rio-terminology</code></td><td>Scan/fix RIO terminology issues</td></tr>
                     <tr><td><code>draft-support</code></td><td>Generate draft replies for support</td></tr>
+                    <tr><td><code>clorag-mcp</code></td><td>MCP server (stdio transport)</td></tr>
+                    <tr><td><code>clorag-mcp-http</code></td><td>MCP server (HTTP transport, port 8080)</td></tr>
+                    <tr><td><code>ingest-gmail</code></td><td>Basic Gmail ingestion (no LLM analysis)</td></tr>
+                    <tr><td><code>ingest-local-docs</code></td><td>Import local markdown docs</td></tr>
+                    <tr><td><code>ingest-legacy-docs</code></td><td>Ingest legacy site markdown</td></tr>
+                    <tr><td><code>extract-cameras</code></td><td>Extract cameras from docs/cases</td></tr>
+                    <tr><td><code>verify-cameras</code></td><td>Verify cameras via web lookup</td></tr>
+                    <tr><td><code>backfill-support-cases</code></td><td>Backfill support cases from Qdrant</td></tr>
+                    <tr><td><code>archive-collection</code></td><td>Archive a Qdrant collection</td></tr>
+                    <tr><td><code>init-prompts</code></td><td>Initialize/manage LLM prompt database</td></tr>
+                    <tr><td><code>init-settings</code></td><td>Initialize/manage RAG settings database</td></tr>
                 </table>
 
                 <h2 id="server">Server Commands</h2>
@@ -161,6 +174,15 @@ uv run clorag "How do I configure the RIO IP address?"</code></pre>
                 </div>
 
                 <h2 id="ingestion">Data Ingestion</h2>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run ingest-gmail [options]</div>
+                    <div class="cmd-card__desc">Basic Gmail ingestion without LLM analysis. Fetches and stores raw threads.</div>
+                    <div class="info-box info-box--warning">
+                        <div class="info-box__title">Prefer ingest-curated</div>
+                        <p><code>ingest-curated</code> adds Sonnet classification, quality control, and anonymization. Use <code>ingest-gmail</code> only when you need raw thread data without LLM processing.</p>
+                    </div>
+                </div>
 
                 <div class="cmd-card">
                     <div class="cmd-card__name">uv run ingest-docs [url] [--fresh]</div>
@@ -225,6 +247,31 @@ uv run import-docs ./docs --category product_info --tags "integration,api"
 
 # Preview first
 uv run import-docs ./docs --dry-run</code></pre>
+                </div>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run ingest-local-docs &lt;path&gt; [options]</div>
+                    <div class="cmd-card__desc">Import local markdown documents into Qdrant. Reads .md files from a directory.</div>
+                    <dl class="cmd-card__options">
+                        <dt>path</dt><dd>Path to directory containing .md files</dd>
+                        <dt>--base-url URL</dt><dd>Base URL prefix for reconstructed page URLs</dd>
+                        <dt>--fresh</dt><dd>Delete existing collection before importing</dd>
+                        <dt>--no-cameras</dt><dd>Skip camera extraction step</dd>
+                    </dl>
+                </div>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run ingest-legacy-docs [path] [options]</div>
+                    <div class="cmd-card__desc">Ingest legacy docs from support.cyanview.com Docusaurus markdown sources into the <code>docusaurus_docs_legacy</code> collection.</div>
+                    <dl class="cmd-card__options">
+                        <dt>path</dt><dd>Path to Docusaurus docs directory (optional)</dd>
+                        <dt>--site-url URL</dt><dd>Legacy site URL for URL reconstruction</dd>
+                        <dt>--fresh</dt><dd>Delete legacy collection before re-ingesting</dd>
+                    </dl>
+                    <div class="info-box info-box--info">
+                        <div class="info-box__title">Legacy System</div>
+                        <p>This ingests into a separate collection used by <a href="/legacy">/legacy</a> search. No RIO terminology transforms are applied &mdash; original text is preserved for review.</p>
+                    </div>
                 </div>
 
                 <h2 id="maintenance">Maintenance Commands</h2>
@@ -306,6 +353,43 @@ uv run fix-rio-terminology --stats</code></pre>
                     </div>
                 </div>
 
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run extract-cameras [options]</div>
+                    <div class="cmd-card__desc">Extract camera compatibility info from documentation and support cases using Sonnet.</div>
+                    <dl class="cmd-card__options">
+                        <dt>--docs-only</dt><dd>Only extract from documentation chunks</dd>
+                        <dt>--cases-only</dt><dd>Only extract from support case chunks</dd>
+                        <dt>--from-sqlite</dt><dd>Extract from support cases SQLite DB</dd>
+                        <dt>--limit N</dt><dd>Maximum chunks to process</dd>
+                        <dt>--dry-run</dt><dd>Preview without saving to database</dd>
+                    </dl>
+                </div>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run verify-cameras [options]</div>
+                    <div class="cmd-card__desc">Verify and correct camera info by looking up manufacturer websites.</div>
+                    <dl class="cmd-card__options">
+                        <dt>--apply</dt><dd>Apply corrections (default is dry-run)</dd>
+                        <dt>--manufacturer NAME</dt><dd>Only verify cameras from this manufacturer</dd>
+                        <dt>--limit N</dt><dd>Maximum cameras to verify</dd>
+                        <dt>--all</dt><dd>Verify all cameras (not just needs_review)</dd>
+                    </dl>
+                </div>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run backfill-support-cases</div>
+                    <div class="cmd-card__desc">One-time tool to backfill the support cases SQLite database from Qdrant gmail_cases collection.</div>
+                    <div class="info-box info-box--warning">
+                        <div class="info-box__title">One-Time Recovery Tool</div>
+                        <p>Use this only when the SQLite support cases DB is empty but Qdrant has data. Not needed for normal operations.</p>
+                    </div>
+                </div>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run archive-collection [options]</div>
+                    <div class="cmd-card__desc">Archive or recover Qdrant collections for backup.</div>
+                </div>
+
                 <h2 id="drafts">Draft Support</h2>
 
                 <div class="cmd-card">
@@ -334,6 +418,64 @@ uv run draft-support --max-drafts 5</code></pre>
                         <div class="info-box__title">Admin UI Available</div>
                         <p>Manage drafts at <a href="/admin/drafts">/admin/drafts</a>. Includes preview, manual pipeline runs, and Gmail integration.</p>
                     </div>
+                </div>
+
+                <h2 id="config">Configuration Management</h2>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run init-prompts [options]</div>
+                    <div class="cmd-card__desc">Initialize or manage the LLM prompt database. Creates SQLite tables and populates with default prompts.</div>
+                    <dl class="cmd-card__options">
+                        <dt>--force</dt><dd>Reset all prompts to defaults (auto-backups first)</dd>
+                        <dt>--list</dt><dd>List all prompts (* = customized)</dd>
+                        <dt>--category CAT</dt><dd>Filter by category</dd>
+                        <dt>--stats</dt><dd>Show prompt database statistics</dd>
+                        <dt>--backup</dt><dd>Backup customized prompts to JSON</dd>
+                        <dt>-o, --output FILE</dt><dd>Backup to specific path</dd>
+                        <dt>--restore FILE</dt><dd>Restore customizations from backup</dd>
+                    </dl>
+                    <pre><code># Initialize defaults
+uv run init-prompts
+
+# List all prompts
+uv run init-prompts --list
+
+# Backup customizations
+uv run init-prompts --backup
+
+# Reset to defaults (auto-backup first)
+uv run init-prompts --force
+
+# Restore from backup
+uv run init-prompts --restore data/prompt_backups/2025-01-01.json</code></pre>
+                </div>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run init-settings [options]</div>
+                    <div class="cmd-card__desc">Initialize or manage the RAG settings database. Creates SQLite tables and populates with default settings.</div>
+                    <dl class="cmd-card__options">
+                        <dt>--force</dt><dd>Reset all settings to defaults</dd>
+                        <dt>--list</dt><dd>List all settings by category</dd>
+                        <dt>--category CAT</dt><dd>Filter by category</dd>
+                        <dt>--stats</dt><dd>Show settings database statistics</dd>
+                        <dt>--export</dt><dd>Export settings to JSON</dd>
+                    </dl>
+                </div>
+
+                <h2 id="mcp-commands">MCP Server</h2>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run clorag-mcp</div>
+                    <div class="cmd-card__desc">Start the MCP server with stdio transport for Claude Desktop integration. No authentication required.</div>
+                </div>
+
+                <div class="cmd-card">
+                    <div class="cmd-card__name">uv run clorag-mcp-http</div>
+                    <div class="cmd-card__desc">Start the MCP server with StreamableHTTP transport on port 8080. Requires <code>MCP_API_KEY</code> for Bearer authentication.</div>
+                    <pre><code># Local development
+MCP_API_KEY=your_key uv run clorag-mcp-http
+
+# Production: https://mcp.cyanview.cloud/ (Docker 8086→8080)</code></pre>
                 </div>
 
                 <h2 id="quality">Quality & Development</h2>
