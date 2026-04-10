@@ -1,0 +1,333 @@
+<!-- PUBLIC VERSION of docs/index.html - sync with admin version when updating -->
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyanview AI Search - Documentation</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root {
+            --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+            --ifm-font-family-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+            --cyan-blue: #00a8e8;
+            --cyan-dark: #0077b6;
+            --cyanview-navy: #003366;
+            --hero-bg: #003366;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ifm-font-family-base);
+            line-height: 1.65;
+            color: #1c1e21;
+            background: #f8f9fa;
+            padding-bottom: 60px;
+        }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            background: #fff;
+            padding: 12px;
+            font-size: 0.85rem;
+            border-top: 1px solid #e0e0e0;
+            z-index: 50;
+            color: #606770;
+        }
+
+        .footer a {
+            color: var(--cyan-dark);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .navbar__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar__logo {
+            height: 32px;
+        }
+
+        .navbar__links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .navbar__link {
+            color: #606770;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .navbar__link:hover {
+            color: var(--cyan-blue);
+        }
+
+        .navbar__link--active {
+            color: var(--cyan-blue);
+            font-weight: 600;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--hero-bg);
+            padding: 3rem 2rem;
+            text-align: center;
+            color: white;
+        }
+
+        .hero__title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+
+        .hero__subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Card Grid */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid transparent;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            border-color: var(--cyan-blue);
+            transform: translateY(-2px);
+        }
+
+        .card__icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .card__title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--cyanview-navy);
+            margin-bottom: 0.5rem;
+        }
+
+        .card__description {
+            color: #606770;
+            font-size: 0.95rem;
+            flex-grow: 1;
+        }
+
+        .card__topics {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .card__topic {
+            background: #e8f4f8;
+            color: var(--cyan-dark);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #606770;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 2rem 0 1rem;
+        }
+
+        .section-title:first-of-type {
+            margin-top: 0;
+        }
+
+        @media (max-width: 768px) {
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="/static/img/logo_cyanview.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="/docs" class="navbar__link navbar__link--active">Docs</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero__title">Documentation</h1>
+        <p class="hero__subtitle">Architecture, API reference, and guides for the Cyanview AI Search platform</p>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main">
+        <h3 class="section-title">Core System</h3>
+        <div class="card-grid">
+            <a href="/docs/architecture" class="card">
+                <div class="card__icon">&#127959;&#65039;</div>
+                <h3 class="card__title">Architecture</h3>
+                <p class="card__description">System architecture, technology stack, and data flow overview. Understand how the Multi-RAG system combines documentation, support cases, and custom knowledge.</p>
+                <div class="card__topics">
+                    <span class="card__topic">System Design</span>
+                    <span class="card__topic">Tech Stack</span>
+                    <span class="card__topic">Data Flow</span>
+                </div>
+            </a>
+
+            <a href="/docs/retrieval" class="card">
+                <div class="card__icon">&#128269;</div>
+                <h3 class="card__title">Retrieval System</h3>
+                <p class="card__description">Complete retrieval flow from query to response. Covers hybrid search, RRF fusion, GraphRAG enrichment, and Claude synthesis.</p>
+                <div class="card__topics">
+                    <span class="card__topic">Hybrid Search</span>
+                    <span class="card__topic">GraphRAG</span>
+                    <span class="card__topic">RRF Fusion</span>
+                </div>
+            </a>
+
+            <a href="/docs/ingestion" class="card">
+                <div class="card__icon">&#128229;</div>
+                <h3 class="card__title">Data Ingestion</h3>
+                <p class="card__description">Documentation and Gmail ingestion pipelines. Learn how content is fetched, processed, embedded, and stored in Qdrant.</p>
+                <div class="card__topics">
+                    <span class="card__topic">Docusaurus</span>
+                    <span class="card__topic">Gmail Cases</span>
+                    <span class="card__topic">Embeddings</span>
+                </div>
+            </a>
+        </div>
+
+        <h3 class="section-title">Content Management</h3>
+        <div class="card-grid">
+            <a href="/docs/content" class="card">
+                <div class="card__icon">&#128218;</div>
+                <h3 class="card__title">Content Management</h3>
+                <p class="card__description">Knowledge base, chunk editor, and conversation sessions. Manage custom documents, edit indexed content, and understand session handling.</p>
+                <div class="card__topics">
+                    <span class="card__topic">Knowledge Base</span>
+                    <span class="card__topic">Chunk Editor</span>
+                    <span class="card__topic">Sessions</span>
+                </div>
+            </a>
+
+            <a href="/docs/features" class="card">
+                <div class="card__icon">&#9881;&#65039;</div>
+                <h3 class="card__title">Features</h3>
+                <p class="card__description">Draft auto-reply system, camera database management, and search analytics. Advanced features for support automation.</p>
+                <div class="card__topics">
+                    <span class="card__topic">Auto-Reply</span>
+                    <span class="card__topic">Camera DB</span>
+                    <span class="card__topic">Analytics</span>
+                </div>
+            </a>
+        </div>
+
+        <h3 class="section-title">Integration</h3>
+        <div class="card-grid">
+            <a href="/docs/api" class="card">
+                <div class="card__icon">&#128268;</div>
+                <h3 class="card__title">API Reference</h3>
+                <p class="card__description">Complete API documentation with authentication methods, endpoint reference, and code examples for all public and admin endpoints.</p>
+                <div class="card__topics">
+                    <span class="card__topic">REST API</span>
+                    <span class="card__topic">Authentication</span>
+                    <span class="card__topic">Examples</span>
+                </div>
+            </a>
+
+            <a href="/docs/mcp" class="card">
+                <div class="card__icon">&#129302;</div>
+                <h3 class="card__title">MCP Server</h3>
+                <p class="card__description">Model Context Protocol server for Claude Desktop and AI assistants. 30 tools, resources, templates, and prompt workflows.</p>
+                <div class="card__topics">
+                    <span class="card__topic">Tools</span>
+                    <span class="card__topic">Resources</span>
+                    <span class="card__topic">Prompts</span>
+                    <span class="card__topic">Ingestion</span>
+                </div>
+            </a>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
+        AI Search with Claude AI, Voyage AI &amp; Qdrant
+    </footer>
+</body>
+</html>

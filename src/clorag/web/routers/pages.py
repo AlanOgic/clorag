@@ -107,6 +107,34 @@ async def cookie_policy(request: Request) -> HTMLResponse:
 # Admin Pages
 # =============================================================================
 
+# Public documentation pages (no auth required)
+_PUBLIC_DOC_PAGES = frozenset(
+    {"architecture", "retrieval", "ingestion", "content", "features", "api", "mcp"}
+)
+
+
+@router.get("/docs", response_class=HTMLResponse)
+async def public_docs_index(request: Request) -> HTMLResponse:
+    """Public technical documentation - index page."""
+    templates = get_templates()
+    return templates.TemplateResponse("public_docs/index.html", {"request": request})
+
+
+@router.get("/docs/{page}", response_class=HTMLResponse)
+async def public_docs_page(request: Request, page: str) -> HTMLResponse:
+    """Public technical documentation - specific page."""
+    if page not in _PUBLIC_DOC_PAGES:
+        raise HTTPException(status_code=404, detail="Page not found")
+    templates = get_templates()
+    return templates.TemplateResponse(
+        f"public_docs/{page}.html", {"request": request}
+    )
+
+
+# =============================================================================
+# Admin pages
+# =============================================================================
+
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_index(request: Request) -> HTMLResponse:

@@ -1,0 +1,243 @@
+<!-- PUBLIC VERSION of docs/features.html -->
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Features - Cyanview AI Search Documentation</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root { --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; --ifm-font-family-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace; --cyan-blue: #00a8e8; --cyan-dark: #0077b6; --cyanview-navy: #003366; --hero-bg: #003366; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--ifm-font-family-base); line-height: 1.65; color: #1c1e21; background: #f8f9fa; padding-bottom: 60px; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; background: #fff; padding: 12px; font-size: 0.85rem; border-top: 1px solid #e0e0e0; z-index: 50; color: #606770; }
+        .footer a { color: var(--cyan-dark); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: #fff; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 100; height: 60px; }
+        .navbar__brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit; font-weight: 700; font-size: 1.1rem; }
+        .navbar__logo { height: 32px; }
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+        .navbar__link { color: #606770; text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+        .navbar__link:hover { color: var(--cyan-blue); }
+        .navbar__link--active { color: var(--cyan-blue); font-weight: 600; }
+        .hero { background: var(--hero-bg); padding: 1.5rem 2rem; color: white; }
+        .hero__breadcrumb { font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.5rem; }
+        .hero__breadcrumb a { color: white; text-decoration: none; }
+        .hero__breadcrumb a:hover { text-decoration: underline; }
+        .hero__title { font-size: 1.8rem; font-weight: 700; }
+        .main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .docs-layout { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; }
+        @media (max-width: 900px) { .docs-layout { grid-template-columns: 1fr; } .docs-nav { display: none; } }
+        .docs-nav { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+        .docs-nav__section { margin-bottom: 1.5rem; }
+        .docs-nav__title { font-size: 0.7rem; font-weight: 600; color: #606770; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+        .docs-nav__list { list-style: none; }
+        .docs-nav__link { display: block; padding: 0.35rem 0.75rem; color: #444; text-decoration: none; font-size: 0.85rem; border-radius: 6px; transition: all 0.15s; }
+        .docs-nav__link:hover { background: #e3f2fd; color: var(--cyan-dark); }
+        .docs-nav__link--active { background: var(--cyan-blue); color: white; }
+        .docs-nav__link--page { font-weight: 500; }
+        .docs-content { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+        .docs-content h1 { font-size: 1.8rem; font-weight: 700; color: var(--cyanview-navy); margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e1e4e8; }
+        .docs-content h2 { font-size: 1.4rem; font-weight: 600; color: var(--cyanview-navy); margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e1e4e8; }
+        .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+        .docs-content h3 { font-size: 1.1rem; font-weight: 600; color: #333; margin: 1.5rem 0 0.75rem; }
+        .docs-content p { margin-bottom: 1rem; }
+        .docs-content ul, .docs-content ol { margin: 0 0 1rem 1.5rem; }
+        .docs-content li { margin-bottom: 0.5rem; }
+        .docs-content code { background: #f1f3f5; padding: 0.15rem 0.4rem; border-radius: 4px; font-family: var(--ifm-font-family-mono); font-size: 0.9em; }
+        .docs-content pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: 0.85rem; }
+        .docs-content pre code { background: transparent; padding: 0; color: inherit; }
+        .info-box { border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+        .info-box--info { background: #e3f2fd; border-left: 4px solid var(--cyan-blue); }
+        .info-box--success { background: #e8f5e9; border-left: 4px solid #4caf50; }
+        .info-box__title { font-weight: 600; margin-bottom: 0.5rem; }
+        .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e1e4e8; }
+        .page-nav__link { display: flex; flex-direction: column; padding: 1rem; border-radius: 8px; text-decoration: none; color: inherit; transition: background 0.2s; max-width: 45%; }
+        .page-nav__link:hover { background: #f6f8fa; }
+        .page-nav__label { font-size: 0.75rem; color: #606770; text-transform: uppercase; }
+        .page-nav__title { font-weight: 600; color: var(--cyan-dark); }
+        .page-nav__link--next { text-align: right; margin-left: auto; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="/static/img/logo_cyanview.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="/docs" class="navbar__link navbar__link--active">Docs</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero__breadcrumb"><a href="/docs">Documentation</a> / Features</div>
+        <h1 class="hero__title">Features</h1>
+    </section>
+
+    <main class="main">
+        <div class="docs-layout">
+            <nav class="docs-nav">
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">Documentation</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="/docs/architecture" class="docs-nav__link docs-nav__link--page">Architecture</a></li>
+                        <li><a href="/docs/retrieval" class="docs-nav__link docs-nav__link--page">Retrieval System</a></li>
+                        <li><a href="/docs/ingestion" class="docs-nav__link docs-nav__link--page">Data Ingestion</a></li>
+                        <li><a href="/docs/content" class="docs-nav__link docs-nav__link--page">Content Management</a></li>
+                        <li><a href="/docs/features" class="docs-nav__link docs-nav__link--page docs-nav__link--active">Features</a></li>
+                        <li><a href="/docs/api" class="docs-nav__link docs-nav__link--page">API Reference</a></li>
+                        <li><a href="/docs/mcp" class="docs-nav__link docs-nav__link--page">MCP Server</a></li>
+                    </ul>
+                </div>
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">On This Page</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="#draft-system" class="docs-nav__link">Draft Auto-Reply</a></li>
+                        <li><a href="#camera-database" class="docs-nav__link">Camera Database</a></li>
+                        <li><a href="#support-cases" class="docs-nav__link">Support Cases</a></li>
+                        <li><a href="#answer-export" class="docs-nav__link">Answer Export</a></li>
+                        <li><a href="#feedback" class="docs-nav__link">User Feedback</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="docs-content">
+                <h1>Features</h1>
+
+                <h2 id="draft-system">Draft Auto-Reply System</h2>
+
+                <h3>Overview</h3>
+                <p>The draft system automatically generates email replies for unanswered support threads using RAG search and Claude AI synthesis. It identifies pending threads, searches the knowledge base for relevant context, and creates draft replies ready for human review.</p>
+
+                <h3>Pipeline Flow</h3>
+                <pre><code>┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│    GMAIL      │     │   ANALYZE     │     │    FILTER     │
+│    FETCH      │────▶│   THREADS     │────▶│   PENDING     │
+│  via API      │     │ ThreadAnalyzer│     │ no cyanview   │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│ CHECK DRAFTS  │     │  RAG SEARCH   │     │    CLAUDE     │
+│  in Gmail     │────▶│ docs + cases  │────▶│   SYNTHESIS   │
+│ skip existing │     │ hybrid query  │     │ draft content │
+└───────────────┘     └───────────────┘     └───────────────┘
+                                                    │
+        ┌───────────────────────────────────────────┘
+        ▼
+┌───────────────┐
+│ CREATE DRAFT  │
+│  in Gmail     │
+│ In-Reply-To   │
+└───────────────┘</code></pre>
+
+                <h3>Key Components</h3>
+                <ul>
+                    <li><strong>Gmail API Integration</strong> &mdash; Fetches unanswered threads and creates draft replies with proper threading headers</li>
+                    <li><strong>RAG-Powered Synthesis</strong> &mdash; Searches documentation and support cases to generate contextual, accurate email content</li>
+                    <li><strong>Pipeline Orchestration</strong> &mdash; Full process from fetching threads to creating drafts, with duplicate detection and preview support</li>
+                    <li><strong>Google Groups Handling</strong> &mdash; Correctly parses original sender from Google Groups headers and strips "via Group" suffixes</li>
+                </ul>
+
+                <h2 id="camera-database">Camera Database</h2>
+
+                <h3>Overview</h3>
+                <p>The camera compatibility database stores structured information about cameras that work with Cyanview products, including connection ports, communication protocols, and supported controls.</p>
+
+                <h3>Data Sources</h3>
+                <p>Camera data is extracted from multiple sources:</p>
+                <ul>
+                    <li><strong>Documentation</strong> &mdash; Automatic extraction during docs ingestion</li>
+                    <li><strong>Support Cases</strong> &mdash; Extraction from resolved support threads</li>
+                    <li><strong>CSV Import</strong> &mdash; Bulk data management via CSV upload</li>
+                    <li><strong>Manual Entry</strong> &mdash; Direct additions through the admin interface</li>
+                </ul>
+
+                <h3>Camera Comparison</h3>
+                <p>The comparison feature allows side-by-side comparison of up to 5 cameras:</p>
+                <ul>
+                    <li><strong>Selection</strong> &mdash; Check boxes in the camera table to select cameras for comparison</li>
+                    <li><strong>Comparison View</strong> &mdash; Side-by-side display showing all specifications</li>
+                    <li><strong>Common Values</strong> &mdash; Shared specifications highlighted with green tags</li>
+                </ul>
+
+                <h3>Related Cameras</h3>
+                <p>The related cameras feature finds similar cameras based on shared manufacturer, device type, ports, and protocols, with a weighted similarity scoring system.</p>
+
+                <h3>CSV Import/Export</h3>
+                <p>Bulk data management via CSV:</p>
+                <ul>
+                    <li><strong>Export</strong> &mdash; Download all cameras (or filtered subset) as CSV</li>
+                    <li><strong>Import</strong> &mdash; Upload CSV file to create or update cameras (uses upsert logic based on name + manufacturer)</li>
+                </ul>
+
+                <h2 id="support-cases">Support Cases Database</h2>
+
+                <h3>Overview</h3>
+                <p>Support cases from Gmail are stored and indexed for easy retrieval, searching, and browsing. The database stores complete anonymized, analyzed content alongside raw thread data.</p>
+
+                <h3>Full-Text Search</h3>
+                <p>The database includes an FTS5 virtual table for fast full-text search with BM25 ranking across subject lines, problem/solution summaries, full document content, and keywords.</p>
+
+                <h3>Thread Cleaning</h3>
+                <p>Raw threads are cleaned before storage to remove redundant content:</p>
+                <ul>
+                    <li><strong>Quoted text</strong> &mdash; Lines starting with <code>&gt;</code></li>
+                    <li><strong>Reply headers</strong> &mdash; "On [date], [person] wrote:" patterns</li>
+                    <li><strong>Forwarded headers</strong> &mdash; "---------- Original Message ----------"</li>
+                    <li><strong>Email signatures</strong> &mdash; "Best regards", "Sent from my iPhone", etc.</li>
+                </ul>
+                <p>Multi-language support includes English, French, and German reply header patterns.</p>
+
+                <h2 id="answer-export">Answer Export</h2>
+                <p>Users can export AI responses in multiple formats directly from the search results:</p>
+                <ul>
+                    <li><strong>Markdown</strong> &mdash; Original formatted response with source links</li>
+                    <li><strong>Plain Text</strong> &mdash; Stripped formatting for pasting into emails or tickets</li>
+                    <li><strong>HTML</strong> &mdash; Rendered HTML for sharing or embedding</li>
+                    <li><strong>PDF</strong> &mdash; Downloadable document for offline use or printing</li>
+                </ul>
+
+                <h2 id="feedback">User Feedback</h2>
+                <p>Thumbs up/down buttons appear on every AI answer after streaming completes:</p>
+                <ul>
+                    <li><strong>Thumbs up</strong> &mdash; One-click positive feedback</li>
+                    <li><strong>Thumbs down</strong> &mdash; Opens optional text field for "What could be improved?"</li>
+                    <li><strong>One vote per search</strong> &mdash; You can change your vote at any time</li>
+                </ul>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Dark Mode &amp; Animations</div>
+                    <p>The admin interface supports a dark theme with automatic OS preference detection, and includes subtle animations (page transitions, card stagger, count-up stats) that respect the <code>prefers-reduced-motion</code> accessibility setting.</p>
+                </div>
+
+                <div class="page-nav">
+                    <a href="/docs/content" class="page-nav__link">
+                        <span class="page-nav__label">Previous</span>
+                        <span class="page-nav__title">&larr; Content Management</span>
+                    </a>
+                    <a href="/docs/api" class="page-nav__link page-nav__link--next">
+                        <span class="page-nav__label">Next</span>
+                        <span class="page-nav__title">API Reference &rarr;</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
+        AI Search with Claude AI, Voyage AI &amp; Qdrant
+    </footer>
+
+    <script nonce="{{ request.state.csp_nonce }}">
+        document.querySelectorAll('.docs-nav__link[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => { e.preventDefault(); const id = link.getAttribute('href').slice(1); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); });
+        });
+    </script>
+</body>
+</html>

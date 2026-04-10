@@ -1,0 +1,471 @@
+<!-- PUBLIC VERSION of docs/mcp.html -->
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Server - Cyanview AI Search Documentation</title>
+    <link rel="icon" href="https://support.cyanview.com/img/siteGfx/favicon.ico">
+    <style>
+        :root { --ifm-font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; --ifm-font-family-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace; --cyan-blue: #00a8e8; --cyan-dark: #0077b6; --cyanview-navy: #003366; --hero-bg: #003366; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--ifm-font-family-base); line-height: 1.65; color: #1c1e21; background: #f8f9fa; padding-bottom: 60px; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; background: #fff; padding: 12px; font-size: 0.85rem; border-top: 1px solid #e0e0e0; z-index: 50; color: #606770; }
+        .footer a { color: var(--cyan-dark); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .navbar { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: #fff; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 100; height: 60px; }
+        .navbar__brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit; font-weight: 700; font-size: 1.1rem; }
+        .navbar__logo { height: 32px; }
+        .navbar__links { display: flex; gap: 1.5rem; align-items: center; }
+        .navbar__link { color: #606770; text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+        .navbar__link:hover { color: var(--cyan-blue); }
+        .navbar__link--active { color: var(--cyan-blue); font-weight: 600; }
+        .hero { background: var(--hero-bg); padding: 1.5rem 2rem; color: white; }
+        .hero__breadcrumb { font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.5rem; }
+        .hero__breadcrumb a { color: white; text-decoration: none; }
+        .hero__breadcrumb a:hover { text-decoration: underline; }
+        .hero__title { font-size: 1.8rem; font-weight: 700; }
+        .main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .docs-layout { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; }
+        @media (max-width: 900px) { .docs-layout { grid-template-columns: 1fr; } .docs-nav { display: none; } }
+        .docs-nav { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+        .docs-nav__section { margin-bottom: 1.5rem; }
+        .docs-nav__title { font-size: 0.7rem; font-weight: 600; color: #606770; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+        .docs-nav__list { list-style: none; }
+        .docs-nav__link { display: block; padding: 0.35rem 0.75rem; color: #444; text-decoration: none; font-size: 0.85rem; border-radius: 6px; transition: all 0.15s; }
+        .docs-nav__link:hover { background: #e3f2fd; color: var(--cyan-dark); }
+        .docs-nav__link--active { background: var(--cyan-blue); color: white; }
+        .docs-nav__link--page { font-weight: 500; }
+        .docs-content { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+        .docs-content h1 { font-size: 1.8rem; font-weight: 700; color: var(--cyanview-navy); margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e1e4e8; }
+        .docs-content h2 { font-size: 1.4rem; font-weight: 600; color: var(--cyanview-navy); margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e1e4e8; }
+        .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+        .docs-content h3 { font-size: 1.1rem; font-weight: 600; color: #333; margin: 1.5rem 0 0.75rem; }
+        .docs-content h4 { font-size: 1rem; font-weight: 600; color: #444; margin: 1rem 0 0.5rem; }
+        .docs-content p { margin-bottom: 1rem; }
+        .docs-content ul, .docs-content ol { margin: 0 0 1rem 1.5rem; }
+        .docs-content li { margin-bottom: 0.5rem; }
+        .docs-content code { background: #f1f3f5; padding: 0.15rem 0.4rem; border-radius: 4px; font-family: var(--ifm-font-family-mono); font-size: 0.9em; }
+        .docs-content pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; font-size: 0.85rem; }
+        .docs-content pre code { background: transparent; padding: 0; color: inherit; }
+        .docs-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+        .docs-content th, .docs-content td { border: 1px solid #e1e4e8; padding: 0.6rem; text-align: left; }
+        .docs-content th { background: #f6f8fa; font-weight: 600; }
+        .info-box { border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+        .info-box--info { background: #e3f2fd; border-left: 4px solid var(--cyan-blue); }
+        .info-box__title { font-weight: 600; margin-bottom: 0.5rem; }
+        .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; color: white; margin-right: 0.25rem; }
+        .badge--tool { background: #007bff; }
+        .badge--resource { background: #28a745; }
+        .badge--template { background: #6f42c1; }
+        .badge--prompt { background: #fd7e14; }
+        .badge--async { background: #17a2b8; }
+        .badge--sync { background: #6c757d; }
+        .tool-card { border: 1px solid #e1e4e8; border-radius: 8px; padding: 1rem; margin: 0.75rem 0; }
+        .tool-card__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+        .tool-card__name { font-family: var(--ifm-font-family-mono); font-weight: 600; font-size: 0.95rem; color: var(--cyanview-navy); }
+        .tool-card__desc { color: #606770; font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .tool-card__params { font-size: 0.85rem; }
+        .tool-card__params code { font-size: 0.85em; }
+        .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e1e4e8; }
+        .page-nav__link { display: flex; flex-direction: column; padding: 1rem; border-radius: 8px; text-decoration: none; color: inherit; transition: background 0.2s; max-width: 45%; }
+        .page-nav__link:hover { background: #f6f8fa; }
+        .page-nav__label { font-size: 0.75rem; color: #606770; text-transform: uppercase; }
+        .page-nav__title { font-weight: 600; color: var(--cyan-dark); }
+        .page-nav__link--next { text-align: right; margin-left: auto; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">
+            <img src="/static/img/logo_cyanview.svg" alt="Cyanview" class="navbar__logo">
+            <span>AI Search</span>
+        </a>
+        <div class="navbar__links">
+            <a href="/" class="navbar__link">Search</a>
+            <a href="/cameras" class="navbar__link">Cameras</a>
+            <a href="/docs" class="navbar__link navbar__link--active">Docs</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero__breadcrumb"><a href="/docs">Documentation</a> / MCP Server</div>
+        <h1 class="hero__title">MCP Server</h1>
+    </section>
+
+    <main class="main">
+        <div class="docs-layout">
+            <nav class="docs-nav">
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">Documentation</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="/docs/architecture" class="docs-nav__link docs-nav__link--page">Architecture</a></li>
+                        <li><a href="/docs/retrieval" class="docs-nav__link docs-nav__link--page">Retrieval System</a></li>
+                        <li><a href="/docs/ingestion" class="docs-nav__link docs-nav__link--page">Data Ingestion</a></li>
+                        <li><a href="/docs/content" class="docs-nav__link docs-nav__link--page">Content Management</a></li>
+                        <li><a href="/docs/features" class="docs-nav__link docs-nav__link--page">Features</a></li>
+                        <li><a href="/docs/api" class="docs-nav__link docs-nav__link--page">API Reference</a></li>
+                        <li><a href="/docs/mcp" class="docs-nav__link docs-nav__link--page docs-nav__link--active">MCP Server</a></li>
+                    </ul>
+                </div>
+                <div class="docs-nav__section">
+                    <h4 class="docs-nav__title">On This Page</h4>
+                    <ul class="docs-nav__list">
+                        <li><a href="#overview" class="docs-nav__link">Overview</a></li>
+                        <li><a href="#tools-search" class="docs-nav__link">Search Tools</a></li>
+                        <li><a href="#tools-cameras" class="docs-nav__link">Camera Tools</a></li>
+                        <li><a href="#tools-documents" class="docs-nav__link">Document Tools</a></li>
+                        <li><a href="#tools-support" class="docs-nav__link">Support Tools</a></li>
+                        <li><a href="#resources" class="docs-nav__link">Resources</a></li>
+                        <li><a href="#prompts" class="docs-nav__link">Prompts</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="docs-content">
+                <h1>MCP Server</h1>
+
+                <h2 id="overview">Overview</h2>
+                <p>
+                    The CLORAG MCP (Model Context Protocol) server exposes the full RAG knowledge base to
+                    AI assistants like Claude Desktop, Claude Code, and any MCP-compatible client. It provides
+                    tools for searching documentation, querying the camera database, browsing support cases,
+                    and accessing custom knowledge documents.
+                </p>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">MCP Protocol</div>
+                    <p>
+                        MCP is an open standard for connecting AI assistants to external data sources.
+                        The server uses <code>FastMCP</code> from the <code>mcp</code> SDK and supports
+                        both stdio (local) and streamable-http (remote) transports.
+                    </p>
+                </div>
+
+                <h3>Capabilities Summary</h3>
+                <table>
+                    <thead>
+                        <tr><th>Type</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><span class="badge badge--tool">Tools</span></td><td>Actions: search knowledge base, query cameras, browse documents and support cases</td></tr>
+                        <tr><td><span class="badge badge--resource">Resources</span></td><td>Static data: product ecosystem reference</td></tr>
+                        <tr><td><span class="badge badge--template">Templates</span></td><td>Parameterized resources for accessing individual records</td></tr>
+                        <tr><td><span class="badge badge--prompt">Prompts</span></td><td>Guided workflows: troubleshoot, compare cameras, generate integration guides</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Transports</h3>
+                <table>
+                    <thead>
+                        <tr><th>Transport</th><th>Use Case</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>stdio</td><td>Claude Desktop, Claude Code, local MCP clients</td></tr>
+                        <tr><td>streamable-http</td><td>Remote servers, multi-client access (requires Bearer token authentication)</td></tr>
+                    </tbody>
+                </table>
+
+                <!-- ==================== TOOLS: SEARCH ==================== -->
+                <h2 id="tools-search">Search Tools</h2>
+                <p>Hybrid RAG search across all three vector collections with RRF fusion and Voyage reranking.</p>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--async">async</span>
+                        <span class="tool-card__name">search</span>
+                    </div>
+                    <div class="tool-card__desc">Search all sources using hybrid RAG with reranking. Main entry point for queries.</div>
+                    <div class="tool-card__params">
+                        <code>query</code>: str &middot;
+                        <code>source</code>: "docs" | "cases" | "custom" | "both" &middot;
+                        <code>limit</code>: 1-20
+                    </div>
+                </div>
+
+                <!-- ==================== TOOLS: CAMERAS ==================== -->
+                <h2 id="tools-cameras">Camera Tools</h2>
+                <p>Camera compatibility database with FTS5 search, comparison, and similarity.</p>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">search_cameras</span>
+                    </div>
+                    <div class="tool-card__desc">Full-text search across camera names, manufacturers, model codes, ports, protocols, and notes.</div>
+                    <div class="tool-card__params">
+                        <code>query</code>: str (e.g. "Sony PTZ", "VISCA", "SDI")
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">get_camera</span>
+                    </div>
+                    <div class="tool-card__desc">Get full details of a camera by ID.</div>
+                    <div class="tool-card__params"><code>camera_id</code>: int</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">list_cameras</span>
+                    </div>
+                    <div class="tool-card__desc">List cameras with optional filtering by manufacturer, device type, or protocol.</div>
+                    <div class="tool-card__params">
+                        <code>manufacturer</code>: str? &middot;
+                        <code>device_type</code>: str? &middot;
+                        <code>protocol</code>: str? &middot;
+                        <code>limit</code>: 1-50
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">find_related_cameras</span>
+                    </div>
+                    <div class="tool-card__desc">Find similar cameras (same manufacturer, type, ports, or protocols).</div>
+                    <div class="tool-card__params">
+                        <code>camera_id</code>: int &middot;
+                        <code>limit</code>: 1-10
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">compare_cameras</span>
+                    </div>
+                    <div class="tool-card__desc">Side-by-side comparison of 2-5 cameras with common ports and protocols highlighted.</div>
+                    <div class="tool-card__params"><code>camera_ids</code>: list[int] (2-5)</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">get_camera_stats</span>
+                    </div>
+                    <div class="tool-card__desc">Database statistics: total cameras, manufacturers, device types, ports, protocols.</div>
+                </div>
+
+                <!-- ==================== TOOLS: DOCUMENTS ==================== -->
+                <h2 id="tools-documents">Document Tools</h2>
+                <p>Custom admin-managed documents across 10 categories.</p>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--async">async</span>
+                        <span class="tool-card__name">list_documents</span>
+                    </div>
+                    <div class="tool-card__desc">List custom documents with optional category filter and pagination.</div>
+                    <div class="tool-card__params">
+                        <code>category</code>: str? &middot;
+                        <code>limit</code>: 1-50 &middot;
+                        <code>offset</code>: int
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--async">async</span>
+                        <span class="tool-card__name">get_document</span>
+                    </div>
+                    <div class="tool-card__desc">Get full content and metadata of a custom document.</div>
+                    <div class="tool-card__params"><code>doc_id</code>: str (UUID)</div>
+                </div>
+
+                <!-- ==================== TOOLS: SUPPORT ==================== -->
+                <h2 id="tools-support">Support Case Tools</h2>
+                <p>Curated Gmail support cases with FTS5 search and raw thread access.</p>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">search_support_cases</span>
+                    </div>
+                    <div class="tool-card__desc">Full-text search across subject, problem/solution summaries, document content, and keywords.</div>
+                    <div class="tool-card__params">
+                        <code>query</code>: str &middot;
+                        <code>limit</code>: 1-20
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">get_support_case</span>
+                    </div>
+                    <div class="tool-card__desc">Get full case details with problem/solution summaries and document content.</div>
+                    <div class="tool-card__params"><code>case_id</code>: str</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">get_support_case_raw</span>
+                    </div>
+                    <div class="tool-card__desc">Get the raw anonymized email thread (not just summaries). Full conversation flow with quoted replies.</div>
+                    <div class="tool-card__params"><code>case_id</code>: str</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">list_support_cases</span>
+                    </div>
+                    <div class="tool-card__desc">List cases with optional category and product filters.</div>
+                    <div class="tool-card__params">
+                        <code>category</code>: str? &middot;
+                        <code>product</code>: str? &middot;
+                        <code>limit</code>: 1-50 &middot;
+                        <code>offset</code>: int
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--tool">Tool</span>
+                        <span class="badge badge--sync">sync</span>
+                        <span class="tool-card__name">get_support_stats</span>
+                    </div>
+                    <div class="tool-card__desc">Statistics: total cases, categories, products, resolution quality breakdown.</div>
+                </div>
+
+                <!-- ==================== RESOURCES ==================== -->
+                <h2 id="resources">Resources</h2>
+                <p>Static data readable by MCP clients. Updated on each access.</p>
+
+                <table>
+                    <thead>
+                        <tr><th>URI</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>clorag://products</code></td><td>Cyanview product catalog: RCP, RIO, CI0, VP4, NIO, RSBM with variants and features</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Resource Templates</h3>
+                <p>Parameterized resources for accessing individual records by ID.</p>
+
+                <table>
+                    <thead>
+                        <tr><th>URI Template</th><th>Parameter</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>clorag://prompt/{prompt_id}/versions</code></td><td>str (UUID)</td><td>Version history of a prompt (newest first)</td></tr>
+                    </tbody>
+                </table>
+
+                <div class="info-box info-box--info">
+                    <div class="info-box__title">Resources vs Tools</div>
+                    <p>
+                        <strong>Resources</strong> are for reading data (clients can subscribe to updates).
+                        <strong>Tools</strong> are for actions (search, edit, ingest). Use resource templates when you know
+                        the exact ID; use tools when you need to search or filter.
+                    </p>
+                </div>
+
+                <!-- ==================== PROMPTS ==================== -->
+                <h2 id="prompts">Prompt Templates</h2>
+                <p>Pre-built conversation starters that guide the AI assistant through structured workflows.</p>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--prompt">Prompt</span>
+                        <span class="tool-card__name">troubleshoot</span>
+                    </div>
+                    <div class="tool-card__desc">Guided troubleshooting: searches docs + cases, identifies causes, provides step-by-step resolution.</div>
+                    <div class="tool-card__params">
+                        <code>issue</code>: str (required) &middot;
+                        <code>product</code>: str (optional)
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--prompt">Prompt</span>
+                        <span class="tool-card__name">compare_cameras</span>
+                    </div>
+                    <div class="tool-card__desc">Side-by-side camera comparison for Cyanview compatibility. Searches DB, highlights ports/protocols.</div>
+                    <div class="tool-card__params"><code>camera_names</code>: str (required)</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--prompt">Prompt</span>
+                        <span class="tool-card__name">find_camera</span>
+                    </div>
+                    <div class="tool-card__desc">Find cameras matching a use case. Recommends Cyanview products and connection methods.</div>
+                    <div class="tool-card__params">
+                        <code>use_case</code>: str (required) &middot;
+                        <code>requirements</code>: str (optional)
+                    </div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--prompt">Prompt</span>
+                        <span class="tool-card__name">explain_product</span>
+                    </div>
+                    <div class="tool-card__desc">Detailed product explanation: variants, features, use cases, licensing, connections.</div>
+                    <div class="tool-card__params"><code>product</code>: str (required, e.g. "RIO", "CI0")</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--prompt">Prompt</span>
+                        <span class="tool-card__name">integration_guide</span>
+                    </div>
+                    <div class="tool-card__desc">Generate a full integration guide: hardware, network, step-by-step setup, pitfalls.</div>
+                    <div class="tool-card__params"><code>scenario</code>: str (required)</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-card__header">
+                        <span class="badge badge--prompt">Prompt</span>
+                        <span class="tool-card__name">ingest_status</span>
+                    </div>
+                    <div class="tool-card__desc">Analyze knowledge base health and suggest which ingestion operations to run.</div>
+                </div>
+
+                <div class="page-nav">
+                    <a href="/docs/api" class="page-nav__link">
+                        <span class="page-nav__label">Previous</span>
+                        <span class="page-nav__title">&larr; API Reference</span>
+                    </a>
+                    <a href="/docs" class="page-nav__link page-nav__link--next">
+                        <span class="page-nav__label">Next</span>
+                        <span class="page-nav__title">Documentation Home &rarr;</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        Powered by <a href="https://cyanview.com" target="_blank">Cyanview</a> |
+        AI Search with Claude AI, Voyage AI &amp; Qdrant
+    </footer>
+
+    <script nonce="{{ request.state.csp_nonce }}">
+        document.querySelectorAll('.docs-nav__link[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => { e.preventDefault(); const id = link.getAttribute('href').slice(1); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); });
+        });
+    </script>
+</body>
+</html>
