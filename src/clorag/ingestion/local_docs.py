@@ -151,7 +151,7 @@ class LocalDocsIngestionPipeline(DocusaurusIngestionPipeline):
                 url_path = str(rel.with_suffix(""))
                 if url_path.endswith("/index"):
                     url_path = url_path[: -len("/index")]
-                url = (self._base_url or "").rstrip("/") + "/docs/" + url_path
+                url = (self._base_url or "").rstrip("/") + "/" + url_path
 
             # Apply product name transformations
             body = apply_product_name_transforms(body)

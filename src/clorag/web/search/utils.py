@@ -18,6 +18,20 @@ def truncate(text: str, max_length: int) -> str:
     return text[: max_length - 3] + "..."
 
 
+def _normalize_doc_url(url: str | None) -> str:
+    """Normalize documentation URLs stored in chunk payloads.
+
+    Safety net for legacy data: rewrites the old `.com` host to `.cloud`
+    and strips the `/docs/` path segment that was mistakenly stored by
+    earlier ingestion runs (routeBasePath is `/`, not `/docs`).
+    """
+    if not url:
+        return ""
+    url = url.replace("support.cyanview.com", "support.cyanview.cloud")
+    url = url.replace("support.cyanview.cloud/docs/", "support.cyanview.cloud/")
+    return url
+
+
 def filter_by_dynamic_threshold(
     results: list[SearchResult],
     chunks: list[dict[str, Any]],
@@ -132,7 +146,7 @@ def build_context(
         source_type = group[0].get("source_type")
 
         if source_type == "documentation":
-            url = group[0].get("url", "")
+            url = _normalize_doc_url(group[0].get("url", ""))
             header = f"[Source {idx}: Doc — {url}] (relevance: {best_score:.2f})"
         elif source_type == "custom_docs":
             url = group[0].get("url") or "Custom Knowledge"
@@ -192,7 +206,7 @@ def extract_source_links(
         if chunk.get("source_type") == "documentation":
             url = chunk.get("url")
             if url and rewrite_urls:
-                url = url.replace("support.cyanview.com", "support.cyanview.cloud")
+                url = _normalize_doc_url(url)
             if url and url not in seen:
                 seen.add(url)
                 link_data: dict[str, Any] = {
