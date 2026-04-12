@@ -21,14 +21,18 @@ def truncate(text: str, max_length: int) -> str:
 def _normalize_doc_url(url: str | None) -> str:
     """Normalize documentation URLs stored in chunk payloads.
 
-    Safety net for legacy data: rewrites the old `.com` host to `.cloud`
-    and strips the `/docs/` path segment that was mistakenly stored by
-    earlier ingestion runs (routeBasePath is `/`, not `/docs`).
+    Safety net for `support.cyanview.cloud` chunks: inserts the `/docs/`
+    path segment when missing, because the site's Docusaurus routeBasePath
+    is `/docs` but earlier ingestion runs stored URLs without that prefix.
+
+    Legacy `support.cyanview.com` URLs are preserved as-is — that site
+    uses a different routeBasePath and must not be rewritten.
     """
     if not url:
         return ""
-    url = url.replace("support.cyanview.com", "support.cyanview.cloud")
-    url = url.replace("support.cyanview.cloud/docs/", "support.cyanview.cloud/")
+    host = "support.cyanview.cloud"
+    if host in url and f"{host}/docs/" not in url and f"{host}/docs" != url.rstrip("/"):
+        url = url.replace(f"{host}/", f"{host}/docs/", 1)
     return url
 
 
@@ -206,6 +210,7 @@ def extract_source_links(
         if chunk.get("source_type") == "documentation":
             url = chunk.get("url")
             if url and rewrite_urls:
+                url = url.replace("support.cyanview.com", "support.cyanview.cloud")
                 url = _normalize_doc_url(url)
             if url and url not in seen:
                 seen.add(url)

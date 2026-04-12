@@ -140,18 +140,21 @@ class LocalDocsIngestionPipeline(DocusaurusIngestionPipeline):
             # Extract title from frontmatter or first heading
             title = fm.get("title") or self._extract_title_from_markdown(body)
 
-            # Build URL from slug or relative path
+            # Build URL from slug or relative path.
+            # Docusaurus docs plugin serves pages under /docs/ by default
+            # (routeBasePath='/docs'), so URLs must include that segment.
+            base = (self._base_url or "").rstrip("/")
             slug = fm.get("slug")
             if slug:
-                url = (self._base_url or "").rstrip("/") + slug
+                slug_path = slug if slug.startswith("/") else "/" + slug
+                url = f"{base}/docs{slug_path}"
             else:
                 # Fallback: derive from file path relative to docs_dir
                 rel = path.relative_to(self._docs_dir)
-                # Remove extension, convert index to parent path
                 url_path = str(rel.with_suffix(""))
                 if url_path.endswith("/index"):
                     url_path = url_path[: -len("/index")]
-                url = (self._base_url or "").rstrip("/") + "/" + url_path
+                url = f"{base}/docs/{url_path}"
 
             # Apply product name transformations
             body = apply_product_name_transforms(body)
