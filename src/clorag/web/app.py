@@ -286,7 +286,11 @@ app.add_exception_handler(Exception, generic_exception_handler)
 # SECURITY: Explicitly list allowed headers instead of wildcard to prevent header exposure
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://cyanview.cloud"],
+    allow_origins=[
+        "https://cyanview.cloud",
+        "https://support.cyanview.cloud",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=[
