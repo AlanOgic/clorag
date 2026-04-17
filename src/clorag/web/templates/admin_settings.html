@@ -501,16 +501,19 @@
             const input = document.getElementById(`input-${settingId || settingKey}`);
             if (!input) return;
 
-            const value = parseFloat(input.value);
-            if (isNaN(value)) {
+            const value = input.value.trim();
+            if (value === '' || isNaN(parseFloat(value))) {
                 showAlert('Invalid value', 'error');
                 return;
             }
 
+            if (!settingId) {
+                showAlert('Missing setting ID', 'error');
+                return;
+            }
+
             try {
-                const endpoint = settingId
-                    ? `/api/admin/settings/${settingId}`
-                    : `/api/admin/settings/by-key/${settingKey}`;
+                const endpoint = `/api/admin/settings/${settingId}`;
                 const response = await AdminUtils.putJson(endpoint, { value: value });
 
                 if (response.ok) {
