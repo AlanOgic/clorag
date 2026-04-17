@@ -226,6 +226,13 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
     # Capture start time for analytics
     search_start_time = start_time
 
+    # Pick prompt composition based on mode
+    prompt_keys = (
+        ("base.chat_identity", "base.product_reference", "synthesis.chat_layer")
+        if req.mode == "chat"
+        else ("base.identity", "base.product_reference", "synthesis.web_layer")
+    )
+
     async def generate() -> AsyncGenerator[str, None]:
         collected_response: list[str] = []
         try:
@@ -234,7 +241,8 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
 
             # Stream the answer with conversation history and graph context
             async for chunk in synthesize_answer_stream(
-                req.query, chunks_for_synthesis, conversation_history, graph_context
+                req.query, chunks_for_synthesis, conversation_history, graph_context,
+                prompt_keys=prompt_keys,
             ):
                 collected_response.append(chunk)
                 yield f"data: {json.dumps({'type': 'text', 'text': chunk})}\n\n"
@@ -303,9 +311,17 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
     # Use helper to perform search
     results, chunks_for_synthesis, graph_context, was_reranked = await perform_search(req)
 
+    # Pick prompt composition based on mode
+    prompt_keys = (
+        ("base.chat_identity", "base.product_reference", "synthesis.chat_layer")
+        if req.mode == "chat"
+        else ("base.identity", "base.product_reference", "synthesis.web_layer")
+    )
+
     # Generate synthesized answer using Claude with conversation history and graph context
     answer = await synthesize_answer(
-        req.query, chunks_for_synthesis, conversation_history, graph_context
+        req.query, chunks_for_synthesis, conversation_history, graph_context,
+        prompt_keys=prompt_keys,
     )
 
     # Store this exchange in the session for future follow-ups

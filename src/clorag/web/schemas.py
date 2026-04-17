@@ -7,7 +7,7 @@ used by the FastAPI web application.
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -49,6 +49,13 @@ class SearchRequest(BaseModel):
         None,
         pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
         description="Session ID previously issued by the server (UUID v4)",
+    )
+    mode: Literal["search", "chat"] = Field(
+        "search",
+        description=(
+            "Synthesis mode. 'search' = full web-search-style answers. "
+            "'chat' = conversational chat-widget replies."
+        ),
     )
 
 
