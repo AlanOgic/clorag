@@ -458,6 +458,37 @@
         }
 
         /* Export dropdown */
+        .answer-copy-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            background: transparent;
+            border: 1px solid #d0e3ff;
+            border-radius: 6px;
+            color: var(--cyan-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .answer-copy-btn:hover {
+            background: #e8f4fc;
+            border-color: var(--cyan-dark);
+        }
+
+        .answer-copy-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .answer-copy-btn.copied {
+            background: #e8f5e9;
+            border-color: #4caf50;
+            color: #2e7d32;
+        }
+
         .export-dropdown {
             position: relative;
             display: inline-block;
@@ -553,7 +584,23 @@
             gap: 0.5rem;
         }
 
-        /* Feedback buttons */
+        /* Feedback footer (bottom of AI answer) */
+        .feedback-footer {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .feedback-label {
+            font-size: 0.8rem;
+            color: #8a9bae;
+            margin-right: auto;
+        }
+
         .feedback-buttons {
             display: flex;
             align-items: center;
@@ -598,8 +645,7 @@
         }
 
         .feedback-comment-container {
-            border-top: 1px solid #e8f4fc;
-            padding: 0.75rem 1rem;
+            margin-top: 0.75rem;
             display: flex;
             gap: 0.5rem;
             align-items: flex-start;
@@ -641,7 +687,7 @@
         .feedback-thanks {
             font-size: 0.8rem;
             color: #4caf50;
-            padding: 0.5rem 1rem;
+            padding: 0.25rem 0;
             animation: fadeIn 0.3s ease;
         }
 
@@ -2053,19 +2099,12 @@ ${bodyContent}
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                         </svg>
                         <span class="answer-title">AI Answer</span>
-                        <div class="feedback-buttons" id="feedback-${exchangeId}" style="display:none;">
-                            <button class="feedback-btn" data-action="feedback" data-rating="up" data-exchange="${exchangeId}" title="Helpful">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                                </svg>
-                            </button>
-                            <button class="feedback-btn" data-action="feedback" data-rating="down" data-exchange="${exchangeId}" title="Not helpful">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
-                                </svg>
-                            </button>
-                        </div>
                         <div class="answer-header-actions">
+                            <button class="answer-copy-btn" id="copy-btn-${exchangeId}" data-action="copy-answer" data-exchange="${exchangeId}" title="Copy answer">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                            </button>
                             <div class="export-dropdown" id="export-dropdown-${exchangeId}">
                                 <button class="export-btn" title="Export answer" data-action="toggle-export" data-exchange="${exchangeId}">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2105,6 +2144,21 @@ ${bodyContent}
                         </div>
                     </div>
                     <div class="answer-content" id="answer-content-${exchangeId}"></div>
+                    <div class="feedback-footer" id="feedback-${exchangeId}" style="display:none;">
+                        <span class="feedback-label">Was this helpful?</span>
+                        <div class="feedback-buttons">
+                            <button class="feedback-btn" data-action="feedback" data-rating="up" data-exchange="${exchangeId}" title="Helpful">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                                </svg>
+                            </button>
+                            <button class="feedback-btn" data-action="feedback" data-rating="down" data-exchange="${exchangeId}" title="Not helpful">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                     <div class="feedback-comment-container" id="feedback-comment-${exchangeId}" style="display:none;">
                         <textarea class="feedback-comment" id="feedback-textarea-${exchangeId}" placeholder="What could be improved?" maxlength="1000" rows="2"></textarea>
                         <button class="feedback-comment-submit" data-action="submit-feedback-comment" data-exchange="${exchangeId}">Send</button>
@@ -2345,6 +2399,10 @@ ${bodyContent}
                     e.preventDefault();
                     submitFeedbackComment(exchangeId);
                     break;
+                case 'copy-answer':
+                    e.preventDefault();
+                    copyAnswer(exchangeId);
+                    break;
             }
         });
 
@@ -2452,33 +2510,29 @@ ${bodyContent}
         });
     </script>
     <script nonce="{{ request.state.csp_nonce }}">
-        // Copy answer to clipboard
-        async function copyAnswer() {
-            const answerEl = document.getElementById('answer-content');
-            const copyBtn = document.getElementById('copy-btn');
-            const copyText = document.getElementById('copy-text');
+        // Copy answer to clipboard (per-exchange)
+        async function copyAnswer(exchangeId) {
+            const answerEl = document.getElementById(`answer-content-${exchangeId}`);
+            const copyBtn = document.getElementById(`copy-btn-${exchangeId}`);
+            if (!answerEl || !copyBtn) return;
 
-            // Get text content (strips HTML)
             const text = answerEl.innerText || answerEl.textContent;
+            const originalTitle = copyBtn.getAttribute('title');
 
             try {
                 await navigator.clipboard.writeText(text);
-
-                // Visual feedback
                 copyBtn.classList.add('copied');
-                copyText.textContent = 'Copied!';
-
-                // Reset after 2 seconds
+                copyBtn.setAttribute('title', 'Copied!');
                 setTimeout(() => {
                     copyBtn.classList.remove('copied');
-                    copyText.textContent = 'Copy';
-                }, 2000);
+                    copyBtn.setAttribute('title', originalTitle);
+                }, 1500);
             } catch (err) {
                 console.error('Copy failed:', err);
-                copyText.textContent = 'Failed';
+                copyBtn.setAttribute('title', 'Copy failed');
                 setTimeout(() => {
-                    copyText.textContent = 'Copy';
-                }, 2000);
+                    copyBtn.setAttribute('title', originalTitle);
+                }, 1500);
             }
         }
     </script>
