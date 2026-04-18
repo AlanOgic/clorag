@@ -399,7 +399,11 @@ uv run rebuild-fts --check</code></pre>
                 <h3>Data Collected</h3>
                 <p>Each search logs the following data:</p>
                 <ul>
-                    <li>Query text and source filter</li>
+                    <li>Raw query text and source filter</li>
+                    <li><strong>Normalized query</strong> — after deterministic RIO terminology transforms (stored only when it differs from raw)</li>
+                    <li><strong>Rewritten query</strong> — LLM standalone rewrite for chat-mode follow-ups (stored only when a rewrite occurred)</li>
+                    <li><strong>Pipeline tag</strong> — <code>web</code>, <code>chat</code>, <code>cli_agent</code>, or <code>mcp</code></li>
+                    <li><strong>Tool calls</strong> — per-invocation list for agent pipelines (tool name, query, result count)</li>
                     <li>Response time (milliseconds)</li>
                     <li>Number of results</li>
                     <li>Full LLM response text</li>
@@ -414,19 +418,21 @@ uv run rebuild-fts --check</code></pre>
                 <ul>
                     <li>Total searches (with time range)</li>
                     <li>Average response time</li>
-                    <li>Searches by source (docs/gmail/both)</li>
+                    <li>Average results per query</li>
+                    <li><strong>Rerank coverage %</strong> — share of searches that went through the cross-encoder</li>
                     <li>Daily search volume chart</li>
-                    <li>Popular queries (ranked)</li>
+                    <li><strong>Source Insights</strong> — per-source <em>win rate</em> (% of searches ranked #1), avg top-5 reranker score, position mix at ranks 1–5</li>
+                    <li>Recent conversations (grouped by session) with italic answer preview under each query</li>
                     <li>Recent searches (clickable to view details)</li>
-                    <li><strong>Search quality review</strong> - Low-scoring queries via <code>/api/admin/search-quality</code></li>
+                    <li><strong>Search quality review</strong> — low-scoring queries via <code>/api/admin/search-quality</code></li>
                 </ul>
 
                 <h3>Admin Interface</h3>
                 <p>Access the analytics dashboard at <a href="/admin/analytics">/admin/analytics</a>:</p>
                 <ul>
                     <li>Time-filtered statistics (7d, 30d, all time)</li>
-                    <li>Visual charts for search volume trends</li>
-                    <li>Click any search to view full details including response and sources</li>
+                    <li>Source Insights panel for retrieval quality by source</li>
+                    <li>Click any search in Recent Searches or a conversation query to open the detail modal — shows raw / rewritten / normalized query variants, agent tool calls, full response, and retrieved chunks with scores</li>
                 </ul>
 
                 <h2 id="performance">Performance Monitoring</h2>

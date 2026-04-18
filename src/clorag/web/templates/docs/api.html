@@ -389,13 +389,25 @@ curl https://cyanview.cloud/api/admin/search-stats \
                     <span class="endpoint__method endpoint__method--get">GET</span>
                     <span class="endpoint__path">/api/admin/search-stats?days=30</span>
                 </div>
-                <p>Get search statistics.</p>
+                <p>Get search statistics: total searches, avg response time, avg results, daily volume, per-source counts, recent searches.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/source-insights?days=30</span>
+                </div>
+                <p>Per-source retrieval quality insight computed from stored <code>source_types</code> and <code>scores</code> arrays. Returns <code>{total, reranked_total, rerank_coverage, sources}</code> where each source has <code>win_rate</code> (% of searches ranked #1), <code>avg_top5_score</code>, <code>positions</code> (count at ranks 1–5), <code>wins</code>, and <code>appearances</code>.</p>
+
+                <div class="endpoint">
+                    <span class="endpoint__method endpoint__method--get">GET</span>
+                    <span class="endpoint__path">/api/admin/conversations?limit=20</span>
+                </div>
+                <p>Recent conversations grouped by <code>session_id</code>. Each query includes a <code>response_preview</code> (first ~240 chars of the answer, cleaned) for the italic teaser in the admin UI.</p>
 
                 <div class="endpoint">
                     <span class="endpoint__method endpoint__method--get">GET</span>
                     <span class="endpoint__path">/api/admin/search/{id}</span>
                 </div>
-                <p>Get stored search details including response, chunks, scores, and source types.</p>
+                <p>Get stored search details: raw query, <code>normalized_query</code> / <code>rewritten_query</code> variants, <code>pipeline</code> tag, agent <code>tool_calls</code>, response, chunks, scores, source types.</p>
 
                 <div class="endpoint">
                     <span class="endpoint__method endpoint__method--get">GET</span>
