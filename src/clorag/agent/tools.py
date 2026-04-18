@@ -1,19 +1,30 @@
 """Custom MCP tools for the CLORAG agent with hybrid RRF search."""
 
+import time
+import uuid
 from typing import Any
 
+import structlog
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
+from clorag.core.analytics_db import AnalyticsDatabase
 from clorag.core.embeddings import EmbeddingsClient
 from clorag.core.retriever import MultiSourceRetriever, SearchSource
 from clorag.core.sparse_embeddings import SparseEmbeddingsClient
 from clorag.core.vectorstore import VectorStore
+
+logger = structlog.get_logger()
 
 # Initialize clients (will be replaced with proper DI in production)
 _embeddings_client: EmbeddingsClient | None = None
 _sparse_embeddings_client: SparseEmbeddingsClient | None = None
 _vector_store: VectorStore | None = None
 _retriever: MultiSourceRetriever | None = None
+
+# One session id per CLI process, so all tool calls in a single `uv run clorag ...`
+# invocation group together in the analytics Recent Conversations view.
+_CLI_SESSION_ID = f"cli-{uuid.uuid4()}"
+_analytics_db: AnalyticsDatabase | None = None
 
 
 def _get_retriever() -> MultiSourceRetriever:
@@ -29,6 +40,73 @@ def _get_retriever() -> MultiSourceRetriever:
             vector_store=_vector_store,
         )
     return _retriever
+
+
+def _get_analytics_db() -> AnalyticsDatabase | None:
+    """Lazy-load analytics DB; returns None if initialization fails."""
+    global _analytics_db
+    if _analytics_db is not None:
+        return _analytics_db
+    try:
+        from clorag.config import get_settings
+        settings = get_settings()
+        _analytics_db = AnalyticsDatabase(db_path=settings.analytics_database_path)
+    except Exception as e:
+        logger.warning("cli_analytics_init_failed", error=str(e))
+        _analytics_db = None
+    return _analytics_db
+
+
+def _log_tool_call(
+    tool_name: str,
+    query: str,
+    source: str,
+    result: Any,
+    elapsed_ms: int,
+) -> None:
+    """Log a CLI-agent tool invocation to analytics_db.
+
+    Each tool call becomes its own ``search_queries`` row tagged
+    ``pipeline='cli_agent'`` so the admin UI can show the actual LLM-rewritten
+    query that the agent chose. Failures are swallowed — analytics must never
+    break the tool call.
+    """
+    db = _get_analytics_db()
+    if db is None:
+        return
+    try:
+        chunks: list[dict[str, Any]] = []
+        scores: list[float] = []
+        source_types: list[str] = []
+        for r in getattr(result, "results", [])[:10]:
+            text = (getattr(r, "text", "") or "")[:800]
+            score = float(getattr(r, "score", 0.0) or 0.0)
+            payload = getattr(r, "payload", None) or {}
+            stype = payload.get("_source") or payload.get("source_type") or "unknown"
+            chunks.append({"text": text, "source_type": stype, "score": score})
+            scores.append(score)
+            source_types.append(str(stype))
+        db.log_search(
+            query=query,
+            source=source,
+            response_time_ms=elapsed_ms,
+            results_count=getattr(result, "total_found", len(chunks)),
+            chunks=chunks,
+            session_id=_CLI_SESSION_ID,
+            reranked=bool(getattr(result, "reranked", False)),
+            scores=scores,
+            source_types=source_types,
+            pipeline="cli_agent",
+            tool_calls=[
+                {
+                    "tool": tool_name,
+                    "query": query,
+                    "result_count": getattr(result, "total_found", len(chunks)),
+                }
+            ],
+        )
+    except Exception as e:
+        logger.debug("cli_tool_call_log_failed", tool=tool_name, error=str(e))
 
 
 @tool(
@@ -63,7 +141,9 @@ async def search_docs(args: dict[str, Any]) -> dict[str, Any]:
         }
 
     retriever = _get_retriever()
+    t0 = time.time()
     result = await retriever.retrieve_docs(query=query, limit=limit)
+    _log_tool_call("search_docs", query, "docs", result, int((time.time() - t0) * 1000))
     context = retriever.format_context(result)
 
     return {
@@ -108,7 +188,9 @@ async def search_cases(args: dict[str, Any]) -> dict[str, Any]:
         }
 
     retriever = _get_retriever()
+    t0 = time.time()
     result = await retriever.retrieve_cases(query=query, limit=limit)
+    _log_tool_call("search_cases", query, "gmail", result, int((time.time() - t0) * 1000))
     context = retriever.format_context(result)
 
     return {
@@ -152,7 +234,9 @@ async def search_custom(args: dict[str, Any]) -> dict[str, Any]:
         }
 
     retriever = _get_retriever()
+    t0 = time.time()
     result = await retriever.retrieve_custom(query=query, limit=limit)
+    _log_tool_call("search_custom", query, "custom", result, int((time.time() - t0) * 1000))
     context = retriever.format_context(result)
 
     return {
@@ -198,11 +282,13 @@ async def hybrid_search(args: dict[str, Any]) -> dict[str, Any]:
         }
 
     retriever = _get_retriever()
+    t0 = time.time()
     result = await retriever.retrieve(
         query=query,
         source=SearchSource.HYBRID,
         limit=limit,
     )
+    _log_tool_call("hybrid_search", query, "both", result, int((time.time() - t0) * 1000))
     context = retriever.format_context(result)
 
     # Include cache stats for debugging (can be removed in production)

@@ -16,6 +16,7 @@ from clorag.web.search.pipeline import (
 )
 from clorag.web.search.synthesis import (
     get_anthropic,
+    rewrite_follow_up,
     synthesize_answer,
     synthesize_answer_stream,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "perform_search",
     # Synthesis
     "get_anthropic",
+    "rewrite_follow_up",
     "synthesize_answer",
     "synthesize_answer_stream",
     # Utils

@@ -12,6 +12,7 @@ import structlog
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 
+from clorag.utils.text_transforms import apply_product_name_transforms
 from clorag.web.auth import get_session_store
 from clorag.web.dependencies import get_analytics_db, get_templates, limiter
 from clorag.web.schemas import (
@@ -23,12 +24,49 @@ from clorag.web.schemas import (
 from clorag.web.search import (
     extract_source_links,
     perform_search,
+    rewrite_follow_up,
     synthesize_answer,
     synthesize_answer_stream,
 )
 
 router = APIRouter()
 logger = structlog.get_logger()
+
+
+async def _resolve_query_variants(
+    req: SearchRequest,
+    conversation_history: list[dict[str, Any]] | None,
+) -> tuple[str, str | None, str | None, SearchRequest]:
+    """Derive the effective retrieval query and record intermediate variants.
+
+    Pipeline:
+      1. Raw query  (what the user typed)
+      2. Rewritten  (LLM standalone rewrite — only for chat mode with history)
+      3. Normalized (deterministic RIO terminology transforms)
+    The effective query used for embeddings is ``normalized`` applied to the
+    rewritten-or-raw query.
+
+    Returns:
+        Tuple of (raw, rewritten_or_none, normalized_or_none, req_for_search)
+        where ``req_for_search`` is a copy of ``req`` with ``query`` set to
+        the final effective retrieval query.
+    """
+    raw = req.query
+    rewritten: str | None = None
+    if req.mode == "chat" and conversation_history:
+        try:
+            rewritten = await rewrite_follow_up(raw, conversation_history)
+        except Exception as e:
+            logger.warning("rewrite_step_failed", error=str(e))
+            rewritten = None
+
+    pre_norm = rewritten or raw
+    normalized_full = apply_product_name_transforms(pre_norm)
+    normalized = normalized_full if normalized_full != pre_norm else None
+
+    effective = normalized_full
+    req_for_search = req.model_copy(update={"query": effective})
+    return raw, rewritten, normalized, req_for_search
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -217,8 +255,13 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
     session = get_session_store().get_or_create_session(req.session_id)
     conversation_history = session.get_context_messages()
 
-    # Use helper to perform search
-    _, chunks_for_synthesis, graph_context, was_reranked = await perform_search(req)
+    # Resolve raw → rewritten (chat only) → normalized query variants
+    raw_query, rewritten_query, normalized_query, req_for_search = (
+        await _resolve_query_variants(req, conversation_history)
+    )
+
+    # Use helper to perform search (against the effective query)
+    _, chunks_for_synthesis, graph_context, was_reranked = await perform_search(req_for_search)
 
     # Extract top 3 unique source links
     source_links = extract_source_links(chunks_for_synthesis)
@@ -233,15 +276,18 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
         else ("base.identity", "base.product_reference", "synthesis.web_layer")
     )
 
+    pipeline_tag = "chat" if req.mode == "chat" else "web"
+
     async def generate() -> AsyncGenerator[str, None]:
         collected_response: list[str] = []
         try:
             # Send session_id first so frontend can track the conversation
             yield f"data: {json.dumps({'type': 'session', 'session_id': session.session_id})}\n\n"
 
-            # Stream the answer with conversation history and graph context
+            # Synthesis sees the raw user question (history already gives intent),
+            # so the LLM voice stays natural even after a standalone rewrite.
             async for chunk in synthesize_answer_stream(
-                req.query, chunks_for_synthesis, conversation_history, graph_context,
+                raw_query, chunks_for_synthesis, conversation_history, graph_context,
                 prompt_keys=prompt_keys,
             ):
                 collected_response.append(chunk)
@@ -257,7 +303,7 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
             response_time_ms = int((time.time() - search_start_time) * 1000)
             try:
                 search_id = get_analytics_db().log_search(
-                    query=req.query,
+                    query=raw_query,
                     source=req.source.value,
                     response_time_ms=response_time_ms,
                     results_count=len(chunks_for_synthesis),
@@ -267,6 +313,9 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
                     reranked=was_reranked,
                     scores=[c.get("score", 0) for c in chunks_for_synthesis],
                     source_types=[c.get("source_type", "unknown") for c in chunks_for_synthesis],
+                    normalized_query=normalized_query,
+                    rewritten_query=rewritten_query,
+                    pipeline=pipeline_tag,
                 )
             except Exception as e:
                 logger.warning("Failed to log search analytics", error=str(e))
@@ -275,9 +324,9 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
             yield f"data: {json.dumps({'type': 'done', 'search_id': search_id})}\n\n"
 
             # Store this exchange in the session for future follow-ups
-            session.add_exchange(req.query, full_response)
+            session.add_exchange(raw_query, full_response)
         except Exception as e:
-            logger.error("Error during streaming response", error=str(e), query=req.query)
+            logger.error("Error during streaming response", error=str(e), query=raw_query)
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
 
     return StreamingResponse(
@@ -308,8 +357,15 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
     session = get_session_store().get_or_create_session(req.session_id)
     conversation_history = session.get_context_messages()
 
-    # Use helper to perform search
-    results, chunks_for_synthesis, graph_context, was_reranked = await perform_search(req)
+    # Resolve raw → rewritten (chat only) → normalized query variants
+    raw_query, rewritten_query, normalized_query, req_for_search = (
+        await _resolve_query_variants(req, conversation_history)
+    )
+
+    # Use helper to perform search (against the effective query)
+    results, chunks_for_synthesis, graph_context, was_reranked = (
+        await perform_search(req_for_search)
+    )
 
     # Pick prompt composition based on mode
     prompt_keys = (
@@ -320,12 +376,12 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
 
     # Generate synthesized answer using Claude with conversation history and graph context
     answer = await synthesize_answer(
-        req.query, chunks_for_synthesis, conversation_history, graph_context,
+        raw_query, chunks_for_synthesis, conversation_history, graph_context,
         prompt_keys=prompt_keys,
     )
 
     # Store this exchange in the session for future follow-ups
-    session.add_exchange(req.query, answer)
+    session.add_exchange(raw_query, answer)
 
     # Extract top 3 unique source links
     source_links = extract_source_links(chunks_for_synthesis, as_model=True)
@@ -335,7 +391,7 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
     response_time_ms = int((time.time() - start_time) * 1000)
     try:
         search_id = get_analytics_db().log_search(
-            query=req.query,
+            query=raw_query,
             source=req.source.value,
             response_time_ms=response_time_ms,
             results_count=len(results),
@@ -345,12 +401,15 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
             reranked=was_reranked,
             scores=[r.score for r in results],
             source_types=[r.source for r in results],
+            normalized_query=normalized_query,
+            rewritten_query=rewritten_query,
+            pipeline="chat" if req.mode == "chat" else "web",
         )
     except Exception as e:
         logger.warning("Failed to log search analytics", error=str(e))
 
     return SearchResponse(
-        query=req.query,
+        query=raw_query,
         source=req.source.value,
         answer=answer,
         source_links=source_links,  # type: ignore[arg-type]

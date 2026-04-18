@@ -241,24 +241,74 @@ const AdminActions = {
     },
 
     /**
-     * Call a global function by name
+     * Call a global function by name.
+     * Args may be provided either via ``data-args`` (comma-separated simple
+     * values) or ``data-args-json`` (a JSON-encoded array of values). The
+     * JSON form is preferred when any argument may contain commas, quotes,
+     * or non-string values.
      */
-    callFunction(fnName, args) {
+    callFunction(fnName, args, argsJson) {
         const fn = window[fnName];
-        if (typeof fn === 'function') {
-            const parsedArgs = args ? args.split(',').map(a => {
+        if (typeof fn !== 'function') {
+            console.warn(`AdminActions: Function "${fnName}" not found`);
+            return;
+        }
+        let parsedArgs = [];
+        if (argsJson) {
+            try {
+                parsedArgs = JSON.parse(argsJson);
+                if (!Array.isArray(parsedArgs)) parsedArgs = [parsedArgs];
+            } catch (e) {
+                console.warn(`AdminActions: invalid data-args-json for "${fnName}":`, e);
+                return;
+            }
+        } else if (args) {
+            parsedArgs = args.split(',').map(a => {
                 const trimmed = a.trim();
-                // Try to parse as number
                 if (/^\d+$/.test(trimmed)) return parseInt(trimmed, 10);
                 if (/^\d+\.\d+$/.test(trimmed)) return parseFloat(trimmed);
-                // Remove quotes if present
                 if (/^['"].*['"]$/.test(trimmed)) return trimmed.slice(1, -1);
+                if (trimmed === 'null') return null;
+                if (trimmed === 'true') return true;
+                if (trimmed === 'false') return false;
                 return trimmed;
-            }) : [];
-            fn(...parsedArgs);
-        } else {
-            console.warn(`AdminActions: Function "${fnName}" not found`);
+            });
         }
+        fn(...parsedArgs);
+    },
+
+    /**
+     * Call a global function, passing the element as the first arg.
+     * Use for cases that previously relied on `this` inside inline handlers.
+     */
+    callFunctionWithEl(element, fnName, args, argsJson) {
+        const fn = window[fnName];
+        if (typeof fn !== 'function') {
+            console.warn(`AdminActions: Function "${fnName}" not found`);
+            return;
+        }
+        let parsedArgs = [];
+        if (argsJson) {
+            try {
+                parsedArgs = JSON.parse(argsJson);
+                if (!Array.isArray(parsedArgs)) parsedArgs = [parsedArgs];
+            } catch (e) {
+                console.warn(`AdminActions: invalid data-args-json for "${fnName}":`, e);
+                return;
+            }
+        } else if (args) {
+            parsedArgs = args.split(',').map(a => {
+                const trimmed = a.trim();
+                if (/^\d+$/.test(trimmed)) return parseInt(trimmed, 10);
+                if (/^\d+\.\d+$/.test(trimmed)) return parseFloat(trimmed);
+                if (/^['"].*['"]$/.test(trimmed)) return trimmed.slice(1, -1);
+                if (trimmed === 'null') return null;
+                if (trimmed === 'true') return true;
+                if (trimmed === 'false') return false;
+                return trimmed;
+            });
+        }
+        fn(element, ...parsedArgs);
     },
 
     /**
@@ -351,7 +401,25 @@ const AdminActions = {
 
             case 'call':
                 event.preventDefault();
-                this.callFunction(actionEl.dataset.fn, actionEl.dataset.args);
+                this.callFunction(
+                    actionEl.dataset.fn,
+                    actionEl.dataset.args,
+                    actionEl.dataset.argsJson,
+                );
+                break;
+
+            case 'call-with-el':
+                event.preventDefault();
+                this.callFunctionWithEl(
+                    actionEl,
+                    actionEl.dataset.fn,
+                    actionEl.dataset.args,
+                    actionEl.dataset.argsJson,
+                );
+                break;
+
+            case 'stop-propagation':
+                event.stopPropagation();
                 break;
 
             case 'confirm-delete':
@@ -520,11 +588,18 @@ const AdminAnimations = {
      */
     closeModalAnimated(overlay) {
         overlay.classList.add('closing');
-        overlay.addEventListener('animationend', () => {
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
             overlay.classList.remove('closing');
             overlay.classList.add('hidden');
             overlay.classList.remove('visible');
-        }, { once: true });
+        };
+        overlay.addEventListener('animationend', finish, { once: true });
+        // Fallback: if no close animation fires (missing keyframe, hidden child,
+        // reduced-motion), still hide the overlay so it never traps the UI.
+        setTimeout(finish, 300);
     },
 
     /**

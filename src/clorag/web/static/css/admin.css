@@ -1301,6 +1301,7 @@ body,
 }
 
 .modal-overlay.closing .modal-content,
+.modal-overlay.closing .modal,
 .merge-modal-overlay.closing .merge-modal {
     animation: modalScaleOut 0.2s ease-in forwards;
 }

@@ -351,9 +351,25 @@
             background: #fafafa;
         }
 
-        .conversation-query__text {
+        .conversation-query__body {
             flex: 1;
+            min-width: 0;
+        }
+
+        .conversation-query__text {
             font-size: 0.9rem;
+        }
+
+        .conversation-query__preview {
+            margin-top: 0.2rem;
+            font-size: 0.82rem;
+            font-style: italic;
+            color: #606770;
+            line-height: 1.35;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
         }
 
         .conversation-query__meta {
@@ -469,7 +485,7 @@
     <!-- Hero -->
     <section class="hero">
         <h1 class="hero__title">Search Analytics</h1>
-        <p class="hero__subtitle">Monitor search usage and popular queries</p>
+        <p class="hero__subtitle">Retrieval quality, query rewrites, and conversations</p>
     </section>
 
     <!-- Main Content -->
@@ -491,8 +507,8 @@
                     <div class="stat-card__label">Avg Results</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card__value" id="uniqueQueries">-</div>
-                    <div class="stat-card__label">Unique Queries</div>
+                    <div class="stat-card__value" id="rerankCoverage">-</div>
+                    <div class="stat-card__label">Reranked %</div>
                 </div>
             </div>
 
@@ -510,35 +526,27 @@
                 <div class="daily-chart" id="dailyChart"></div>
             </div>
 
-            <!-- Source Distribution -->
+            <!-- Source Insights -->
             <div class="section">
-                <h3 class="section__title">Searches by Source</h3>
-                <div id="sourceDistribution"></div>
-            </div>
-
-            <!-- Popular Queries -->
-            <div class="section section--collapsible">
-                <div class="section__header" id="popularQueriesHeader" data-section="popularQueries">
-                    <h3 class="section__title">Popular Queries (Last 30 Days)</h3>
-                    <span class="section__toggle">
-                        <span id="popularQueriesLabel">Show</span>
-                        <svg class="expand-icon" id="popularQueriesIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                    </span>
-                </div>
-                <div class="section__content" id="popularQueriesContent">
-                    <table class="data-table" id="popularTable">
-                        <thead>
-                            <tr>
-                                <th>Query</th>
-                                <th>Count</th>
-                                <th>Last Searched</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+                <h3 class="section__title">Source Insights</h3>
+                <p style="margin: 0.25rem 0 1rem; color: #606770; font-size: 0.85rem;">
+                    Win rate = % of searches where that source was retrieved at rank&nbsp;#1.
+                    Avg score = mean Voyage rerank-2.5 score across top-5 appearances.
+                </p>
+                <table class="data-table" id="sourceInsightsTable">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Win rate</th>
+                            <th>Avg top-5 score</th>
+                            <th>Position mix (1→5)</th>
+                            <th>Wins / Appearances</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sourceInsightsBody">
+                        <tr><td colspan="5" style="text-align:center; color:#999;">Loading…</td></tr>
+                    </tbody>
+                </table>
             </div>
 
             <!-- Recent Conversations -->
@@ -685,9 +693,6 @@
         document.getElementById('refreshBtn').addEventListener('click', loadAnalytics);
 
         // Section toggle handlers (using data-action attributes)
-        document.getElementById('popularQueriesHeader').addEventListener('click', () => {
-            AdminActions.toggleSection('popularQueries');
-        });
         document.getElementById('recentConversationsHeader').addEventListener('click', () => {
             AdminActions.toggleSection('recentConversations');
         });
@@ -734,23 +739,75 @@
                 stats.avg_response_time_ms ? Math.round(stats.avg_response_time_ms) : '-';
             document.getElementById('avgResults').textContent =
                 stats.avg_results_count ? stats.avg_results_count.toFixed(1) : '-';
-            document.getElementById('uniqueQueries').textContent = data.popular_queries.length;
 
             // Daily chart
             renderDailyChart(stats.searches_per_day || []);
 
-            // Source distribution
-            renderSourceDistribution(stats.searches_by_source || {});
-
-            // Popular queries table
-            renderPopularTable(data.popular_queries || []);
-
             // Recent searches table
             renderRecentTable(data.recent_searches || []);
 
-            // Load conversations and feedback separately
+            // Load source insights, conversations, and feedback separately
+            loadSourceInsights();
             loadConversations();
             loadFeedback();
+        }
+
+        async function loadSourceInsights() {
+            try {
+                const response = await fetch('/api/admin/source-insights?days=30');
+                if (!response.ok) throw new Error('Failed to load source insights');
+                const data = await response.json();
+                renderSourceInsights(data);
+            } catch (error) {
+                console.error('Failed to load source insights:', error);
+                document.getElementById('sourceInsightsBody').innerHTML =
+                    '<tr><td colspan="5" style="text-align:center; color:#e53935;">Failed to load</td></tr>';
+            }
+        }
+
+        const SOURCE_LABELS = {
+            documentation: 'Documentation',
+            gmail_case: 'Support Cases',
+            custom_docs: 'Custom Knowledge',
+        };
+        const SOURCE_CLASSES = {
+            documentation: 'tag--docs',
+            gmail_case: 'tag--gmail',
+            custom_docs: 'tag--both',
+        };
+
+        function renderSourceInsights(data) {
+            const tbody = document.getElementById('sourceInsightsBody');
+            const rerankEl = document.getElementById('rerankCoverage');
+            rerankEl.textContent = (data.total > 0)
+                ? (data.rerank_coverage || 0).toFixed(1) + '%'
+                : '-';
+
+            const sources = data.sources || {};
+            const entries = Object.entries(sources).sort(
+                (a, b) => (b[1].win_rate || 0) - (a[1].win_rate || 0)
+            );
+
+            if (!entries.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999;">No reranked data yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = entries.map(([stype, s]) => {
+                const tagClass = SOURCE_CLASSES[stype] || 'tag--both';
+                const label = SOURCE_LABELS[stype] || stype;
+                const avgScore = s.avg_top5_score != null ? s.avg_top5_score.toFixed(3) : '—';
+                const positions = (s.positions || []).map((n, idx) =>
+                    `<span style="display:inline-block; min-width:1.6rem; text-align:center; padding:0.1rem 0.35rem; margin-right:0.15rem; background:#eef3f9; border-radius:4px; font-size:0.78rem;" title="Rank ${idx+1}: ${n}">${n}</span>`
+                ).join('');
+                return `<tr>
+                    <td><span class="tag ${tagClass}">${escapeHtml(label)}</span></td>
+                    <td><strong>${(s.win_rate || 0).toFixed(1)}%</strong></td>
+                    <td>${avgScore}</td>
+                    <td>${positions}</td>
+                    <td>${s.wins || 0} / ${s.appearances || 0}</td>
+                </tr>`;
+            }).join('');
         }
 
         async function loadConversations() {
@@ -826,15 +883,23 @@
                 const truncatedQuery = firstQuery.length > 80 ? firstQuery.substring(0, 80) + '...' : firstQuery;
                 const sessionShort = conv.session_id ? conv.session_id.substring(0, 8) : 'Unknown';
 
-                const queriesHtml = conv.queries.map((q, i) => `
+                const queriesHtml = conv.queries.map((q, i) => {
+                    const preview = q.response_preview
+                        ? `<div class="conversation-query__preview">${escapeHtml(q.response_preview)}</div>`
+                        : '';
+                    return `
                     <div class="conversation-query clickable-row" data-action="open-search-detail" data-id="${q.id}" title="Click to view details">
                         <span class="conversation-query__number">${i + 1}</span>
-                        <span class="conversation-query__text">${escapeHtml(q.query)}</span>
+                        <div class="conversation-query__body">
+                            <div class="conversation-query__text">${escapeHtml(q.query)}</div>
+                            ${preview}
+                        </div>
                         <div class="conversation-query__meta">
                             <span class="conversation-query__time">${formatDate(q.created_at)}</span>
                         </div>
                     </div>
-                `).join('');
+                `;
+                }).join('');
 
                 return `
                     <div class="conversation-card">
@@ -886,49 +951,6 @@
                     </div>
                 `;
             }).join('');
-        }
-
-        function renderSourceDistribution(sources) {
-            const container = document.getElementById('sourceDistribution');
-            const total = Object.values(sources).reduce((a, b) => a + b, 0);
-
-            if (total === 0) {
-                container.innerHTML = '<p style="color: #999;">No data yet</p>';
-                return;
-            }
-
-            const items = Object.entries(sources).map(([source, count]) => {
-                const pct = ((count / total) * 100).toFixed(1);
-                const tagClass = source === 'docs' ? 'tag--docs' :
-                                 source === 'gmail' ? 'tag--gmail' : 'tag--both';
-                return `
-                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
-                        <span class="tag ${tagClass}">${source}</span>
-                        <div style="flex: 1; background: #eee; height: 8px; border-radius: 4px; overflow: hidden;">
-                            <div style="width: ${pct}%; height: 100%; background: var(--cyan-blue);"></div>
-                        </div>
-                        <span style="font-size: 0.9rem; color: #606770;">${count} (${pct}%)</span>
-                    </div>
-                `;
-            });
-
-            container.innerHTML = items.join('');
-        }
-
-        function renderPopularTable(queries) {
-            const tbody = document.querySelector('#popularTable tbody');
-            if (!queries.length) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #999;">No queries yet</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = queries.map(q => `
-                <tr>
-                    <td><a href="/admin/search-debug?q=${encodeURIComponent(q.query)}" class="query-link" title="Debug this query"><strong>${escapeHtml(q.query)}</strong></a></td>
-                    <td>${q.count}</td>
-                    <td>${formatDate(q.last_searched)}</td>
-                </tr>
-            `).join('');
         }
 
         function renderRecentTable(searches) {
@@ -1021,20 +1043,70 @@
             const rerankTag = data.reranked
                 ? '<span class="tag tag--reranked">Yes</span>'
                 : '<span class="tag tag--no-rerank">No</span>';
+            const pipelineTag = data.pipeline
+                ? `<span class="tag" style="background:#eef3f9; color:#34495e;">${escapeHtml(data.pipeline)}</span>`
+                : '-';
+
+            // Query variants: raw → rewritten → normalized
+            const variantRows = [];
+            variantRows.push(`
+                <div style="margin-bottom:0.35rem;">
+                    <span style="color:#606770; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.03em;">Raw</span>
+                    <div style="font-size:1.05rem; font-weight:500;">${escapeHtml(data.query)}</div>
+                </div>`);
+            if (data.rewritten_query) {
+                variantRows.push(`
+                    <div style="margin-bottom:0.35rem;">
+                        <span style="color:#606770; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.03em;">Rewritten (standalone)</span>
+                        <div style="font-size:0.95rem; color:#1976d2;">${escapeHtml(data.rewritten_query)}</div>
+                    </div>`);
+            }
+            if (data.normalized_query) {
+                variantRows.push(`
+                    <div style="margin-bottom:0.35rem;">
+                        <span style="color:#606770; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.03em;">Normalized (retrieval)</span>
+                        <div style="font-size:0.95rem; color:#7b1fa2;">${escapeHtml(data.normalized_query)}</div>
+                    </div>`);
+            }
+
+            // Tool calls (CLI agent / MCP)
+            let toolCallsHtml = '';
+            if (Array.isArray(data.tool_calls) && data.tool_calls.length > 0) {
+                const rows = data.tool_calls.map(tc => `
+                    <tr>
+                        <td><code>${escapeHtml(tc.tool || '?')}</code></td>
+                        <td>${escapeHtml(tc.query || '-')}</td>
+                        <td style="text-align:right;">${tc.result_count ?? '-'}</td>
+                    </tr>`).join('');
+                toolCallsHtml = `
+                    <div class="detail-section">
+                        <div class="detail-section__title">Agent Tool Calls</div>
+                        <table class="data-table">
+                            <thead><tr><th>Tool</th><th>Query</th><th style="text-align:right;">Results</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>`;
+            }
 
             let chunksHtml = '<p class="no-data">No chunks stored for this search</p>';
             if (data.chunks && data.chunks.length > 0) {
                 chunksHtml = data.chunks.map((chunk, i) => {
-                    const sourceType = chunk.source_type === 'documentation' ? 'Documentation' : 'Support Case';
+                    const sourceType = chunk.source_type === 'documentation' ? 'Documentation'
+                        : chunk.source_type === 'custom_docs' ? 'Custom Knowledge'
+                        : 'Support Case';
+                    const score = (typeof chunk.score === 'number') ? chunk.score.toFixed(3) : null;
                     // Security: Validate URL before rendering as link
                     const urlHtml = (chunk.url && isSafeUrl(chunk.url))
                         ? `<a href="${escapeHtml(chunk.url)}" class="detail-chunk__url" target="_blank" rel="noopener">${escapeHtml(chunk.url)}</a>`
                         : (chunk.subject ? `<span class="detail-chunk__url">${escapeHtml(chunk.subject)}</span>` : '');
+                    const scoreHtml = score != null
+                        ? `<span style="font-size:0.75rem; color:#606770; margin-left:0.5rem;">score ${score}</span>`
+                        : '';
 
                     return `
                         <div class="detail-chunk">
                             <div class="detail-chunk__header">
-                                <span class="detail-chunk__source">#${i + 1} - ${sourceType}</span>
+                                <span class="detail-chunk__source">#${i + 1} — ${sourceType}${scoreHtml}</span>
                                 ${urlHtml}
                             </div>
                             <div class="detail-chunk__text">${escapeHtml(chunk.text?.substring(0, 500) || '')}${chunk.text?.length > 500 ? '...' : ''}</div>
@@ -1046,13 +1118,17 @@
             modalBody.innerHTML = `
                 <div class="detail-section">
                     <div class="detail-section__title">Query</div>
-                    <div style="font-size: 1.1rem; font-weight: 500;">${escapeHtml(data.query)}</div>
+                    ${variantRows.join('')}
                 </div>
 
                 <div class="detail-section">
                     <div class="detail-meta">
                         <div class="detail-meta__item">
-                            <span class="detail-meta__label">Source:</span>
+                            <span class="detail-meta__label">Pipeline:</span>
+                            ${pipelineTag}
+                        </div>
+                        <div class="detail-meta__item">
+                            <span class="detail-meta__label">Source filter:</span>
                             <span class="tag ${tagClass}">${data.source}</span>
                         </div>
                         <div class="detail-meta__item">
@@ -1073,6 +1149,8 @@
                         </div>
                     </div>
                 </div>
+
+                ${toolCallsHtml}
 
                 <div class="detail-section">
                     <div class="detail-section__title">LLM Response</div>

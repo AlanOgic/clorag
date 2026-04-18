@@ -3,10 +3,60 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+_PREVIEW_MAX_CHARS = 240
+
+
+def _extract_preview(response: str | None) -> str | None:
+    """Return a short single-line teaser of an answer (~240 chars).
+
+    Strips markdown headings, collapses whitespace, and truncates on a word
+    boundary with an ellipsis. Numbered/bulleted lists flatten naturally
+    onto one line. Returns None when empty so the UI can omit the preview.
+    """
+    if not response:
+        return None
+    text = response.strip()
+    # Drop leading markdown heading line(s) ("# ...", "## ..." etc.)
+    lines = text.split("\n")
+    while lines and lines[0].lstrip().startswith("#"):
+        lines.pop(0)
+    text = "\n".join(lines).strip()
+    # Collapse all internal whitespace (including newlines) into single spaces
+    text = re.sub(r"\s+", " ", text)
+    # Strip leading quote/bullet markers left after heading cleanup
+    text = re.sub(r"^[>\-*•\s]+", "", text).strip()
+    if not text:
+        return None
+    if len(text) <= _PREVIEW_MAX_CHARS:
+        return text
+    # Prefer cutting on a sentence boundary within the budget, else word boundary
+    cut = text[: _PREVIEW_MAX_CHARS]
+    boundary = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    if boundary >= _PREVIEW_MAX_CHARS // 2:
+        return cut[: boundary + 1].rstrip() + " …"
+    ws = cut.rfind(" ")
+    if ws > 0:
+        cut = cut[:ws]
+    return cut.rstrip() + "…"
+
+
+def _src_bucket(sources: dict[str, dict[str, Any]], stype: str) -> dict[str, Any]:
+    """Return (creating if absent) the accumulator bucket for a source type."""
+    if stype not in sources:
+        sources[stype] = {
+            "wins": 0,
+            "appearances": 0,
+            "positions": [0, 0, 0, 0, 0],
+            "score_sum": 0.0,
+            "score_n": 0,
+        }
+    return sources[stype]
 
 
 class AnalyticsDatabase:
@@ -66,6 +116,22 @@ class AnalyticsDatabase:
                 conn.execute(
                     "ALTER TABLE search_queries ADD COLUMN source_types TEXT"
                 )
+            if "normalized_query" not in columns:
+                conn.execute(
+                    "ALTER TABLE search_queries ADD COLUMN normalized_query TEXT"
+                )
+            if "rewritten_query" not in columns:
+                conn.execute(
+                    "ALTER TABLE search_queries ADD COLUMN rewritten_query TEXT"
+                )
+            if "pipeline" not in columns:
+                conn.execute(
+                    "ALTER TABLE search_queries ADD COLUMN pipeline TEXT DEFAULT 'web'"
+                )
+            if "tool_calls" not in columns:
+                conn.execute(
+                    "ALTER TABLE search_queries ADD COLUMN tool_calls TEXT"
+                )
 
             # Feedback table
             conn.execute("""
@@ -98,11 +164,15 @@ class AnalyticsDatabase:
         reranked: bool = False,
         scores: list[float] | None = None,
         source_types: list[str] | None = None,
+        normalized_query: str | None = None,
+        rewritten_query: str | None = None,
+        pipeline: str = "web",
+        tool_calls: list[dict[str, Any]] | None = None,
     ) -> int:
         """Log a search query with full response data and quality metrics.
 
         Args:
-            query: The search query text.
+            query: The raw user query as typed.
             source: Data source used (docs, gmail, both).
             response_time_ms: Response time in milliseconds.
             results_count: Number of results returned.
@@ -112,6 +182,13 @@ class AnalyticsDatabase:
             reranked: Whether reranking was applied to results.
             scores: List of result scores (reranker scores if reranked).
             source_types: List of source types for each result.
+            normalized_query: Query after deterministic text transforms
+                (e.g. RIO terminology). Stored only when it differs from raw.
+            rewritten_query: Standalone query produced by LLM rewrite for
+                conversational follow-ups. Stored only when rewritten.
+            pipeline: Origin of the query — 'web', 'chat', 'cli_agent', 'mcp'.
+            tool_calls: For agent pipelines, list of tool invocations with
+                their per-tool queries and result counts.
 
         Returns:
             The ID of the inserted record.
@@ -119,16 +196,19 @@ class AnalyticsDatabase:
         chunks_json = json.dumps(chunks) if chunks else None
         scores_json = json.dumps(scores) if scores else None
         source_types_json = json.dumps(source_types) if source_types else None
+        tool_calls_json = json.dumps(tool_calls) if tool_calls else None
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO search_queries
                 (query, source, response_time_ms, results_count, response, chunks, session_id,
-                 reranked, scores, source_types)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 reranked, scores, source_types, normalized_query, rewritten_query,
+                 pipeline, tool_calls)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (query, source, response_time_ms, results_count, response, chunks_json,
-                 session_id, 1 if reranked else 0, scores_json, source_types_json),
+                 session_id, 1 if reranked else 0, scores_json, source_types_json,
+                 normalized_query, rewritten_query, pipeline, tool_calls_json),
             )
             conn.commit()
             return cursor.lastrowid or 0
@@ -266,7 +346,8 @@ class AnalyticsDatabase:
                 """
                 SELECT id, query, source, response_time_ms, results_count,
                        response, chunks, session_id, reranked, scores,
-                       source_types, created_at
+                       source_types, normalized_query, rewritten_query,
+                       pipeline, tool_calls, created_at
                 FROM search_queries
                 WHERE id = ?
                 """,
@@ -283,6 +364,8 @@ class AnalyticsDatabase:
                 result["scores"] = json.loads(result["scores"])
             if result.get("source_types"):
                 result["source_types"] = json.loads(result["source_types"])
+            if result.get("tool_calls"):
+                result["tool_calls"] = json.loads(result["tool_calls"])
             # Convert reranked to boolean
             result["reranked"] = bool(result.get("reranked", 0))
             return result
@@ -336,6 +419,9 @@ class AnalyticsDatabase:
     def get_recent_conversations(self, limit: int = 20) -> list[dict[str, Any]]:
         """Get recent conversations grouped by session_id.
 
+        Each query includes a ``response_preview`` with the first 2–3 sentences
+        of the LLM answer (max 240 chars) so the admin UI can show a teaser.
+
         Args:
             limit: Maximum number of conversations to return.
 
@@ -371,18 +457,107 @@ class AnalyticsDatabase:
                     placeholders = ",".join("?" * len(query_ids))
                     queries_cursor = conn.execute(
                         f"""
-                        SELECT id, query, source, response_time_ms, results_count, created_at
+                        SELECT id, query, source, response_time_ms, results_count,
+                               response, created_at
                         FROM search_queries
                         WHERE id IN ({placeholders})
                         ORDER BY created_at ASC
                         """,
                         query_ids,
                     )
-                    conv["queries"] = [dict(q) for q in queries_cursor.fetchall()]
+                    queries = []
+                    for q in queries_cursor.fetchall():
+                        q_dict = dict(q)
+                        q_dict["response_preview"] = _extract_preview(q_dict.pop("response", None))
+                        queries.append(q_dict)
+                    conv["queries"] = queries
                 else:
                     conv["queries"] = []
                 conversations.append(conv)
             return conversations
+
+    def get_source_insights(self, days: int = 30) -> dict[str, Any]:
+        """Compute per-source retrieval insight.
+
+        Aggregates ``source_types`` + ``scores`` parallel arrays stored on
+        each logged search to produce:
+          - win_rate: % of searches where each source was ranked #1
+          - avg_top5_score: mean reranker score of that source in top-5
+          - position_mix: count of appearances at each rank 1..5
+          - rerank_coverage: % of searches that were reranked
+
+        Args:
+            days: Lookback window in days.
+
+        Returns:
+            Dict with ``total``, ``reranked_total``, ``rerank_coverage``,
+            ``sources`` keyed by source_type.
+        """
+        since = datetime.now() - timedelta(days=days)
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT reranked, scores, source_types
+                FROM search_queries
+                WHERE created_at >= ? AND source_types IS NOT NULL
+                """,
+                (since.isoformat(),),
+            )
+            rows = cursor.fetchall()
+
+        total = len(rows)
+        reranked_total = 0
+        sources: dict[str, dict[str, Any]] = {}
+
+        for reranked_flag, scores_json, source_types_json in rows:
+            if reranked_flag:
+                reranked_total += 1
+            try:
+                stypes = json.loads(source_types_json) if source_types_json else []
+            except (TypeError, ValueError):
+                continue
+            try:
+                sscores = json.loads(scores_json) if scores_json else []
+            except (TypeError, ValueError):
+                sscores = []
+
+            if not stypes:
+                continue
+            # Count wins (rank 1 only) — first source wins
+            top_source = stypes[0]
+            _src_bucket(sources, top_source)["wins"] += 1
+
+            # Top-5 position mix + score accumulation
+            for idx, stype in enumerate(stypes[:5]):
+                bucket = _src_bucket(sources, stype)
+                bucket["appearances"] += 1
+                bucket["positions"][idx] += 1
+                if idx < len(sscores) and isinstance(sscores[idx], (int, float)):
+                    bucket["score_sum"] += float(sscores[idx])
+                    bucket["score_n"] += 1
+
+        # Finalize averages + rates
+        for stype, bucket in sources.items():
+            bucket["avg_top5_score"] = (
+                round(bucket["score_sum"] / bucket["score_n"], 4)
+                if bucket["score_n"]
+                else None
+            )
+            bucket["win_rate"] = (
+                round(bucket["wins"] / total * 100, 1) if total else 0.0
+            )
+            # Drop internal accumulators from output
+            bucket.pop("score_sum", None)
+            bucket.pop("score_n", None)
+
+        return {
+            "total": total,
+            "reranked_total": reranked_total,
+            "rerank_coverage": (
+                round(reranked_total / total * 100, 1) if total else 0.0
+            ),
+            "sources": sources,
+        }
 
     def save_feedback(
         self,

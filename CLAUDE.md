@@ -9,7 +9,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 
 Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
-**Version**: 0.10.5 | **Python**: 3.10-3.13
+**Version**: 0.11.0 | **Python**: 3.10-3.13
 
 ## Commands
 
@@ -301,8 +301,22 @@ Production:
 - Web: https://cyanview.cloud/ (Docker maps 8085→8080)
 - MCP HTTP: https://mcp.cyanview.cloud/ (Docker maps 8086→8080, Bearer auth required)
 
-## Recent Updates (2026-04-03)
+## Recent Updates (2026-04-18)
 
+### v0.11.0: Analytics Rework + Query Rewriting Visibility
+
+- **Source Insights panel** (`/admin/analytics`): replaces the flat "Searches by Source" bar with per-source retrieval quality metrics — win rate (% of searches where the source was ranked #1), avg top-5 reranker score, position mix at ranks 1–5, wins/appearances count. Real visibility into which sources actually win after rerank.
+- **Reranked %** stat card on the dashboard (replaced "Unique Queries") showing the share of searches that went through the cross-encoder
+- **Popular Queries section removed** from the analytics dashboard (endpoint `/search-stats/popular` preserved for potential future use)
+- **Query-rewrite visibility**: three layers of query transformation are now logged and surfaced in the search-detail modal
+  - **Normalized query** (deterministic RIO terminology — e.g. "RIO-Live" → "RIO +LAN") — web pipeline now applies `apply_product_name_transforms` before embedding, previously only the CLI retriever did
+  - **Rewritten query** (LLM standalone rewrite) — chat-mode follow-ups ("and the FX6?") are rewritten to standalone queries ("Sony FX6 camera connection") via a cheap `sonnet_model` call before retrieval; only fires when history is present, falls back silently on failure
+  - **Agent tool calls** — each CLI `search_docs` / `search_cases` / `search_custom` / `hybrid_search` invocation is logged as its own analytics row tagged `pipeline='cli_agent'` with the actual query the LLM chose; visible in the modal as a dedicated Tool Calls table
+- **Conversation previews**: each query in Recent Conversations now shows an italic 2-line teaser of the answer (first ~240 chars, heading-stripped, sentence-boundary truncation). `get_recent_conversations()` now includes `response_preview` per query.
+- **Modal close bug fixed**: analytics search-detail modal was stuck open because the close animation selector (`.modal-overlay.closing .modal-content`) didn't match the actual child class (`.modal`). Fixed in two places: (a) CSS selector broadened to also match `.modal` and `.merge-modal`; (b) `closeModalAnimated` in `admin.js` now has a 300ms fallback timeout so a missing animation never traps the overlay.
+- **Schema migration** (non-destructive, verified on existing data): `search_queries` gains `normalized_query`, `rewritten_query`, `pipeline`, `tool_calls` columns via `ALTER TABLE ADD COLUMN` guarded by `PRAGMA table_info` checks. Existing rows retain all original data; `pipeline` defaults to `'web'`.
+- **New analytics method**: `AnalyticsDatabase.get_source_insights(days)` aggregates `source_types` + `scores` parallel arrays into per-source statistics without schema changes.
+- **New endpoint**: `GET /api/admin/source-insights?days=30` (admin-auth-required, returns `{total, reranked_total, rerank_coverage, sources}`)
 ### v0.10.5: Composable Prompt Architecture
 
 - **Split `base.system_prompt` → `base.identity` + `base.product_reference`**: Product knowledge is now a separate composable block, not baked into the base prompt

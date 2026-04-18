@@ -20,13 +20,26 @@ async def api_search_stats(
     days: int = 30,
     _: bool = Depends(verify_admin),
 ) -> dict[str, Any]:
-    """Get search analytics statistics."""
+    """Get search analytics statistics.
+
+    Popular-query aggregation is exposed on the dedicated ``/search-stats/popular``
+    endpoint; the main dashboard panel was removed in favor of source insights.
+    """
     analytics = get_analytics_db()
     return {
         "stats": analytics.get_search_stats(days=days),
-        "popular_queries": analytics.get_popular_queries(limit=10, days=days),
         "recent_searches": analytics.get_recent_searches(limit=20),
     }
+
+
+@router.get("/source-insights", tags=["Analytics"])
+async def api_source_insights(
+    days: int = 30,
+    _: bool = Depends(verify_admin),
+) -> dict[str, Any]:
+    """Per-source retrieval insight: win-rate, avg top-5 score, position mix."""
+    analytics = get_analytics_db()
+    return analytics.get_source_insights(days=days)
 
 
 @router.get("/search-stats/popular", tags=["Analytics"])
