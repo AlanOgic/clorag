@@ -8,6 +8,7 @@ import base64
 import json
 import os
 import shutil
+from datetime import date
 from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -97,6 +98,26 @@ def encrypt_token_data(data: dict[str, object]) -> str:
     return encrypted.decode()
 
 
+def _plaintext_fallback_allowed() -> bool:
+    """Return True when the configured cutoff has not yet elapsed.
+
+    Empty/None cutoff disables the time-bound guard (legacy behavior);
+    this must be set explicitly by an operator.
+    """
+    cutoff_str = get_settings().token_plaintext_cutoff
+    if not cutoff_str:
+        return True
+    try:
+        cutoff = date.fromisoformat(cutoff_str)
+    except ValueError:
+        logger.warning(
+            "Invalid TOKEN_PLAINTEXT_CUTOFF, treating as unset",
+            value=cutoff_str,
+        )
+        return True
+    return date.today() < cutoff
+
+
 def decrypt_token_data(encrypted_data: str) -> dict[str, object] | None:
     """Decrypt token data from storage.
 
@@ -106,12 +127,17 @@ def decrypt_token_data(encrypted_data: str) -> dict[str, object] | None:
     Returns:
         Decrypted token data dictionary, or None if decryption fails.
     """
-    # Try plain JSON first (for backwards compatibility)
+    # Try plain JSON first (bounded backwards compatibility)
     try:
         data = json.loads(encrypted_data)
         if isinstance(data, dict):
-            # Check if this looks like unencrypted token data
             if any(k in data for k in ["token", "refresh_token", "client_id"]):
+                if not _plaintext_fallback_allowed():
+                    logger.error(
+                        "Refusing to load plaintext OAuth token past"
+                        " TOKEN_PLAINTEXT_CUTOFF; rotate the credential.",
+                    )
+                    return None
                 logger.info("Found unencrypted token data, will encrypt on next save")
                 return data
     except json.JSONDecodeError:
@@ -160,14 +186,47 @@ def save_encrypted_token(token_path: Path, token_data: dict[str, object]) -> Non
 def load_encrypted_token(token_path: Path) -> dict[str, object] | None:
     """Load and decrypt token data from file.
 
+    If the file is still stored as plaintext JSON (legacy layout) and the
+    plaintext fallback is still within its cutoff, the token is re-encrypted
+    in place so subsequent loads never touch plaintext again.
+
     Args:
         token_path: Path to the encrypted token file.
 
     Returns:
-        Decrypted token data dictionary, or None if file doesn't exist or decryption fails.
+        Decrypted token data dictionary, or None if file doesn't exist or
+        decryption fails / plaintext was rejected past the cutoff.
     """
     if not token_path.exists():
         return None
 
-    encrypted_data = token_path.read_text()
-    return decrypt_token_data(encrypted_data)
+    raw = token_path.read_text()
+    data = decrypt_token_data(raw)
+    if data is None:
+        return None
+
+    # If we just read plaintext JSON, upgrade the file in place (best-effort).
+    try:
+        parsed = json.loads(raw)
+        is_plaintext = isinstance(parsed, dict) and any(
+            k in parsed for k in ["token", "refresh_token", "client_id"]
+        )
+    except json.JSONDecodeError:
+        is_plaintext = False
+
+    if is_plaintext and _get_fernet() is not None:
+        try:
+            save_encrypted_token(token_path, data)
+            logger.info(
+                "Migrated plaintext OAuth token to encrypted storage",
+                path=str(token_path),
+            )
+        except Exception as e:
+            # Never block callers on migration failure; the raw plaintext is
+            # still usable (and will retry on next load).
+            logger.warning(
+                "Plaintext token migration failed",
+                path=str(token_path),
+                error=str(e),
+            )
+    return data

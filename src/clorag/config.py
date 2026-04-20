@@ -144,10 +144,40 @@ class Settings(BaseSettings):
         default=None,
         description="Secret for OAuth token encryption. Falls back to admin_password.",
     )
+    token_plaintext_cutoff: str | None = Field(
+        default="2026-07-01",
+        description=(
+            "ISO date (YYYY-MM-DD) after which legacy plaintext OAuth token"
+            " files are rejected. Intermediate reads auto-upgrade to"
+            " Fernet-encrypted storage. Set to empty string to disable the"
+            " cutoff (strongly discouraged)."
+        ),
+    )
 
     # Analytics Database (separate from camera database)
     analytics_database_path: str = Field(
         default="data/analytics.db", description="SQLite database path for search analytics"
+    )
+
+    # Analytics retention policy (PII/GDPR)
+    analytics_retention_days: int = Field(
+        default=90,
+        description=(
+            "Hard-delete searches older than this many days."
+            " 0 disables deletion."
+        ),
+    )
+    analytics_anonymize_after_days: int = Field(
+        default=30,
+        description=(
+            "Strip raw query + response + chunks from searches older than"
+            " this many days while keeping aggregate columns."
+            " 0 disables anonymization."
+        ),
+    )
+    analytics_cleanup_interval_hours: int = Field(
+        default=24,
+        description="How often the retention cleanup job runs (hours).",
     )
 
     # Search Engine
@@ -160,6 +190,17 @@ class Settings(BaseSettings):
     secure_cookies: bool = Field(
         default=True,
         description="Use secure cookies (HTTPS only). Set to False for local development.",
+    )
+    cors_allowed_origins: list[str] = Field(
+        default=[
+            "https://cyanview.cloud",
+            "https://support.cyanview.cloud",
+        ],
+        description=(
+            "CORS allowed origins for browser credentialed requests."
+            " Set via CORS_ALLOWED_ORIGINS JSON env var."
+            " Production MUST NOT include localhost origins."
+        ),
     )
     mcp_api_key: SecretStr | None = Field(
         default=None,

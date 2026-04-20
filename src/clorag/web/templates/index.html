@@ -2359,7 +2359,7 @@ ${bodyContent}
             // Parse markdown then sanitize to prevent XSS
             const rawHtml = marked.parse(text);
             return DOMPurify.sanitize(rawHtml, {
-                ADD_TAGS: ['svg', 'path', 'g', 'defs', 'marker', 'polygon', 'polyline', 'line', 'rect', 'circle', 'ellipse', 'text', 'tspan', 'foreignObject'],
+                ADD_TAGS: ['svg', 'path', 'g', 'defs', 'marker', 'polygon', 'polyline', 'line', 'rect', 'circle', 'ellipse', 'text', 'tspan'],
                 ADD_ATTR: ['viewBox', 'fill', 'stroke', 'stroke-width', 'd', 'points', 'transform', 'x', 'y', 'cx', 'cy', 'r', 'rx', 'ry', 'width', 'height', 'marker-end', 'marker-start', 'class', 'id', 'style', 'dominant-baseline', 'text-anchor', 'font-size', 'font-weight', 'font-family'],
                 ALLOW_DATA_ATTR: false
             });

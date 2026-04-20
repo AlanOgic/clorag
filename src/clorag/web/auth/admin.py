@@ -5,7 +5,7 @@ along with brute force protection through login attempt tracking.
 """
 
 import time
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import structlog
 from fastapi import Cookie, HTTPException
@@ -17,6 +17,9 @@ from clorag.web.auth.sessions import (
     get_session_serializer,
 )
 
+if TYPE_CHECKING:
+    from clorag.core.analytics_db import AnalyticsDatabase
+
 logger = structlog.get_logger()
 
 # Brute force protection settings
@@ -25,56 +28,56 @@ LOGIN_LOCKOUT_DURATION = 300  # 5 minutes lockout
 
 
 class LoginAttemptTracker:
-    """Track failed login attempts per IP for brute force protection."""
+    """Track failed login attempts per IP for brute force protection.
 
-    def __init__(self) -> None:
-        self._attempts: dict[str, list[float]] = {}  # IP -> list of attempt timestamps
-        self._lockouts: dict[str, float] = {}  # IP -> lockout expiry timestamp
+    State is persisted in the analytics SQLite database so lockouts survive
+    container restarts and rolling deploys. Lookups happen per request but
+    the tables are indexed and tiny (one row per offender), so overhead is
+    negligible compared to the PBKDF2/timing-safe password check.
+    """
+
+    def __init__(self, db: "AnalyticsDatabase | None" = None) -> None:
+        self._db = db  # Resolved lazily so tests can inject a throwaway DB.
+
+    def _store(self) -> "AnalyticsDatabase":
+        if self._db is None:
+            # Local import to avoid circular dependency at module import time.
+            from clorag.core.analytics_db import AnalyticsDatabase
+
+            settings = get_settings()
+            self._db = AnalyticsDatabase(settings.analytics_database_path)
+        return self._db
 
     def is_locked_out(self, ip: str) -> bool:
         """Check if IP is currently locked out."""
-        if ip in self._lockouts:
-            if time.time() < self._lockouts[ip]:
-                return True
-            # Lockout expired, remove it
-            del self._lockouts[ip]
-            if ip in self._attempts:
-                del self._attempts[ip]
-        return False
+        return self.get_lockout_remaining(ip) > 0
 
     def get_lockout_remaining(self, ip: str) -> int:
         """Get seconds remaining in lockout, or 0 if not locked out."""
-        if ip in self._lockouts:
-            remaining = int(self._lockouts[ip] - time.time())
-            return max(0, remaining)
-        return 0
+        locked_until = self._store().get_login_lockout_until(ip)
+        if not locked_until:
+            return 0
+        remaining = int(locked_until - time.time())
+        return max(0, remaining)
 
     def record_failed_attempt(self, ip: str) -> bool:
         """Record a failed login attempt. Returns True if now locked out."""
         now = time.time()
-
-        # Clean old attempts (older than lockout duration)
-        if ip in self._attempts:
-            self._attempts[ip] = [
-                t for t in self._attempts[ip] if now - t < LOGIN_LOCKOUT_DURATION
-            ]
-        else:
-            self._attempts[ip] = []
-
-        self._attempts[ip].append(now)
-
-        # Check if should be locked out
-        if len(self._attempts[ip]) >= LOGIN_LOCKOUT_THRESHOLD:
-            self._lockouts[ip] = now + LOGIN_LOCKOUT_DURATION
+        store = self._store()
+        _, should_lock = store.record_login_attempt(
+            ip,
+            now=now,
+            window_seconds=LOGIN_LOCKOUT_DURATION,
+            threshold=LOGIN_LOCKOUT_THRESHOLD,
+        )
+        if should_lock:
+            store.set_login_lockout(ip, now + LOGIN_LOCKOUT_DURATION)
             return True
         return False
 
     def clear_attempts(self, ip: str) -> None:
         """Clear attempts on successful login."""
-        if ip in self._attempts:
-            del self._attempts[ip]
-        if ip in self._lockouts:
-            del self._lockouts[ip]
+        self._store().clear_login_attempts(ip)
 
 
 # Global login attempt tracker singleton

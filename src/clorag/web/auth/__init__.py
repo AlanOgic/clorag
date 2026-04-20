@@ -25,6 +25,7 @@ from clorag.web.auth.sessions import (
     SessionStore,
     get_session_serializer,
     get_session_store,
+    reset_session_serializer_cache,
 )
 
 __all__ = [
@@ -35,6 +36,7 @@ __all__ = [
     "SessionStore",
     "get_session_serializer",
     "get_session_store",
+    "reset_session_serializer_cache",
     # Admin auth
     "LOGIN_LOCKOUT_DURATION",
     "LOGIN_LOCKOUT_THRESHOLD",

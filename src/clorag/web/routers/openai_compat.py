@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from clorag.config import get_settings
+from clorag.web.dependencies import limiter
 from clorag.web.schemas import SearchRequest, SearchSource
 from clorag.web.search import (
     extract_source_links,
@@ -127,7 +128,9 @@ def _verify_api_key(authorization: str | None) -> JSONResponse | None:
 
 
 @router.get("/v1/models")
+@limiter.limit("20/minute")
 async def list_models(
+    request: Request,
     authorization: str | None = Header(None),
 ) -> JSONResponse:
     """List available models (OpenAI-compatible)."""
@@ -149,6 +152,7 @@ async def list_models(
 
 
 @router.post("/v1/chat/completions", response_model=None)
+@limiter.limit("20/minute")
 async def chat_completions(
     request: Request,
     body: ChatCompletionRequest,

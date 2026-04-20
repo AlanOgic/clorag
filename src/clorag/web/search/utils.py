@@ -150,16 +150,14 @@ def build_context(
         source_type = group[0].get("source_type")
 
         if source_type == "documentation":
-            url = _normalize_doc_url(group[0].get("url", ""))
-            header = f"[Source {idx}: Doc — {url}] (relevance: {best_score:.2f})"
+            source_label = "documentation"
+            source_ref = _normalize_doc_url(group[0].get("url", "") or "")
         elif source_type == "custom_docs":
-            url = group[0].get("url") or "Custom Knowledge"
-            header = f"[Source {idx}: Knowledge — {url}] (relevance: {best_score:.2f})"
+            source_label = "custom_knowledge"
+            source_ref = group[0].get("url") or "Custom Knowledge"
         else:
-            header = (
-                f"[Source {idx}: Case — {group[0].get('subject', 'Support')}]"
-                f" (relevance: {best_score:.2f})"
-            )
+            source_label = "support_case"
+            source_ref = group[0].get("subject", "Support")
 
         # Merge all chunks from this group first, then truncate the group
         # to the group budget (instead of truncating each chunk independently)
@@ -167,7 +165,17 @@ def build_context(
         if len(combined_text) > max_group_chars:
             combined_text = combined_text[:max_group_chars] + "..."
 
-        group_content = f"{header}\n{combined_text}"
+        # Defuse any literal </document> sequences in retrieved content so a
+        # malicious chunk cannot close the wrapping tag and escape into the
+        # instruction frame.
+        safe_text = combined_text.replace("</document>", "<\\/document>")
+        safe_ref = str(source_ref).replace('"', "'")
+        group_content = (
+            f'<document index="{idx}" source="{source_label}"'
+            f' ref="{safe_ref}" relevance="{best_score:.2f}">\n'
+            f"{safe_text}\n"
+            f"</document>"
+        )
 
         # Check total budget
         if total_chars + len(group_content) > max_total_chars:
@@ -181,7 +189,7 @@ def build_context(
         total_chars += len(group_content)
         idx += 1
 
-    return "\n---\n".join(parts)
+    return "\n".join(parts)
 
 
 def extract_source_links(

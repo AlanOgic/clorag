@@ -24,6 +24,7 @@ from clorag.web.auth import (
     generate_csrf_token,
     get_login_tracker,
     get_session_serializer,
+    reset_session_serializer_cache,
     verify_admin,
 )
 from clorag.web.dependencies import limiter
@@ -34,7 +35,10 @@ logger = structlog.get_logger()
 
 
 @router.post("/login")
-@limiter.limit("10/minute")
+# Aligned with LoginAttemptTracker (5 failures / 5 min lockout): the slowapi
+# limiter is a fail-open defense-in-depth cap so a single IP can never exceed
+# the lockout threshold faster than the tracker can record it.
+@limiter.limit("5/minute")
 async def api_admin_login(
     request: Request,
     login_req: LoginRequest,
@@ -173,6 +177,33 @@ async def api_admin_csrf_token(
 
     token = generate_csrf_token(session_id)
     return {"csrf_token": token}
+
+
+@router.post("/reload-env")
+@limiter.limit("5/hour")
+async def api_admin_reload_env(
+    request: Request,
+    _auth: Annotated[bool, Depends(verify_admin)],
+) -> dict[str, Any]:
+    """Clear the cached Settings singleton so env/secret changes take effect.
+
+    Useful for rotating CORS_ALLOWED_ORIGINS or secret file paths without
+    rebooting the container. Middleware that reads settings per-request
+    (DynamicCORSMiddleware) picks up new values on the next request.
+    """
+    get_settings.cache_clear()
+    # Drop the cached PBKDF2-derived session-signing key so rotating
+    # ADMIN_PASSWORD or SESSION_SECRET takes effect on the next request.
+    reset_session_serializer_cache()
+    settings = get_settings()
+    logger.info(
+        "Settings cache reloaded",
+        cors_origins=len(settings.cors_allowed_origins),
+    )
+    return {
+        "success": True,
+        "cors_allowed_origins": settings.cors_allowed_origins,
+    }
 
 
 @router.get("/backup")

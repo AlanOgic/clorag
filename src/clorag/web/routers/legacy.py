@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
+from clorag.utils.url_validator import UrlNotAllowedError, validate_public_url
 from clorag.web.auth import verify_admin
 from clorag.web.dependencies import get_templates, limiter
 
@@ -255,6 +256,13 @@ async def legacy_ingest_new(
 
     for url in req.urls:
         try:
+            validate_public_url(url)
+        except UrlNotAllowedError as e:
+            results.append(IngestResultEntry(
+                url=url, status="failed", error=f"URL rejected: {e}",
+            ))
+            continue
+        try:
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(60.0),
             ) as client:
@@ -426,6 +434,16 @@ async def legacy_ingest_page(
     )
 
     url = req.url.strip()
+    try:
+        validate_public_url(url)
+    except UrlNotAllowedError as e:
+        return IngestResponse(
+            results=[IngestResultEntry(
+                url=url, status="failed", error=f"URL rejected: {e}",
+            )],
+            total_ingested=0,
+            total_chunks=0,
+        )
     logger.info("Single page legacy ingest", url=url)
 
     try:

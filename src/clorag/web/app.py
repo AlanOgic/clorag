@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     pass
 
+import asyncio
+
 import anyio
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -17,7 +19,6 @@ from fastapi import (
     Request,
     Response,
 )
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -25,6 +26,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from clorag.config import get_settings
 
@@ -67,6 +69,62 @@ def _inject_structlog_processor(processor: Any) -> None:
 # =============================================================================
 # Middleware Configuration
 # =============================================================================
+
+
+_CORS_ALLOWED_METHODS = "GET, POST, PUT, DELETE, OPTIONS"
+_CORS_ALLOWED_HEADERS = (
+    "Content-Type, X-Admin-Password, X-CSRF-Token, X-Requested-With, Authorization"
+)
+_CORS_MAX_AGE = "600"
+
+
+class DynamicCORSMiddleware(BaseHTTPMiddleware):
+    """CORS middleware that reads the allowlist from settings per-request.
+
+    Unlike fastapi.middleware.cors.CORSMiddleware, which freezes allow_origins
+    at construction time, this middleware re-reads get_settings() on every
+    request so admins can update CORS_ALLOWED_ORIGINS and trigger a settings
+    reload without restarting the container.
+
+    Behavior:
+      * Origin in allowlist → echoes Origin, allows credentials, exposes
+        configured headers/methods.
+      * Origin missing/disallowed → pass-through (no CORS headers) so the
+        browser enforces same-origin. Non-browser clients are unaffected.
+      * Preflight (OPTIONS with Access-Control-Request-Method) → 200 with
+        headers; no downstream call.
+    """
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        origin = request.headers.get("origin")
+        allowed = origin in get_settings().cors_allowed_origins if origin else False
+
+        if (
+            request.method == "OPTIONS"
+            and "access-control-request-method" in request.headers
+        ):
+            if not allowed:
+                return Response(status_code=400)
+            preflight = Response(status_code=200)
+            preflight.headers["Access-Control-Allow-Origin"] = origin or ""
+            preflight.headers["Access-Control-Allow-Credentials"] = "true"
+            preflight.headers["Access-Control-Allow-Methods"] = _CORS_ALLOWED_METHODS
+            preflight.headers["Access-Control-Allow-Headers"] = _CORS_ALLOWED_HEADERS
+            preflight.headers["Access-Control-Max-Age"] = _CORS_MAX_AGE
+            preflight.headers["Vary"] = "Origin"
+            return preflight
+
+        response = await call_next(request)
+        if allowed and origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            existing_vary = response.headers.get("Vary")
+            response.headers["Vary"] = (
+                f"{existing_vary}, Origin" if existing_vary else "Origin"
+            )
+        return response
 
 
 class TimeoutMiddleware(BaseHTTPMiddleware):
@@ -124,25 +182,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = (
             "max-age=31536000; includeSubDomains"
         )
-        # Content Security Policy with nonce for inline scripts
-        # SECURITY: Uses per-request nonce for script execution (CSP Level 2+).
-        # All templates use nonce="{{ request.state.csp_nonce }}" for inline scripts.
-        # 'unsafe-inline' for style-src is needed for inline styles and libraries like Mermaid.
-        #
-        # NOTE: Admin pages use 'unsafe-hashes' to allow inline event handlers (onclick, etc.)
-        # while templates are being migrated to use data-action attributes with event delegation.
-        # Public pages use strict nonce-only policy.
-        is_admin_page = request.url.path.startswith("/admin")
-        if is_admin_page:
-            # Admin pages: Allow inline event handlers via 'unsafe-inline'
-            # NOTE: When a nonce is present, browsers ignore 'unsafe-inline' per CSP Level 2+.
-            # So we omit the nonce for admin pages to allow onclick handlers to work.
-            # This is a temporary measure while templates are migrated to data-action pattern.
-            script_src = "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://esm.sh"
-        else:
-            # Public pages: Strict nonce-only policy (esm.sh for Excalidraw modules)
-            script_src = f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net https://esm.sh"
-
+        # Content Security Policy with per-request nonce for inline scripts.
+        # SECURITY: Single nonce-only policy for both public and admin pages.
+        # Admin templates have been migrated from inline event handlers
+        # (onclick="...") to data-action attributes handled by AdminActions
+        # event delegation in static/js/admin.js, so no 'unsafe-inline' is
+        # needed for script-src anywhere.
+        script_src = (
+            f"script-src 'self' 'nonce-{csp_nonce}'"
+            " https://cdn.jsdelivr.net https://esm.sh"
+        )
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             f"{script_src}; "
@@ -221,6 +270,63 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             interval_minutes=settings.draft_poll_interval_minutes,
         )
 
+    # Analytics retention (PII/GDPR) + expired-lockout cleanup.
+    if (
+        settings.analytics_retention_days > 0
+        or settings.analytics_anonymize_after_days > 0
+    ):
+        from clorag.core.analytics_db import AnalyticsDatabase
+
+        if _scheduler is None:
+            _scheduler = AsyncIOScheduler()
+        if not _scheduler.running:
+            try:
+                _scheduler.start()
+            except Exception as _e:
+                logger.warning(
+                    "Failed to start retention scheduler, running sweep only",
+                    error=str(_e),
+                )
+                _scheduler = None
+
+        def _run_retention() -> None:
+            import time as _time
+
+            from clorag.web.auth import LOGIN_LOCKOUT_DURATION
+
+            db = AnalyticsDatabase(settings.analytics_database_path)
+            anonymized = db.anonymize_old_searches(
+                settings.analytics_anonymize_after_days
+            )
+            purged = db.purge_old_searches(settings.analytics_retention_days)
+            db.purge_login_state(_time.time(), LOGIN_LOCKOUT_DURATION)
+            logger.info(
+                "Analytics retention sweep",
+                anonymized=anonymized,
+                purged=purged,
+            )
+
+        if _scheduler is not None and _scheduler.running:
+            _scheduler.add_job(
+                _run_retention,
+                "interval",
+                hours=settings.analytics_cleanup_interval_hours,
+                id="analytics_retention",
+                replace_existing=True,
+                next_run_time=None,
+            )
+        # Run once at startup so restarts don't leave stale rows indefinitely.
+        # Offloaded to a worker thread so a large analytics DB (where the
+        # UPDATE/DELETE can take seconds) can't block the lifespan past the
+        # docker-compose healthcheck timeout and crashloop the container.
+        await asyncio.to_thread(_run_retention)
+        logger.info(
+            "Analytics retention scheduler started",
+            interval_hours=settings.analytics_cleanup_interval_hours,
+            retention_days=settings.analytics_retention_days,
+            anonymize_after_days=settings.analytics_anonymize_after_days,
+        )
+
     # Initialize ingestion runner (marks stale jobs, cleans old entries)
     from clorag.services.ingestion_runner import get_ingestion_runner, ingestion_log_capture
 
@@ -237,8 +343,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await ingestion_runner.shutdown()
 
     if _scheduler:
-        _scheduler.shutdown()
-        logger.info("Draft creation scheduler stopped")
+        try:
+            if _scheduler.running:
+                _scheduler.shutdown()
+                logger.info("Scheduler stopped")
+        except Exception as e:
+            logger.warning("Scheduler shutdown failed", error=str(e))
 
 
 # Initialize FastAPI app with lifespan
@@ -282,31 +392,33 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 app.add_exception_handler(Exception, generic_exception_handler)
 
-# Add CORS middleware
-# SECURITY: Explicitly list allowed headers instead of wildcard to prevent header exposure
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://cyanview.cloud",
-        "https://support.cyanview.cloud",
-        "http://localhost:3000",
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=[
-        "Content-Type",
-        "X-Admin-Password",
-        "X-CSRF-Token",
-        "X-Requested-With",
-        "Authorization",
-    ],
-)
+# Add CORS middleware.
+# SECURITY: DynamicCORSMiddleware reads the allowlist from settings on every
+# request so rotating CORS_ALLOWED_ORIGINS doesn't require restarting the
+# container (admins can trigger get_settings.cache_clear() via reload).
+app.add_middleware(DynamicCORSMiddleware)
 
 # Add timeout middleware
 app.add_middleware(TimeoutMiddleware)
 
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Trust X-Forwarded-* headers from the reverse proxy so that
+# slowapi.get_remote_address (and any other request.client.host consumer)
+# sees the real client IP, not the Docker bridge gateway. Without this,
+# every rate limit — including the admin brute-force lockout — applies
+# globally across all users sharing the same proxy hop, which is a
+# production-breaking misconfiguration rather than a hardening detail.
+#
+# trusted_hosts="*" is safe here because the container port is bound to
+# 127.0.0.1 in docker-compose (only the co-located Caddy reverse proxy
+# can open a TCP connection to the app). If that assumption changes,
+# narrow this to the reverse proxy's actual source IPs.
+# Added LAST so it becomes the OUTERMOST middleware (Starlette wraps in
+# reverse, so the last add_middleware call runs first on the request and
+# gets to rewrite request.client before any other middleware sees it).
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 # Static files and templates
 STATIC_DIR = Path(__file__).parent / "static"

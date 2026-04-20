@@ -857,10 +857,10 @@
                     const comment = f.comment ? (f.comment.length > 80 ? f.comment.substring(0, 80) + '...' : f.comment) : '-';
                     const time = f.updated_at || f.feedback_at || '-';
                     return `<tr>
-                        <td>${AdminActions.escapeHtml ? AdminActions.escapeHtml(query) : query}</td>
+                        <td>${escapeHtml(query)}</td>
                         <td style="text-align:center;">${icon}</td>
-                        <td>${AdminActions.escapeHtml ? AdminActions.escapeHtml(comment) : comment}</td>
-                        <td>${time}</td>
+                        <td>${escapeHtml(comment)}</td>
+                        <td>${escapeHtml(time)}</td>
                     </tr>`;
                 }).join('');
             } catch (error) {

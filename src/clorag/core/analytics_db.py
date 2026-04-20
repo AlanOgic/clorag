@@ -133,6 +133,24 @@ class AnalyticsDatabase:
                     "ALTER TABLE search_queries ADD COLUMN tool_calls TEXT"
                 )
 
+            # Brute-force login protection (persisted across restarts)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS login_attempts (
+                    ip TEXT NOT NULL,
+                    attempted_at REAL NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_login_attempts_ip
+                ON login_attempts(ip, attempted_at)
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS login_lockouts (
+                    ip TEXT PRIMARY KEY,
+                    locked_until REAL NOT NULL
+                )
+            """)
+
             # Feedback table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS search_feedback (
@@ -558,6 +576,173 @@ class AnalyticsDatabase:
             ),
             "sources": sources,
         }
+
+    def anonymize_old_searches(self, older_than_days: int) -> int:
+        """Strip free-text PII from searches older than the cutoff.
+
+        Blanks out the raw query, LLM response, and retrieved chunks while
+        preserving the aggregate columns used by analytics dashboards
+        (response_time_ms, results_count, reranked, scores, source_types,
+        pipeline, created_at).
+
+        Args:
+            older_than_days: Rows older than this many days are anonymized.
+                Values <= 0 are treated as a no-op.
+
+        Returns:
+            Number of rows anonymized.
+        """
+        if older_than_days <= 0:
+            return 0
+        cutoff = datetime.now() - timedelta(days=older_than_days)
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                UPDATE search_queries
+                SET query = '[redacted]',
+                    response = NULL,
+                    chunks = NULL,
+                    normalized_query = NULL,
+                    rewritten_query = NULL,
+                    tool_calls = NULL
+                WHERE created_at < ?
+                  AND query != '[redacted]'
+                """,
+                (cutoff.isoformat(),),
+            )
+            # User-submitted feedback comments are free text (PII under the
+            # same rationale as queries); null them in lockstep so the
+            # anonymize window is honored for both tables.
+            conn.execute(
+                """
+                UPDATE search_feedback
+                SET comment = NULL
+                WHERE comment IS NOT NULL
+                  AND search_id IN (
+                      SELECT id FROM search_queries
+                      WHERE created_at < ?
+                  )
+                """,
+                (cutoff.isoformat(),),
+            )
+            conn.commit()
+            return cursor.rowcount or 0
+
+    def purge_old_searches(self, older_than_days: int) -> int:
+        """Hard-delete searches (and their feedback) older than the cutoff.
+
+        Args:
+            older_than_days: Rows older than this many days are deleted.
+                Values <= 0 are treated as a no-op.
+
+        Returns:
+            Number of search rows deleted.
+        """
+        if older_than_days <= 0:
+            return 0
+        cutoff = datetime.now() - timedelta(days=older_than_days)
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                DELETE FROM search_feedback
+                WHERE search_id IN (
+                    SELECT id FROM search_queries WHERE created_at < ?
+                )
+                """,
+                (cutoff.isoformat(),),
+            )
+            cursor = conn.execute(
+                "DELETE FROM search_queries WHERE created_at < ?",
+                (cutoff.isoformat(),),
+            )
+            conn.commit()
+            return cursor.rowcount or 0
+
+    def get_login_lockout_until(self, ip: str) -> float:
+        """Return the stored lockout expiry timestamp for ``ip`` (0.0 if none).
+
+        Expired rows are cleaned up lazily when the caller observes them as
+        expired, to keep the table bounded without a background job.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT locked_until FROM login_lockouts WHERE ip = ?",
+                (ip,),
+            )
+            row = cursor.fetchone()
+            return float(row[0]) if row else 0.0
+
+    def record_login_attempt(
+        self, ip: str, now: float, window_seconds: int, threshold: int
+    ) -> tuple[int, bool]:
+        """Record a failed login attempt and return (recent_count, should_lock).
+
+        Only attempts within the last ``window_seconds`` count toward the
+        threshold, matching the in-memory sliding-window semantics.
+        """
+        cutoff = now - window_seconds
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "DELETE FROM login_attempts WHERE ip = ? AND attempted_at < ?",
+                (ip, cutoff),
+            )
+            conn.execute(
+                "INSERT INTO login_attempts (ip, attempted_at) VALUES (?, ?)",
+                (ip, now),
+            )
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM login_attempts WHERE ip = ?",
+                (ip,),
+            )
+            count = int(cursor.fetchone()[0])
+            conn.commit()
+        return count, count >= threshold
+
+    def set_login_lockout(self, ip: str, until: float) -> None:
+        """Persist a lockout expiry for ``ip``."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO login_lockouts (ip, locked_until)
+                VALUES (?, ?)
+                ON CONFLICT(ip) DO UPDATE SET locked_until = excluded.locked_until
+                """,
+                (ip, until),
+            )
+            conn.commit()
+
+    def clear_login_attempts(self, ip: str) -> None:
+        """Clear all attempts and any lockout for ``ip`` (successful login)."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM login_attempts WHERE ip = ?", (ip,))
+            conn.execute("DELETE FROM login_lockouts WHERE ip = ?", (ip,))
+            conn.commit()
+
+    def purge_login_state(self, now: float, window_seconds: int) -> None:
+        """Drop expired lockouts and stale attempt rows across all IPs.
+
+        record_login_attempt() only prunes rows for the IP it was called
+        with, so a distributed brute-force sweep that rotates through
+        many source IPs leaves orphaned rows behind. This global prune
+        keeps login_attempts bounded regardless of rotation strategy.
+
+        Args:
+            now: Current wall-clock epoch seconds.
+            window_seconds: Attempts older than this are discarded — pass
+                the same value LoginAttemptTracker uses as its sliding
+                window (LOGIN_LOCKOUT_DURATION).
+        """
+        cutoff = now - window_seconds
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "DELETE FROM login_lockouts WHERE locked_until < ?",
+                (now,),
+            )
+            conn.execute(
+                "DELETE FROM login_attempts WHERE attempted_at < ?",
+                (cutoff,),
+            )
+            conn.commit()
 
     def save_feedback(
         self,

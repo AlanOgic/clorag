@@ -81,10 +81,29 @@ def get_session_store() -> SessionStore:
     return _session_store
 
 
+# Cache of the PBKDF2-derived HMAC key when SESSION_SECRET is not set.
+# Derivation costs ~250-400 ms at 600K iterations, which would pin a CPU
+# core if recomputed on every admin request. The cache is keyed by the
+# admin password so rotating it (via restart or reload-env) naturally
+# invalidates the entry. reset_session_serializer_cache() forces refresh.
+_session_secret_cache: dict[str, str] = {}
+
+
+def reset_session_serializer_cache() -> None:
+    """Clear the cached derived session secret.
+
+    Called by /api/admin/reload-env after get_settings.cache_clear(), so
+    rotating ADMIN_PASSWORD or SESSION_SECRET without a restart forces
+    re-derivation on the next request.
+    """
+    _session_secret_cache.clear()
+
+
 def get_session_serializer() -> URLSafeTimedSerializer:
     """Get session serializer using dedicated session secret.
 
-    Falls back to PBKDF2-derived key from admin_password if session_secret not set.
+    Falls back to a cached PBKDF2-derived key from admin_password if
+    session_secret is not set.
     """
     import hashlib
 
@@ -95,10 +114,15 @@ def get_session_serializer() -> URLSafeTimedSerializer:
     if settings.session_secret:
         secret = settings.session_secret.get_secret_value()
     else:
-        # Derive a separate key from admin_password so raw password is never used as HMAC key
         raw = settings.admin_password.get_secret_value()
-        secret = hashlib.pbkdf2_hmac(
-            "sha256", raw.encode(), b"clorag-session-signing", 100_000
-        ).hex()
+        cached = _session_secret_cache.get(raw)
+        if cached is None:
+            # OWASP 2023 minimum for PBKDF2-HMAC-SHA256 is 600K iterations.
+            cached = hashlib.pbkdf2_hmac(
+                "sha256", raw.encode(), b"clorag-session-signing", 600_000
+            ).hex()
+            _session_secret_cache.clear()
+            _session_secret_cache[raw] = cached
+        secret = cached
 
     return URLSafeTimedSerializer(secret)

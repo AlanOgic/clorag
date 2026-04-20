@@ -43,4 +43,4 @@ USER clorag
 EXPOSE 8080
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "clorag.web:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python", "-m", "uvicorn", "clorag.web:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips=*"]

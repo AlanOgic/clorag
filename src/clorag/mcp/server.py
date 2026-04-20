@@ -195,13 +195,33 @@ def main_http() -> None:
 
         app = apply_bearer_auth(app, settings.mcp_api_key.get_secret_value())  # type: ignore[assignment]
         structlog.get_logger().info("mcp_http_auth_enabled")
-    else:
+    elif os.getenv("MCP_ALLOW_UNAUTH_HTTP") == "1":
         structlog.get_logger().warning(
             "mcp_http_no_auth",
-            msg="MCP HTTP running without authentication. Set MCP_API_KEY.",
+            msg=(
+                "MCP HTTP running without authentication because"
+                " MCP_ALLOW_UNAUTH_HTTP=1 is set. Do not use in production."
+            ),
+        )
+    else:
+        raise RuntimeError(
+            "MCP HTTP transport requires MCP_API_KEY (or MCP_API_KEY_FILE for"
+            " Docker Secrets). Set it, or opt out explicitly with"
+            " MCP_ALLOW_UNAUTH_HTTP=1 for local testing."
         )
 
-    config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    # Trust X-Forwarded-* from the co-located reverse proxy so
+    # request.client reflects the real caller instead of the Docker
+    # bridge gateway. The container port is bound to 127.0.0.1 by
+    # docker-compose, so only the local proxy can reach us.
+    config = uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+    )
     server = uvicorn.Server(config)
     anyio.run(server.serve)
 
