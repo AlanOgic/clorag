@@ -30,6 +30,12 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 
+# SQLite databases (runtime + test fixtures)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
 # Google OAuth credentials (keep .example)
 credentials.json
 token.json
