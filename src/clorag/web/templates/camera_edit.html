@@ -298,17 +298,17 @@
                             {% for port in camera.ports %}
                             <div class="array-input-row">
                                 <input type="text" class="form-input" name="ports[]" value="{{ port }}" placeholder="e.g., RS-422">
-                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                                <button type="button" class="btn-remove" data-action="call-with-el" data-fn="removeRow">X</button>
                             </div>
                             {% endfor %}
                         {% else %}
                             <div class="array-input-row">
                                 <input type="text" class="form-input" name="ports[]" placeholder="e.g., RS-422">
-                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                                <button type="button" class="btn-remove" data-action="call-with-el" data-fn="removeRow">X</button>
                             </div>
                         {% endif %}
                     </div>
-                    <button type="button" class="btn-add" onclick="addRow('ports-container', 'ports[]', 'e.g., RS-422')">+ Add Port</button>
+                    <button type="button" class="btn-add" data-action="call" data-fn="addRow" data-args-json='["ports-container","ports[]","e.g., RS-422"]'>+ Add Port</button>
                 </div>
 
                 <div class="form-group">
@@ -318,17 +318,17 @@
                             {% for protocol in camera.protocols %}
                             <div class="array-input-row">
                                 <input type="text" class="form-input" name="protocols[]" value="{{ protocol }}" placeholder="e.g., VISCA">
-                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                                <button type="button" class="btn-remove" data-action="call-with-el" data-fn="removeRow">X</button>
                             </div>
                             {% endfor %}
                         {% else %}
                             <div class="array-input-row">
                                 <input type="text" class="form-input" name="protocols[]" placeholder="e.g., VISCA">
-                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                                <button type="button" class="btn-remove" data-action="call-with-el" data-fn="removeRow">X</button>
                             </div>
                         {% endif %}
                     </div>
-                    <button type="button" class="btn-add" onclick="addRow('protocols-container', 'protocols[]', 'e.g., VISCA')">+ Add Protocol</button>
+                    <button type="button" class="btn-add" data-action="call" data-fn="addRow" data-args-json='["protocols-container","protocols[]","e.g., VISCA"]'>+ Add Protocol</button>
                 </div>
 
                 <div class="form-group">
@@ -338,17 +338,17 @@
                             {% for control in camera.supported_controls %}
                             <div class="array-input-row">
                                 <input type="text" class="form-input" name="supported_controls[]" value="{{ control }}" placeholder="e.g., Iris">
-                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                                <button type="button" class="btn-remove" data-action="call-with-el" data-fn="removeRow">X</button>
                             </div>
                             {% endfor %}
                         {% else %}
                             <div class="array-input-row">
                                 <input type="text" class="form-input" name="supported_controls[]" placeholder="e.g., Iris">
-                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                                <button type="button" class="btn-remove" data-action="call-with-el" data-fn="removeRow">X</button>
                             </div>
                         {% endif %}
                     </div>
-                    <button type="button" class="btn-add" onclick="addRow('controls-container', 'supported_controls[]', 'e.g., Iris')">+ Add Control</button>
+                    <button type="button" class="btn-add" data-action="call" data-fn="addRow" data-args-json='["controls-container","supported_controls[]","e.g., Iris"]'>+ Add Control</button>
                 </div>
 
                 <div class="form-group">
@@ -358,17 +358,17 @@
                             {% for note in camera.notes %}
                             <div class="array-input-row">
                                 <input type="text" class="form-input" name="notes[]" value="{{ note }}" placeholder="e.g., Requires firmware 2.0+">
-                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                                <button type="button" class="btn-remove" data-action="call-with-el" data-fn="removeRow">X</button>
                             </div>
                             {% endfor %}
                         {% else %}
                             <div class="array-input-row">
                                 <input type="text" class="form-input" name="notes[]" placeholder="e.g., Requires firmware 2.0+">
-                                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                                <button type="button" class="btn-remove" data-action="call-with-el" data-fn="removeRow">X</button>
                             </div>
                         {% endif %}
                     </div>
-                    <button type="button" class="btn-add" onclick="addRow('notes-container', 'notes[]', 'e.g., Requires firmware 2.0+')">+ Add Note</button>
+                    <button type="button" class="btn-add" data-action="call" data-fn="addRow" data-args-json='["notes-container","notes[]","e.g., Requires firmware 2.0+"]'>+ Add Note</button>
                 </div>
 
                 <div class="form-group">
@@ -391,7 +391,7 @@
                     </button>
                     <a href="/admin/cameras" class="btn btn-secondary">Cancel</a>
                     {% if camera %}
-                    <button type="button" class="btn btn-danger" onclick="deleteCamera()">Delete</button>
+                    <button type="button" class="btn btn-danger" data-action="call" data-fn="deleteCamera">Delete</button>
                     {% endif %}
                 </div>
             </form>
@@ -423,7 +423,7 @@
             row.className = 'array-input-row';
             row.innerHTML = `
                 <input type="text" class="form-input" name="${name}" placeholder="${placeholder}">
-                <button type="button" class="btn-remove" onclick="removeRow(this)">X</button>
+                <button type="button" class="btn-remove" data-action="call-with-el" data-fn="removeRow">X</button>
             `;
             container.appendChild(row);
         }

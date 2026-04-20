@@ -216,7 +216,7 @@
     <main class="main">
         <div class="page-header">
             <h1 class="page-title">Knowledge Graph Explorer</h1>
-            <button class="btn btn-secondary" onclick="loadStats()">Refresh</button>
+            <button class="btn btn-secondary" data-action="call" data-fn="loadStats">Refresh</button>
         </div>
 
         <!-- Unavailable Notice -->
@@ -288,7 +288,7 @@
                     <option value="">Select entity type...</option>
                 </select>
                 <input type="text" class="filter-bar__search" id="entitySearch" placeholder="Search entities...">
-                <button class="btn btn-primary" onclick="searchEntities()">Search</button>
+                <button class="btn btn-primary" data-action="call" data-fn="searchEntities">Search</button>
             </div>
 
             <div class="table-container">
@@ -308,9 +308,9 @@
             </div>
 
             <div class="pagination" id="entitiesPagination" style="display: none;">
-                <button class="btn btn-secondary btn-sm" id="prevPage" onclick="changePage(-1)">Previous</button>
+                <button class="btn btn-secondary btn-sm" id="prevPage" data-action="call" data-fn="changePage" data-args="-1">Previous</button>
                 <span id="pageInfo">Page 1</span>
-                <button class="btn btn-secondary btn-sm" id="nextPage" onclick="changePage(1)">Next</button>
+                <button class="btn btn-secondary btn-sm" id="nextPage" data-action="call" data-fn="changePage" data-args="1">Next</button>
             </div>
         </div>
 
@@ -323,7 +323,7 @@
                 <select class="filter-bar__select" id="relType">
                     <option value="">All relationships</option>
                 </select>
-                <button class="btn btn-primary" onclick="loadRelationships()">Filter</button>
+                <button class="btn btn-primary" data-action="call" data-fn="loadRelationships">Filter</button>
             </div>
 
             <div class="table-container">
@@ -351,7 +351,7 @@
         <div class="modal__content">
             <div class="modal__header">
                 <h2 class="modal__title" id="modalTitle">Entity Details</h2>
-                <button class="modal__close" onclick="closeModal()">&times;</button>
+                <button class="modal__close" data-action="call" data-fn="closeModal">&times;</button>
             </div>
             <div class="modal__body" id="modalBody">
                 <!-- Content loaded dynamically -->
@@ -364,7 +364,7 @@
         <div class="modal__content" style="max-width: 500px;">
             <div class="modal__header">
                 <h2 class="modal__title">Delete Relationship</h2>
-                <button class="modal__close" onclick="closeDeleteRelModal()">&times;</button>
+                <button class="modal__close" data-action="call" data-fn="closeDeleteRelModal">&times;</button>
             </div>
             <div class="modal__body">
                 <p>Are you sure you want to delete this relationship?</p>
@@ -373,8 +373,8 @@
                 </div>
                 <p style="color: var(--danger); font-size: 0.9rem;"><strong>Warning:</strong> This action cannot be undone.</p>
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end;">
-                    <button class="btn btn-secondary" onclick="closeDeleteRelModal()">Cancel</button>
-                    <button class="btn btn-danger" id="confirmDeleteRelBtn" onclick="confirmDeleteRelationship()">Delete</button>
+                    <button class="btn btn-secondary" data-action="call" data-fn="closeDeleteRelModal">Cancel</button>
+                    <button class="btn btn-danger" id="confirmDeleteRelBtn" data-action="call" data-fn="confirmDeleteRelationship">Delete</button>
                 </div>
             </div>
         </div>
@@ -385,7 +385,7 @@
         <div class="modal__content" style="max-width: 500px;">
             <div class="modal__header">
                 <h2 class="modal__title">Edit Relationship</h2>
-                <button class="modal__close" onclick="closeEditRelModal()">&times;</button>
+                <button class="modal__close" data-action="call" data-fn="closeEditRelModal">&times;</button>
             </div>
             <div class="modal__body">
                 <div class="property-list" id="editRelDetails" style="margin-bottom: 1.5rem;">
@@ -408,8 +408,8 @@
                     </select>
                 </div>
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end;">
-                    <button class="btn btn-secondary" onclick="closeEditRelModal()">Cancel</button>
-                    <button class="btn btn-primary" id="confirmEditRelBtn" onclick="confirmEditRelationship()">Save</button>
+                    <button class="btn btn-secondary" data-action="call" data-fn="closeEditRelModal">Cancel</button>
+                    <button class="btn btn-primary" id="confirmEditRelBtn" data-action="call" data-fn="confirmEditRelationship">Save</button>
                 </div>
             </div>
         </div>
@@ -499,7 +499,7 @@
                     row.innerHTML = `
                         <td><span class="tag tag--${item.type.toLowerCase()}">${item.type}</span></td>
                         <td>${item.count.toLocaleString()}</td>
-                        <td><button class="btn btn-sm btn-secondary" onclick="browseEntityType('${item.type}')">Browse</button></td>
+                        <td><button class="btn btn-sm btn-secondary" data-action="call" data-fn="browseEntityType" data-args="${item.type}">Browse</button></td>
                     `;
                     tbody.appendChild(row);
 
@@ -591,7 +591,7 @@
                         <td><span class="entity-name" title="${escapeHtml(entity.name)}">${escapeHtml(entity.name.substring(0, 80))}${entity.name.length > 80 ? '...' : ''}</span></td>
                         <td><span class="tag tag--${entity.entity_type.toLowerCase()}">${entity.entity_type}</span></td>
                         <td>${entity.relationship_count}</td>
-                        <td><button class="btn btn-sm btn-secondary" onclick="viewEntity('${entity.entity_type}', '${escapeAttr(entity.id)}')">View</button></td>
+                        <td><button class="btn btn-sm btn-secondary" data-action="call" data-fn="viewEntity" data-args-json='${JSON.stringify([entity.entity_type, entity.id])}'>View</button></td>
                     `;
                     tbody.appendChild(row);
                 });
@@ -717,8 +717,8 @@
                             <span class="entity-name" style="display: block; margin-top: 0.25rem;">${escapeHtml((rel.target_name || '').substring(0, 30))}</span>
                         </td>
                         <td class="actions-cell">
-                            <button class="btn btn-sm btn-warning" onclick='openEditRelModal(${relData})' title="Edit">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick='openDeleteRelModal(${relData})' title="Delete">Delete</button>
+                            <button class="btn btn-sm btn-warning" data-action="call" data-fn="openEditRelModal" data-args-json='[${relData}]' title="Edit">Edit</button>
+                            <button class="btn btn-sm btn-danger" data-action="call" data-fn="openDeleteRelModal" data-args-json='[${relData}]' title="Delete">Delete</button>
                         </td>
                     `;
                     tbody.appendChild(row);

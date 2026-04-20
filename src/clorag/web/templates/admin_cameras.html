@@ -217,8 +217,8 @@
 
         <!-- Filter Bar -->
         <div class="filter-bar">
-            <input type="text" class="filter-bar__search" id="searchInput" placeholder="Search cameras..." oninput="filterTable()">
-            <select class="filter-bar__select" id="manufacturerFilter" onchange="filterByManufacturer()">
+            <input type="text" class="filter-bar__search" id="searchInput" placeholder="Search cameras...">
+            <select class="filter-bar__select" id="manufacturerFilter">
                 <option value="">All Manufacturers</option>
                 {% for mfr in manufacturers %}
                 <option value="{{ mfr }}" {% if selected_manufacturer == mfr %}selected{% endif %}>{{ mfr }}</option>
@@ -283,7 +283,7 @@
                         <td>
                             <div class="actions">
                                 <a href="/admin/cameras/{{ camera.id }}/edit" class="btn btn-sm btn-edit">Edit</a>
-                                <button class="btn btn-sm btn-delete" onclick="deleteCamera({{ camera.id }}, '{{ camera.name }}')">Delete</button>
+                                <button class="btn btn-sm btn-delete" data-action="call" data-fn="deleteCamera" data-args-json='{{ [camera.id, camera.name] | tojson | e }}'>Delete</button>
                             </div>
                         </td>
                     </tr>
@@ -364,6 +364,13 @@
                 window.location.href = '/admin/cameras';
             }
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.addEventListener('input', filterTable);
+            const mfrFilter = document.getElementById('manufacturerFilter');
+            if (mfrFilter) mfrFilter.addEventListener('change', filterByManufacturer);
+        });
 
         async function deleteCamera(id, name) {
             if (!confirm(`Are you sure you want to delete "${name}"?`)) return;

@@ -154,12 +154,12 @@
                 <option value="gmail_cases">Support Cases</option>
                 <option value="custom_docs">Custom Docs</option>
             </select>
-            <button class="btn btn-primary" onclick="loadFixes()">Filter</button>
+            <button class="btn btn-primary" data-action="call" data-fn="loadFixes">Filter</button>
             <div style="margin-left: auto; display: flex; gap: 0.5rem;">
-                <button class="btn btn-secondary" id="quickScanBtn" onclick="runScan(20)">
+                <button class="btn btn-secondary" id="quickScanBtn" data-action="call" data-fn="runScan" data-args="20">
                     Quick Scan (20)
                 </button>
-                <button class="btn btn-primary" id="fullScanBtn" onclick="runScan(null)">
+                <button class="btn btn-primary" id="fullScanBtn" data-action="call" data-fn="runScan" data-args="null">
                     Full Scan
                 </button>
             </div>
@@ -172,14 +172,14 @@
 
         <div class="batch-actions" id="batchActions">
             <label style="display: flex; align-items: center; gap: 0.5rem;">
-                <input type="checkbox" id="selectAll" class="fix-checkbox" onchange="toggleSelectAll()">
+                <input type="checkbox" id="selectAll" class="fix-checkbox" data-action-change="select-all">
                 <span>Select All</span>
             </label>
             <span id="selectedCount">0 selected</span>
             <div class="batch-actions__buttons">
-                <button class="btn btn-sm btn-approve" onclick="batchApprove()">Approve Selected</button>
-                <button class="btn btn-sm btn-reject" onclick="batchReject()">Reject Selected</button>
-                <button class="btn btn-primary btn-sm" onclick="applyApproved()">Apply All Approved</button>
+                <button class="btn btn-sm btn-approve" data-action="call" data-fn="batchApprove">Approve Selected</button>
+                <button class="btn btn-sm btn-reject" data-action="call" data-fn="batchReject">Reject Selected</button>
+                <button class="btn btn-primary btn-sm" data-action="call" data-fn="applyApproved">Apply All Approved</button>
             </div>
         </div>
 
@@ -205,7 +205,7 @@
         </div>
 
         <div class="pagination" id="pagination" style="display: none;">
-            <button class="btn btn-secondary btn-sm" id="loadMoreBtn" onclick="loadMore()">Load More</button>
+            <button class="btn btn-secondary btn-sm" id="loadMoreBtn" data-action="call" data-fn="loadMore">Load More</button>
             <span id="pageInfo"></span>
         </div>
 
@@ -332,7 +332,8 @@
                             class="fix-checkbox"
                             ${isChecked ? 'checked' : ''}
                             ${!isPending ? 'disabled' : ''}
-                            onchange="toggleSelect('${fix.id}')">
+                            data-action-change="select-fix"
+                            data-fix-id="${fix.id}">
                     </td>
                     <td>${typeTag}</td>
                     <td class="diff-view">
@@ -355,8 +356,8 @@
                     <td>
                         <div class="actions">
                             ${isPending ? `
-                                <button class="btn btn-sm btn-approve" onclick="updateStatus('${fix.id}', 'approved')">Approve</button>
-                                <button class="btn btn-sm btn-reject" onclick="updateStatus('${fix.id}', 'rejected')">Reject</button>
+                                <button class="btn btn-sm btn-approve" data-action="call" data-fn="updateStatus" data-args-json='${JSON.stringify([fix.id, "approved"])}'>Approve</button>
+                                <button class="btn btn-sm btn-reject" data-action="call" data-fn="updateStatus" data-args-json='${JSON.stringify([fix.id, "rejected"])}'>Reject</button>
                             ` : ''}
                             <a href="/admin/chunks/${fix.collection}/${fix.chunk_id}"
                                class="btn btn-sm btn-edit"
@@ -370,6 +371,14 @@
 
             updateSelectedCount();
         }
+
+        document.addEventListener('change', (e) => {
+            const el = e.target.closest('[data-action-change]');
+            if (!el) return;
+            const action = el.dataset.actionChange;
+            if (action === 'select-all') toggleSelectAll();
+            else if (action === 'select-fix') toggleSelect(el.dataset.fixId);
+        });
 
         function toggleSelect(id) {
             if (selectedIds.has(id)) {

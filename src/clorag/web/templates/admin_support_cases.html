@@ -313,8 +313,8 @@
             <select class="filter-select" id="filterProduct">
                 <option value="">All Products</option>
             </select>
-            <button class="btn btn-primary" onclick="loadCases()">Search</button>
-            <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+            <button class="btn btn-primary" data-action="call" data-fn="loadCases">Search</button>
+            <button class="btn btn-secondary" data-action="call" data-fn="clearFilters">Clear</button>
         </div>
 
         <!-- Table -->
@@ -339,9 +339,9 @@
 
         <!-- Pagination -->
         <div class="pagination">
-            <button class="btn btn-secondary btn-sm" id="prevBtn" onclick="prevPage()" disabled>Previous</button>
+            <button class="btn btn-secondary btn-sm" id="prevBtn" data-action="call" data-fn="prevPage" disabled>Previous</button>
             <span class="pagination__info" id="paginationInfo">Page 1</span>
-            <button class="btn btn-secondary btn-sm" id="nextBtn" onclick="nextPage()" disabled>Next</button>
+            <button class="btn btn-secondary btn-sm" id="nextBtn" data-action="call" data-fn="nextPage" disabled>Next</button>
         </div>
     </main>
 
@@ -350,7 +350,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title" id="modalTitle">Support Case</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" data-action="call" data-fn="closeModal">&times;</button>
             </div>
 
             <div class="modal-meta" id="modalMeta"></div>
@@ -394,8 +394,8 @@
 
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
                 <a id="modalChunksLink" href="#" class="btn btn-edit" target="_blank">View Chunks</a>
-                <button class="btn btn-delete" onclick="deleteCase(currentCaseId)">Delete Case</button>
-                <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+                <button class="btn btn-delete" data-action="call" data-fn="deleteCaseCurrent">Delete Case</button>
+                <button class="btn btn-secondary" data-action="call" data-fn="closeModal">Close</button>
             </div>
         </div>
     </div>
@@ -523,7 +523,7 @@
                         <td class="quality-stars">${c.resolution_quality ? '★'.repeat(c.resolution_quality) + '☆'.repeat(5 - c.resolution_quality) : '-'}</td>
                         <td>${c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}</td>
                         <td class="actions">
-                            <button class="btn btn-sm btn-view" onclick="viewCase('${c.id}')">View</button>
+                            <button class="btn btn-sm btn-view" data-action="call" data-fn="viewCase" data-args="${c.id}">View</button>
                             <a href="/admin/chunks?collection=gmail_cases&thread_id=${encodeURIComponent(c.thread_id)}" class="btn btn-sm btn-edit" title="View related chunks">Chunks</a>
                         </td>
                     </tr>
@@ -634,6 +634,10 @@
         }
 
         // Delete case
+        function deleteCaseCurrent() {
+            if (currentCaseId !== null) deleteCase(currentCaseId);
+        }
+
         async function deleteCase(caseId) {
             if (!confirm('Delete this support case permanently? This cannot be undone.')) return;
 

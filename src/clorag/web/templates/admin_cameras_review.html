@@ -492,9 +492,9 @@
                         </td>
                         <td>
                             <div class="actions">
-                                <button class="btn btn--success btn--small" onclick="approveCamera({{ camera.id }})">Approve</button>
+                                <button class="btn btn--success btn--small" data-action="call" data-fn="approveCamera" data-args="{{ camera.id }}">Approve</button>
                                 <a href="/admin/cameras/{{ camera.id }}/edit" class="btn btn--primary btn--small">Edit</a>
-                                <button class="btn btn--danger btn--small" onclick="deleteCamera({{ camera.id }}, '{{ camera.name | replace("'", "\\'") }}')">Delete</button>
+                                <button class="btn btn--danger btn--small" data-action="call-with-el" data-fn="deleteCameraFromEl" data-camera-id="{{ camera.id }}" data-camera-name="{{ camera.name | e }}">Delete</button>
                             </div>
                         </td>
                     </tr>
@@ -589,6 +589,10 @@
             } catch (error) {
                 showToast('Error: ' + error.message, true);
             }
+        }
+
+        function deleteCameraFromEl(el) {
+            deleteCamera(parseInt(el.dataset.cameraId, 10), el.dataset.cameraName);
         }
 
         async function deleteCamera(id, name) {

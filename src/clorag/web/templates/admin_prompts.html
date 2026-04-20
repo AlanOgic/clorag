@@ -314,8 +314,8 @@
         <div class="page-header">
             <h1 class="page-title">Prompt Management</h1>
             <div>
-                <button class="btn btn-secondary" onclick="reloadAllCaches()">Reload All Caches</button>
-                <button class="btn btn-primary" onclick="initializeDefaults()">Initialize Defaults</button>
+                <button class="btn btn-secondary" data-action="call" data-fn="reloadAllCaches">Reload All Caches</button>
+                <button class="btn btn-primary" data-action="call" data-fn="initializeDefaults">Initialize Defaults</button>
             </div>
         </div>
 
@@ -333,7 +333,7 @@
                 <option value="graph">Graph</option>
                 <option value="scripts">Scripts</option>
             </select>
-            <button class="btn btn-secondary" onclick="loadPrompts()">Refresh</button>
+            <button class="btn btn-secondary" data-action="call" data-fn="loadPrompts">Refresh</button>
         </div>
 
         <!-- Prompts Table -->
@@ -362,7 +362,7 @@
         <div class="modal-content" style="max-width: 1000px;">
             <div class="modal-header">
                 <h2 class="modal-title" id="modalTitle">Edit Prompt</h2>
-                <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+                <button class="modal-close" data-action="close-modal" data-modal="editModal">&times;</button>
             </div>
             <form id="editPromptForm">
                 <input type="hidden" name="prompt_id" id="editPromptId">
@@ -420,7 +420,7 @@
 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
                     <button type="submit" class="btn btn-primary">Save Changes</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-action="close-modal" data-modal="editModal">Cancel</button>
                 </div>
             </form>
 
@@ -439,7 +439,7 @@
                     <label class="form-label">Sample Variables (JSON)</label>
                     <textarea class="form-textarea" id="testVariables" rows="3" placeholder='{"variable_name": "sample value"}'></textarea>
                 </div>
-                <button class="btn btn-secondary" onclick="testPrompt()">Run Test</button>
+                <button class="btn btn-secondary" data-action="call" data-fn="testPrompt">Run Test</button>
                 <div class="form-group" style="margin-top: 1rem;">
                     <label class="form-label">Output</label>
                     <div class="test-output" id="testOutput">Click "Run Test" to see the prompt with variables substituted.</div>
@@ -453,7 +453,7 @@
         <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header">
                 <h2 class="modal-title">Version <span id="versionNumber"></span></h2>
-                <button class="modal-close" onclick="closeModal('versionModal')">&times;</button>
+                <button class="modal-close" data-action="close-modal" data-modal="versionModal">&times;</button>
             </div>
             <div class="form-group">
                 <label class="form-label">Content at this version</label>
@@ -468,8 +468,8 @@
                 <p id="versionCreated">-</p>
             </div>
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                <button class="btn btn-primary" onclick="rollbackToVersion()">Rollback to This Version</button>
-                <button class="btn btn-secondary" onclick="closeModal('versionModal')">Close</button>
+                <button class="btn btn-primary" data-action="call" data-fn="rollbackToVersion">Rollback to This Version</button>
+                <button class="btn btn-secondary" data-action="close-modal" data-modal="versionModal">Close</button>
             </div>
         </div>
     </div>
@@ -516,7 +516,7 @@
                         <td><span class="source-badge source-badge--${p.source}">${p.source}</span></td>
                         <td>${p.variables.length > 0 ? p.variables.map(v => `<code>{${v}}</code>`).join(' ') : '-'}</td>
                         <td class="actions">
-                            <button class="btn btn-sm btn-edit" onclick="editPrompt('${p.id || p.key}', '${p.source}')">Edit</button>
+                            <button class="btn btn-sm btn-edit" data-action="call" data-fn="editPrompt" data-args-json='${JSON.stringify([p.id || p.key, p.source])}'>Edit</button>
                         </td>
                     </tr>
                 `).join('');
@@ -579,7 +579,7 @@
                 }
 
                 list.innerHTML = versions.map(v => `
-                    <div class="version-item" onclick="viewVersion(${v.version}, '${v.id}')">
+                    <div class="version-item" data-action="call" data-fn="viewVersion" data-args-json='${JSON.stringify([v.version, v.id])}'>
                         <div class="version-item__header">
                             <span class="version-item__number">Version ${v.version}</span>
                             <span class="version-item__date">${formatDate(v.created_at)}</span>

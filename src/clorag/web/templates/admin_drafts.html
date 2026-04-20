@@ -431,10 +431,10 @@
             <div class="section__header">
                 <h3 class="section__title">Pending Threads</h3>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-secondary" onclick="loadPendingThreads()">
+                    <button class="btn btn-secondary" data-action="call" data-fn="loadPendingThreads">
                         Refresh
                     </button>
-                    <button class="btn btn-primary" id="runPipelineBtn" onclick="runPipeline()">
+                    <button class="btn btn-primary" id="runPipelineBtn" data-action="call" data-fn="runPipeline">
                         Run Pipeline
                     </button>
                 </div>
@@ -452,7 +452,7 @@
         <div class="modal">
             <div class="modal__header">
                 <h3 class="modal__title">Draft Preview</h3>
-                <button class="modal__close" onclick="closePreviewModal()">&times;</button>
+                <button class="modal__close" data-action="call" data-fn="closePreviewModal">&times;</button>
             </div>
             <div class="modal__body">
                 <div class="preview-section">
@@ -480,8 +480,8 @@
                 </div>
             </div>
             <div class="modal__footer">
-                <button class="btn btn-secondary" onclick="closePreviewModal()">Cancel</button>
-                <button class="btn btn-primary" id="createDraftBtn" onclick="createDraft()">
+                <button class="btn btn-secondary" data-action="call" data-fn="closePreviewModal">Cancel</button>
+                <button class="btn btn-primary" id="createDraftBtn" data-action="call" data-fn="createDraft">
                     Create Draft in Gmail
                 </button>
             </div>
@@ -641,7 +641,7 @@
         function renderThreadItem(t) {
             return `
                 <div class="thread-item" data-thread-id="${t.thread_id}">
-                    <div class="thread-header" onclick="toggleThread('${t.thread_id}')">
+                    <div class="thread-header" data-action="call" data-fn="toggleThread" data-args="${t.thread_id}">
                         <div class="thread-toggle">&#x25B6;</div>
                         <div class="thread-info">
                             <div class="thread-subject" title="${escapeHtml(t.subject)}">${escapeHtml(t.subject)}</div>
@@ -651,8 +651,8 @@
                                 <span>${t.received_at ? formatDate(t.received_at) : '-'}</span>
                             </div>
                         </div>
-                        <div class="thread-actions" onclick="event.stopPropagation()">
-                            <button class="btn btn-secondary btn-small" onclick="previewDraft('${t.thread_id}')">
+                        <div class="thread-actions" data-action="stop-propagation">
+                            <button class="btn btn-secondary btn-small" data-action="call" data-fn="previewDraft" data-args="${t.thread_id}">
                                 Preview Draft
                             </button>
                         </div>
@@ -724,7 +724,7 @@
                             <div class="message-date">${m.date ? formatDateTime(m.date) : ''}</div>
                         </div>
                         <div class="message-snippet" id="msg-${threadId}-${i}">${escapeHtml(m.snippet || m.body.substring(0, 200))}</div>
-                        ${m.body.length > 200 ? `<span class="message-expand" onclick="toggleMessage('${threadId}', ${i}, \`${escapeHtml(m.body).replace(/`/g, '\\`')}\`)">Show full message</span>` : ''}
+                        ${m.body.length > 200 ? `<span class="message-expand" data-action="call" data-fn="toggleMessage" data-args-json='${JSON.stringify([threadId, i, m.body])}'>Show full message</span>` : ''}
                     </div>
                 `;
             }).join('');

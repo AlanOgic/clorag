@@ -217,8 +217,8 @@
                 <option value="docusaurus_docs">Documentation</option>
                 <option value="gmail_cases">Support Cases</option>
             </select>
-            <button class="btn btn-primary" onclick="searchChunks()">Search</button>
-            <button class="btn btn-secondary" onclick="clearFilter()">Browse All</button>
+            <button class="btn btn-primary" data-action="call" data-fn="searchChunks">Search</button>
+            <button class="btn btn-secondary" data-action="call" data-fn="clearFilter">Browse All</button>
         </div>
 
         <!-- Thread filter banner -->
@@ -249,7 +249,7 @@
 
         <!-- Pagination -->
         <div class="pagination" id="pagination" style="display: none;">
-            <button class="btn btn-secondary btn-sm" id="loadMoreBtn" onclick="loadMore()">Load More</button>
+            <button class="btn btn-secondary btn-sm" id="loadMoreBtn" data-action="call" data-fn="loadMore">Load More</button>
             <span id="pageInfo"></span>
         </div>
     </main>
@@ -402,7 +402,7 @@
                         <div class="actions">
                             ${caseLink}
                             <a href="/admin/chunks/${chunk.collection}/${chunk.id}" class="btn btn-sm btn-edit">Edit</a>
-                            <button class="btn btn-sm btn-delete" onclick="deleteChunk('${chunk.collection}', '${chunk.id}')">Delete</button>
+                            <button class="btn btn-sm btn-delete" data-action="call" data-fn="deleteChunk" data-args-json='${JSON.stringify([chunk.collection, chunk.id])}'>Delete</button>
                         </div>
                     </td>
                 `;

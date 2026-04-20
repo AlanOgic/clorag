@@ -258,7 +258,7 @@
     <main class="main">
         <div class="page-header">
             <h1 class="page-title">Messages</h1>
-            <button class="btn btn-primary" onclick="openCreateModal()">Create Message</button>
+            <button class="btn btn-primary" data-action="call" data-fn="openCreateModal">Create Message</button>
         </div>
 
         <!-- Alert container -->
@@ -289,9 +289,9 @@
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
                 <h2 class="modal-title" id="modalTitle">Create Message</h2>
-                <button class="modal-close" onclick="closeModal('messageModal')">&times;</button>
+                <button class="modal-close" data-action="close-modal" data-modal="messageModal">&times;</button>
             </div>
-            <form id="messageForm" onsubmit="handleSubmit(event)">
+            <form id="messageForm">
                 <div class="form-group">
                     <label class="form-label" for="msgTitle">Title</label>
                     <input type="text" id="msgTitle" class="form-input" required maxlength="200" placeholder="Message title">
@@ -334,7 +334,7 @@
                 </div>
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
                     <button type="submit" class="btn btn-primary" id="submitBtn">Create</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('messageModal')">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-action="close-modal" data-modal="messageModal">Cancel</button>
                 </div>
             </form>
         </div>
@@ -345,12 +345,12 @@
         <div class="modal-content" style="max-width: 400px;">
             <div class="modal-header">
                 <h2 class="modal-title">Delete Message</h2>
-                <button class="modal-close" onclick="closeModal('deleteModal')">&times;</button>
+                <button class="modal-close" data-action="close-modal" data-modal="deleteModal">&times;</button>
             </div>
             <p>Are you sure you want to delete "<span id="deleteTitle"></span>"?</p>
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                <button class="btn btn-primary" style="background: #dc3545;" onclick="confirmDelete()">Delete</button>
-                <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+                <button class="btn btn-primary" style="background: #dc3545;" data-action="call" data-fn="confirmDelete">Delete</button>
+                <button class="btn btn-secondary" data-action="close-modal" data-modal="deleteModal">Cancel</button>
             </div>
         </div>
     </div>
@@ -397,7 +397,7 @@
                         <td><span class="body-preview" title="${escapeAttr(m.body)}">${escapeHtml(bodyPreview)}</span></td>
                         <td>
                             <label class="toggle-switch">
-                                <input type="checkbox" ${m.is_active ? 'checked' : ''} onchange="toggleActive('${m.id}', this.checked)">
+                                <input type="checkbox" ${m.is_active ? 'checked' : ''} data-action-change="toggle-active" data-msg-id="${m.id}">
                                 <span class="toggle-slider"></span>
                             </label>
                         </td>
@@ -405,8 +405,8 @@
                         <td>${formatDate(m.created_at)}</td>
                         <td>${expiresDisplay}${isExpired ? '<span class="expired-badge">Expired</span>' : ''}</td>
                         <td>
-                            <button class="action-btn action-btn--edit" onclick="openEditModal('${m.id}')" title="Edit">Edit</button>
-                            <button class="action-btn action-btn--delete" onclick="openDeleteModal('${m.id}', '${escapeAttr(m.title)}')" title="Delete">Delete</button>
+                            <button class="action-btn action-btn--edit" data-action="call" data-fn="openEditModal" data-args="${m.id}" title="Edit">Edit</button>
+                            <button class="action-btn action-btn--delete" data-action="call" data-fn="openDeleteModal" data-args-json='${JSON.stringify([m.id, m.title])}' title="Delete">Delete</button>
                         </td>
                     </tr>`;
                 }).join('');
@@ -457,6 +457,16 @@
                 showAlert('Failed to load message: ' + error.message, 'error');
             }
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('messageForm');
+            if (form) form.addEventListener('submit', handleSubmit);
+        });
+
+        document.addEventListener('change', (e) => {
+            const el = e.target.closest('[data-action-change="toggle-active"]');
+            if (el) toggleActive(el.dataset.msgId, el.checked);
+        });
 
         // Handle form submit (create or update)
         async function handleSubmit(event) {

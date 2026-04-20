@@ -337,8 +337,8 @@
         <div class="page-header">
             <h1 class="page-title">RAG Settings</h1>
             <div>
-                <button class="btn btn-secondary" onclick="reloadAll()">Reload All</button>
-                <button class="btn btn-primary" onclick="initializeDefaults()">Initialize Defaults</button>
+                <button class="btn btn-secondary" data-action="call" data-fn="reloadAll">Reload All</button>
+                <button class="btn btn-primary" data-action="call" data-fn="initializeDefaults">Initialize Defaults</button>
             </div>
         </div>
 
@@ -366,7 +366,7 @@
         <div class="modal-content" style="max-width: 700px;">
             <div class="modal-header">
                 <h2 class="modal-title">History: <span id="versionSettingName"></span></h2>
-                <button class="modal-close" onclick="closeModal('versionModal')">&times;</button>
+                <button class="modal-close" data-action="close-modal" data-modal="versionModal">&times;</button>
             </div>
             <div class="version-list" id="versionList">
                 <div class="empty-state">Loading versions...</div>
@@ -379,7 +379,7 @@
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
                 <h2 class="modal-title">Version <span id="versionNumber"></span></h2>
-                <button class="modal-close" onclick="closeModal('versionDetailModal')">&times;</button>
+                <button class="modal-close" data-action="close-modal" data-modal="versionDetailModal">&times;</button>
             </div>
             <div class="form-group">
                 <label class="form-label">Value at this version</label>
@@ -394,8 +394,8 @@
                 <p id="versionCreated">-</p>
             </div>
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                <button class="btn btn-primary" onclick="rollbackToVersion()">Rollback to This Version</button>
-                <button class="btn btn-secondary" onclick="closeModal('versionDetailModal')">Close</button>
+                <button class="btn btn-primary" data-action="call" data-fn="rollbackToVersion">Rollback to This Version</button>
+                <button class="btn btn-secondary" data-action="close-modal" data-modal="versionDetailModal">Close</button>
             </div>
         </div>
     </div>
@@ -454,8 +454,8 @@
                             <div class="setting-card__input-row">
                                 <input type="${inputType}" step="${step}" ${minAttr} ${maxAttr}
                                        id="input-${s.id || s.key}" value="${s.value}">
-                                <button class="btn btn-sm btn-primary" onclick="saveSetting('${s.id}', '${escapeHtml(s.key)}')">Save</button>
-                                ${s.id ? `<button class="btn btn-sm btn-secondary" onclick="showVersions('${s.id}', '${escapeHtml(s.name)}')">History</button>` : ''}
+                                <button class="btn btn-sm btn-primary" data-action="call" data-fn="saveSetting" data-args-json='${JSON.stringify([s.id, s.key])}'>Save</button>
+                                ${s.id ? `<button class="btn btn-sm btn-secondary" data-action="call" data-fn="showVersions" data-args-json='${JSON.stringify([s.id, s.name])}'>History</button>` : ''}
                             </div>
                         </div>
                         <div class="setting-card__footer">
@@ -463,7 +463,7 @@
                             ${s.min_value !== null && s.min_value !== undefined ? `<span class="setting-card__meta">Min: ${s.min_value}</span>` : ''}
                             ${s.max_value !== null && s.max_value !== undefined ? `<span class="setting-card__meta">Max: ${s.max_value}</span>` : ''}
                             <span class="setting-card__meta setting-card__meta--source ${s.source === 'database' ? 'customized' : 'default'}">${s.source === 'database' ? 'Customized' : 'Default'}</span>
-                            ${s.id ? `<button class="setting-card__options-toggle" onclick="toggleOptions('${s.id}')">Options</button>` : ''}
+                            ${s.id ? `<button class="setting-card__options-toggle" data-action="call" data-fn="toggleOptions" data-args="${s.id}">Options</button>` : ''}
                         </div>
                         ${s.id ? `
                         <div class="setting-card__options" id="options-${s.id}">
@@ -485,8 +485,8 @@
                                 </div>
                             </div>
                             <div class="setting-card__options-actions">
-                                <button class="btn btn-sm btn-primary" onclick="saveMetadata('${s.id}', '${escapeHtml(s.key)}')">Save Options</button>
-                                ${s.is_customized ? `<button class="btn btn-sm btn-secondary" onclick="resetToDefault('${s.id}', '${escapeHtml(s.key)}', '${s.default_value}')">Reset to Default</button>` : ''}
+                                <button class="btn btn-sm btn-primary" data-action="call" data-fn="saveMetadata" data-args-json='${JSON.stringify([s.id, s.key])}'>Save Options</button>
+                                ${s.is_customized ? `<button class="btn btn-sm btn-secondary" data-action="call" data-fn="resetToDefault" data-args-json='${JSON.stringify([s.id, s.key, s.default_value])}'>Reset to Default</button>` : ''}
                             </div>
                         </div>` : ''}
                     </div>`;
@@ -546,7 +546,7 @@
                 }
 
                 list.innerHTML = versions.map(v => `
-                    <div class="version-item" onclick="viewVersion(${v.version})">
+                    <div class="version-item" data-action="call" data-fn="viewVersion" data-args="${v.version}">
                         <div class="version-item__header">
                             <span class="version-item__number">Version ${v.version}</span>
                             <span class="version-item__date">${formatDate(v.created_at)}</span>
