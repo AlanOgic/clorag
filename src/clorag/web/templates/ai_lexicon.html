@@ -190,7 +190,7 @@
   <footer>Cyanview internal reference · maintained by the AI team</footer>
 </div>
 
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 const TERMS = [
   // ============ FUNDAMENTALS ============
   { term: "LLM", cat: "fundamentals", def: "<strong>Large Language Model.</strong> A neural network trained on massive text corpora to predict the next token. Examples: Claude, GPT, Gemini, Llama." },
