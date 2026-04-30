@@ -75,6 +75,11 @@ CLORAG is a production-ready Multi-RAG agent designed to power Cyanview's techni
 | **Performance Monitoring** | Real-time metrics with percentile stats and alerts |
 | **RAG Settings** | 20 tuning parameters editable at runtime via admin UI |
 | **OpenAI-Compatible API** | `/v1/chat/completions` endpoint for any OpenAI SDK client |
+| **MCP Server** | Standalone Model Context Protocol server (stdio + HTTP transports) exposing search, cameras, documents, and support tools |
+| **Legacy Docs RAG** | Independent search engine + admin UI for the legacy `support.cyanview.com` site |
+| **User Feedback** | Thumbs up/down per answer with optional comment, surfaced on `/admin/analytics` |
+| **Conversation Grounding** | Follow-ups use history for intent only; facts from prior answers never bleed into the current response |
+| **AI Lexicon** | `/ai-lexicon` glossary of AI / agent / MCP / ops terminology |
 
 ### Technology Stack
 
@@ -218,13 +223,14 @@ Configuration:
 
 ### Vector Collections
 
-Three Qdrant collections store the knowledge base:
+Four Qdrant collections store the knowledge base:
 
 | Collection | Source | Content |
 |------------|--------|---------|
-| `docusaurus_docs` | Sitemap crawler | Official documentation pages |
+| `docusaurus_docs` | Sitemap crawler | Official documentation pages (support.cyanview.cloud) |
 | `gmail_cases` | Gmail API | Curated, anonymized support threads |
 | `custom_docs` | Admin uploads | Custom knowledge (.txt, .md, .pdf) |
+| `docusaurus_docs_legacy` | Sitemap crawler | Legacy docs (support.cyanview.com) — independent from main search, used by the `/legacy` standalone RAG |
 
 Each collection contains:
 - **Dense vectors**: 1024-dimensional voyage-context-3 embeddings
@@ -496,19 +502,34 @@ uv run clorag                                 # Interactive mode
 
 #### Data Ingestion
 ```bash
-uv run ingest-docs                            # Docusaurus documentation
+uv run ingest-docs                            # Docusaurus documentation (live crawl)
+uv run ingest-local-docs                      # Docusaurus from local markdown sources
+uv run ingest-legacy-docs [path] --fresh      # Legacy docs from local markdown
 uv run ingest-curated --max-threads 300       # Gmail support threads
 uv run ingest-curated --offset N              # Incremental ingestion
 uv run import-docs ./folder --category X      # Bulk import custom docs
+uv run backfill-support-cases                 # Backfill Gmail cases into SQLite
+uv run enrich-support-cases                   # Re-run keyword/summary enrichment
 ```
 
 #### Maintenance
 ```bash
-uv run enrich-cameras                         # Extract camera info from docs
+uv run extract-cameras --from-sqlite          # Extract cameras from support cases
+uv run extract-cameras --docs-only            # Extract cameras from Qdrant docs
+uv run enrich-cameras                         # Enrich cameras with model codes + URLs
+uv run verify-cameras                         # Verify/correct cameras via web (dry-run)
+uv run verify-cameras --apply                 # Apply corrections
 uv run populate-graph                         # Build Neo4j knowledge graph
 uv run rebuild-fts                            # Rebuild camera FTS5 index
 uv run draft-support                          # Generate auto-reply drafts
 uv run draft-support --preview                # Preview without creating
+uv run archive-collection                     # Archive a Qdrant collection
+```
+
+#### MCP Server
+```bash
+uv run clorag-mcp                             # MCP server (stdio transport)
+uv run clorag-mcp-http                        # MCP server (HTTP transport, port 8080)
 ```
 
 #### RIO Terminology Fixes
@@ -527,8 +548,11 @@ uv run fix-rio-terminology --apply            # Apply approved fixes
 #### Prompt Management
 ```bash
 uv run init-prompts                           # Initialize prompt database
-uv run init-prompts --list                    # List all prompts
+uv run init-prompts --list                    # List all prompts (* = customized)
 uv run init-prompts --stats                   # Show statistics
+uv run init-prompts --force                   # Reset all to defaults (auto-backups first)
+uv run init-prompts --backup                  # Backup customized prompts to JSON
+uv run init-prompts --restore FILE            # Restore customizations from backup
 ```
 
 #### RAG Settings Management
@@ -555,6 +579,12 @@ uv run pytest                                 # Tests
 | `/` | AI Search - Natural language query interface |
 | `/cameras` | Camera Compatibility - Browse supported cameras |
 | `/help` | User Guide - How to use the search features |
+| `/ai-lexicon` | Glossary of AI / agent / MCP / ops terminology |
+| `/docs` | Public technical documentation index |
+| `/video` | Video showcase |
+| `/legacy` | Standalone RAG for the legacy `support.cyanview.com` site |
+| `/legacy/help` | Usage guide for the legacy search |
+| `/privacy`, `/terms`, `/legal`, `/cookies` | Legal/GDPR pages |
 
 #### Admin Pages (requires login)
 
@@ -562,8 +592,9 @@ uv run pytest                                 # Tests
 |-----|-------------|
 | `/admin` | Dashboard with links to all features |
 | `/admin/cameras` | Camera CRUD management |
+| `/admin/cameras-list` | Camera browser with detail popup |
 | `/admin/knowledge` | Custom knowledge base (upload/paste) |
-| `/admin/analytics` | Search analytics and statistics |
+| `/admin/analytics` | Search analytics, source insights, query rewrites, feedback |
 | `/admin/drafts` | Draft auto-reply management |
 | `/admin/support-cases` | Browse ingested Gmail cases |
 | `/admin/chunks` | Vector chunk browser/editor |
@@ -571,10 +602,13 @@ uv run pytest                                 # Tests
 | `/admin/prompts` | LLM prompt editor with version history |
 | `/admin/settings` | RAG tuning parameters (thresholds, caches, etc.) |
 | `/admin/ingestion` | Start, monitor, and review ingestion jobs |
+| `/admin/messages` | Manage homepage announcements |
 | `/admin/metrics` | Performance metrics with percentile stats |
 | `/admin/terminology-fixes` | RIO terminology review |
 | `/admin/search-debug` | Debug RAG: chunks, prompts, timing |
 | `/admin/docs` | Technical documentation |
+| `/admin/api-docs` | Swagger UI for the admin API |
+| `/legacy/manage` | Scan/ingest legacy docs (admin-protected) |
 
 ### API Reference
 
@@ -726,9 +760,28 @@ docker compose up -d
 ### Manual Deployment
 
 ```bash
-rsync -avz --exclude '.venv' --exclude 'data' . root@server:/opt/clorag/
+rsync -avz \
+  --exclude='.venv' --exclude='__pycache__' --exclude='.git' \
+  --exclude='data' --exclude='node_modules' \
+  --exclude='.pytest_cache' --exclude='.mypy_cache' --exclude='.ruff_cache' \
+  --exclude='.env' --exclude='secrets' --exclude='logs' \
+  --exclude='.DS_Store' --exclude='token*.json' \
+  . root@server:/opt/clorag/
+
 ssh root@server "cd /opt/clorag && docker compose build && docker compose up -d"
 ```
+
+> **CRITICAL excludes** — without these, rsync clobbers production:
+> - `.env` overwrites prod secrets and may contain malformed lines that crash `pydantic-settings`
+> - `secrets/` — rsync `-a` preserves local file modes; the `clorag` container user (different uid than yours) needs **644** on every file in `/run/secrets/`. A 600 file = `PermissionError` at startup
+> - `logs/`, `.DS_Store`, `token*.json` — pollute the prod tree
+>
+> Verify post-deploy:
+> ```bash
+> curl -sI https://your-domain/                                  # 200
+> ssh root@server "cd /opt/clorag && docker compose ps"          # all healthy
+> ssh root@server "cd /opt/clorag && docker compose logs clorag-web --tail=30"
+> ```
 
 ### Infrastructure Setup
 
