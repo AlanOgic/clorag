@@ -7,7 +7,7 @@ CLORAG is a Multi-RAG agent for Cyanview support combining:
 - **Gmail support threads** (curated and anonymized)
 - **Custom knowledge documents** (admin-managed)
 
-Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across three Qdrant collections. Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
+Uses hybrid search (dense voyage-context-3 + sparse BM25 vectors with RRF fusion) + **Voyage rerank-2.5** cross-encoder for refined relevance across four Qdrant collections (main docs, gmail cases, custom docs, legacy docs). Claude Sonnet synthesizes responses with automatic Excalidraw diagrams (hand-drawn style) for integration scenarios.
 
 **Version**: 0.11.0 | **Python**: 3.10-3.13
 
@@ -53,8 +53,15 @@ uv run clorag-mcp-http                     # MCP server (HTTP transport, port 80
 
 # Quality
 uv run ruff check src/ && uv run mypy src/clorag --strict
-uv run pytest
+uv run pytest                              # Full suite
+uv run pytest tests/path/to/test_file.py::test_name -v   # Single test
+uv run pytest --cov=src/clorag --cov-report=term-missing # With coverage
 ```
+
+Tests live in `tests/`. Web routes use FastAPI's `TestClient`; database tests
+use temp SQLite paths via fixtures. CLI entry points are defined in
+`pyproject.toml` `[project.scripts]` — when adding a new script, register it
+there and rerun `uv sync`.
 
 ## Architecture
 
@@ -74,7 +81,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 
 **Agent** (`agent/`): `tools.py` (Claude Agent SDK MCP tools), `prompts.py`
 
-**MCP** (`mcp/`): Standalone MCP server for Claude Desktop and remote clients. `server.py` (FastMCP server with lifespan for stdio, manual init for HTTP), `tools/` (search, cameras, documents, support). 16+ tools exposing full RAG capabilities via stdio and StreamableHTTP transports.
+**MCP** (`mcp/`): Standalone MCP server for Claude Desktop and remote clients. `server.py` (FastMCP server with lifespan for stdio, manual init for HTTP), `tools/` (search, cameras, documents, support) exposing full RAG capabilities via stdio and StreamableHTTP transports.
 
 **Graph** (`graph/`): `schema.py` (Camera, Product, Protocol, Issue, Solution entities), `enrichment.py`
 
@@ -89,7 +96,7 @@ Query → Voyage AI embeddings → Qdrant (hybrid RRF) → Reranker → Neo4j en
 - `schemas.py` - Request/response Pydantic models
 - `search/` - Search pipeline: `pipeline.py`, `synthesis.py`, `utils.py`
 - `dependencies.py` - FastAPI dependency injection
-- `templates/` - 38 Jinja2 templates including `/admin/docs` (11 doc pages), legacy (3 pages)
+- `templates/` - Jinja2 templates including `/admin/docs` (doc pages), legacy (`legacy*.html`), and the `ai_lexicon.html` standalone page
 - Admin UI at `/admin/{cameras,cameras-list,knowledge,analytics,metrics,drafts,chunks,graph,support-cases,prompts,settings,ingestion,terminology-fixes,messages}`, REST APIs at `/api/`
 - Legacy UI at `/legacy`, `/legacy/manage` (admin-protected), `/legacy/help`
 
@@ -293,190 +300,38 @@ Completely independent RAG for `support.cyanview.com` (the existing production s
 ## Deployment
 
 ```bash
-rsync -avz --exclude '.venv' ... root@cyanview.cloud:/opt/clorag/
+rsync -avz \
+  --exclude='.venv' --exclude='__pycache__' --exclude='.git' \
+  --exclude='data' --exclude='node_modules' \
+  --exclude='.pytest_cache' --exclude='.mypy_cache' --exclude='.ruff_cache' \
+  --exclude='.env' --exclude='secrets' --exclude='logs' \
+  --exclude='.DS_Store' --exclude='token*.json' \
+  /Users/alanogic/dev/clorag/ root@cyanview.cloud:/opt/clorag/
+
 ssh root@cyanview.cloud "cd /opt/clorag && docker compose build && docker compose up -d"
+```
+
+CRITICAL excludes — without these, rsync clobbers production:
+- `.env` — overwrites prod secrets and may contain malformed lines that crash `pydantic-settings`
+- `secrets/` — rsync `-a` preserves local file modes; the `clorag` container user (different uid) needs **644** on all secret files (`/run/secrets/<name>`). A 600 file → `PermissionError` at startup.
+- `logs/`, `.DS_Store`, `token*.json` — pollute the prod tree.
+
+Verify post-deploy:
+```bash
+curl -sI https://cyanview.cloud/                                  # 200
+ssh root@cyanview.cloud "cd /opt/clorag && docker compose ps"     # all healthy
+ssh root@cyanview.cloud "cd /opt/clorag && docker compose logs clorag-web --tail=30"
 ```
 
 Production:
 - Web: https://cyanview.cloud/ (Docker maps 8085→8080)
 - MCP HTTP: https://mcp.cyanview.cloud/ (Docker maps 8086→8080, Bearer auth required)
 
-## Recent Updates (2026-04-18)
+## Change History
 
-### v0.11.0: Analytics Rework + Query Rewriting Visibility
-
-- **Source Insights panel** (`/admin/analytics`): replaces the flat "Searches by Source" bar with per-source retrieval quality metrics — win rate (% of searches where the source was ranked #1), avg top-5 reranker score, position mix at ranks 1–5, wins/appearances count. Real visibility into which sources actually win after rerank.
-- **Reranked %** stat card on the dashboard (replaced "Unique Queries") showing the share of searches that went through the cross-encoder
-- **Popular Queries section removed** from the analytics dashboard (endpoint `/search-stats/popular` preserved for potential future use)
-- **Query-rewrite visibility**: three layers of query transformation are now logged and surfaced in the search-detail modal
-  - **Normalized query** (deterministic RIO terminology — e.g. "RIO-Live" → "RIO +LAN") — web pipeline now applies `apply_product_name_transforms` before embedding, previously only the CLI retriever did
-  - **Rewritten query** (LLM standalone rewrite) — chat-mode follow-ups ("and the FX6?") are rewritten to standalone queries ("Sony FX6 camera connection") via a cheap `sonnet_model` call before retrieval; only fires when history is present, falls back silently on failure
-  - **Agent tool calls** — each CLI `search_docs` / `search_cases` / `search_custom` / `hybrid_search` invocation is logged as its own analytics row tagged `pipeline='cli_agent'` with the actual query the LLM chose; visible in the modal as a dedicated Tool Calls table
-- **Conversation previews**: each query in Recent Conversations now shows an italic 2-line teaser of the answer (first ~240 chars, heading-stripped, sentence-boundary truncation). `get_recent_conversations()` now includes `response_preview` per query.
-- **Modal close bug fixed**: analytics search-detail modal was stuck open because the close animation selector (`.modal-overlay.closing .modal-content`) didn't match the actual child class (`.modal`). Fixed in two places: (a) CSS selector broadened to also match `.modal` and `.merge-modal`; (b) `closeModalAnimated` in `admin.js` now has a 300ms fallback timeout so a missing animation never traps the overlay.
-- **Schema migration** (non-destructive, verified on existing data): `search_queries` gains `normalized_query`, `rewritten_query`, `pipeline`, `tool_calls` columns via `ALTER TABLE ADD COLUMN` guarded by `PRAGMA table_info` checks. Existing rows retain all original data; `pipeline` defaults to `'web'`.
-- **New analytics method**: `AnalyticsDatabase.get_source_insights(days)` aggregates `source_types` + `scores` parallel arrays into per-source statistics without schema changes.
-- **New endpoint**: `GET /api/admin/source-insights?days=30` (admin-auth-required, returns `{total, reranked_total, rerank_coverage, sources}`)
-### v0.10.5: Composable Prompt Architecture
-
-- **Split `base.system_prompt` → `base.identity` + `base.product_reference`**: Product knowledge is now a separate composable block, not baked into the base prompt
-- **Product-free legacy synthesis**: Legacy search uses `base.identity` + `synthesis.web_layer` (no product knowledge injection — answers grounded in retrieved docs only)
-- **6 prompts now use `{product_reference}`**: Extended from 3 to 6 — added `camera_extractor`, `rio_terminology`, `entity_extractor` alongside existing `thread_analyzer`, `quality_controller`, `email_generator`
-- **Eliminated hardcoded product lists**: Camera extractor and graph entity extractor no longer hardcode "Cyanview makes camera control equipment (RCP, RIO, CI0, VP4)" — product knowledge comes from the shared `base.product_reference`
-- **RIO terminology deduplication**: Removed inline product definitions from `rio_terminology` prompt, replaced with `{product_reference}` variable
-- **Fixed phantom `CVP` product**: Drafts email generator listed non-existent `CVP` in bold formatting rule — replaced with `NIO, RSBM`
-- **Configurable synthesis prompts**: `synthesize_answer()` and `synthesize_answer_stream()` accept `prompt_keys` parameter for per-pipeline prompt composition
-- **Removed key**: `base.system_prompt` (split into `base.identity` + `base.product_reference`)
-- **New key**: `base.identity` (identity, response rules, formatting, language — product-free)
-
-### v0.10.4: Legacy Docs System
-
-- **Standalone legacy RAG**: Independent search engine for `support.cyanview.com` with its own Qdrant collection (`docusaurus_docs_legacy`)
-- **Public search page**: `/legacy` with streaming Claude synthesis, follow-up questions, source links to `.com` (no URL rewriting)
-- **Admin management**: `/legacy/manage` (password-protected) — scan sitemap for new pages, ingest by URL, full re-crawl
-- **Documentation**: `/legacy/help` with usage workflow and technical details
-- **Local markdown ingestion**: `ingest-legacy-docs` CLI reads Docusaurus `.md` sources directly, no web crawling needed
-- **Sitemap scanning**: Compares live sitemap against indexed URLs, shows new pages with checkbox selection for batch ingestion
-- **No text transforms**: Legacy ingestion preserves original text (e.g., "RIO-Live" stays as-is for content review)
-- **Brown theme**: Visual distinction from main blue CLORAG UI
-- **New config**: `QDRANT_LEGACY_DOCS_COLLECTION` (default: `docusaurus_docs_legacy`)
-- **New router**: `web/routers/legacy.py` with 6 endpoints (manage page, help page, stats, scan, ingest-new, ingest-page, reingest-full)
-- **New script**: `scripts/ingest_legacy_docs.py` with `ingest-legacy-docs` CLI entry point
-- **New templates**: `legacy.html`, `legacy_manage.html`, `legacy_help.html`
-- **Timeout exemption**: `/api/legacy/*` exempt from 60s middleware timeout
-- **`extract_source_links(rewrite_urls=False)`**: New parameter to skip `.com` → `.cloud` URL rewriting
-
-
-
-### v0.10.3: User Feedback (Thumbs Up/Down)
-
-- **Feedback buttons**: Thumbs up/down on every AI answer, enabled after streaming completes
-- **Optional comment**: Text field appears on thumbs down for "What could be improved?"
-- **Feedback API**: `POST /api/feedback` (rate-limited 10/min, upsert — one vote per search)
-- **search_id linking**: `log_search()` now runs before SSE `done` event, `search_id` included in payload
-- **Admin dashboard**: Feedback stats (satisfaction rate, total, up/down counts) + recent feedback table at `/admin/analytics`
-- **Database**: `search_feedback` table in analytics DB with upsert on `search_id`
-- **New endpoints**: `POST /api/feedback`, `GET /api/admin/feedback-stats`, `GET /api/admin/feedback/recent`
-- **New schemas**: `FeedbackRequest`, `FeedbackResponse`
-
-### v0.10.2: Conversation Grounding + Prompt Backup/Restore
-
-- **Conversation grounding**: Fixed multi-turn answer contamination where follow-up questions (e.g., "connect FX6" after "connect FX3") would bleed facts from previous answers into the current response
-  - Message-level separator injected between history and new question in `synthesis.py`
-  - `<conversation_grounding>` rule added to `synthesis.web_layer` prompt
-  - History used for intent resolution only; each answer grounded exclusively in current context
-- **Prompt backup/restore**: `init-prompts --backup` exports customized prompts to `data/prompt_backups/<timestamp>.json`; `--restore FILE` re-applies them selectively
-  - `--force` auto-backups before resetting (safety net)
-  - Customization detection compares DB content against hardcoded defaults
-  - `--list` now marks customized prompts with `*`; `--stats` shows customization count
-  - Restore skips prompts matching current defaults or removed from registry
-
-### v0.10.1: Prompt Composition (base + layer)
-
-- **Prompt composition**: Extracted shared identity, product knowledge, and response rules into composable blocks. Web and CLI compose thin layers on top via `get_composed_prompt()`
-- **Web pipeline**: `base.identity` + `base.product_reference` + `synthesis.web_layer` (replaces monolithic `synthesis.web_answer`)
-- **CLI agent**: `base.identity` + `base.product_reference` + `agent.tools_layer` (replaces `agent.system_prompt_en/fr`, adds product knowledge)
-- **XML-structured prompts**: All composition blocks use XML tags optimized for Sonnet 4.6
-- **Orphan cleanup**: `init-prompts --force` now removes DB prompts no longer in the default registry
-- **New prompt category**: "base" added for shared foundation prompts
-- **Removed keys**: `agent.system_prompt_en`, `agent.system_prompt_fr`, `synthesis.web_answer`
-- **New keys**: `base.identity`, `base.product_reference`, `synthesis.web_layer`, `agent.tools_layer`
-
-### v0.10.0: Admin UI for RAG Settings
-
-- **RAG settings admin**: 20 tuning parameters configurable at runtime via `/admin/settings` without code changes or redeployment
-- **5 parameter categories**: Retrieval (thresholds, overfetch, min results), Reranking (top_k, source diversity), Synthesis (max_tokens, context budgets), Caches (embedding/reranker/camera sizes), Prefetch (multiplier, max limit)
-- **Database layer**: `settings_db.py` with `settings` + `setting_versions` tables, mirrors `prompt_db.py` pattern
-- **Service layer**: `settings_manager.py` with TTL cache, typed getters (`get_setting(key)`), fallback to defaults
-- **Admin UI**: Category filter tabs, inline edit per setting, version history modal, rollback, "Requires restart" badges
-- **Integration**: All 20 parameters wired into existing code with try/except fallbacks for graceful degradation
-- **New endpoints**: `GET/PUT /api/admin/settings/*`, `POST initialize/reload/rollback`
-- **New CLI**: `uv run init-settings` (--list, --stats, --force, --export)
-- **New schemas**: `SettingUpdateRequest`, `SettingRollbackRequest`
-- **Navbar**: Settings link added to all 16 admin templates
-- **Dashboard**: Settings card added to admin index
-
-### v0.9.0: Camera Merge, Dark Mode, Animations
-
-- **Camera merge**: Find duplicates via name normalization + code_model cross-reference, merge with union of array fields. UI: checkboxes, "Find Duplicates" button, floating toolbar, merge modal with primary selection and preview
-- **Dark mode**: Toggle in navbar (persists in localStorage, respects `prefers-color-scheme`). 30+ semantic CSS variables for all admin pages
-- **Admin animations**: Page fade-in, card stagger entrance, modal scale-in/out, alert slide-in, stat count-up, button press feedback, running badge pulse. All disabled with `prefers-reduced-motion`
-- **Ingestion descriptions**: All 10 job types have detailed descriptions and expanded parameter help
-- **New endpoints**: `GET /api/admin/cameras/duplicates`, `POST /api/admin/cameras/merge`
-- **New DB methods**: `find_duplicate_candidates()`, `merge_cameras()`
-- **New schemas**: `CameraMergeRequest`, `CameraMergeResponse`
-
-### v0.8.0: Retrieval Accuracy Improvements
-
-- **Fix RRF threshold scaling** (BUG): Removed arbitrary `threshold * 0.5` pre-rerank filtering. RRF scores are uncalibrated and the old scaling caused unpredictable filtering masked by the "minimum 3 results" fallback
-- **Fix filtering order** (BUG): Dynamic threshold now applied AFTER reranking (calibrated 0-1 scores), not before. Documents previously filtered out by bad RRF thresholds can now be recovered by the reranker
-- **Unified threshold logic** (BUG): Web pipeline had only 9 technical terms vs CLI's 30+. Both now import shared `calculate_dynamic_threshold()` from `core/retriever.py`
-- **Source diversity**: Post-merge interleaving in `hybrid_search_rrf()` ensures representation from each collection (docs, cases, custom) in top results
-- **Synthesis grounding**: Added explicit "I don't know" instruction + source conflict handling (prefer docs over cases) to synthesis prompt
-- **Keyword extraction**: Now samples first 2000 + last 2000 chars instead of first 4000, covering full page content
-- **Smarter context truncation**: Groups merged before truncation (4K per group, 12K total budget) instead of per-chunk truncation
-- **Search quality logging**: Scores + source types per result logged to analytics DB. New `/api/admin/search-quality` endpoint for reviewing low-scoring queries
-- **Reranker-based confidence**: Draft generator confidence uses top-3 reranker scores instead of chunk-count heuristic
-- **Thread analyzer**: Increased `max_tokens` from 1024 to 2048 for complex multi-reply threads
-- **Eval scripts**: `scripts/generate_eval_dataset.py` (synthetic Q&A pairs from docs) and `scripts/eval_retrieval.py` (Recall@5, MRR, NDCG measurement)
-
-### v0.7.0: Product Knowledge in Prompts + Unified Sonnet Model
-
-- **Product ecosystem knowledge**: Injected Cyanview product context (RCP, RIO, CI0, VP4, NIO, RSBM, connection rules, licensing) into 4 LLM prompts: `synthesis.web_answer`, `analysis.thread_analyzer`, `analysis.quality_controller`, `drafts.email_generator`
-- **Unified Sonnet model**: Replaced all Haiku usage with Sonnet (`claude-sonnet-4-6`) across the entire pipeline — analysis, keyword extraction, camera extraction, entity extraction, and RIO terminology analysis
-- **Removed `haiku_model` config**: Single `sonnet_model` setting for all LLM tasks
-- **Updated model IDs**: All model references use `claude-sonnet-4-6` (no date suffix)
-- **CSP fix**: Added `api.fontshare.com` / `cdn.fontshare.com` to Content Security Policy
-- **Thread analyzer categories**: Expanded to RCP, RIO, CI0, VP4, Network, Firmware, Configuration, Installation, REMI, Tally, Other
-- **Product field**: Now supports RCP, RCP-J, RIO, RIO +WAN, RIO +LAN, CI0, CI0BM, VP4, NIO, RSBM
-
-### Previous Updates (2026-01-23)
-
-### Major Refactoring: Modular Web Architecture
-
-The monolithic `app.py` (2700+ lines) has been refactored into a clean modular structure:
-
-**New Web Structure:**
-
-```text
-web/
-├── app.py              # Now ~200 lines: middleware, lifespan, app init
-├── schemas.py          # Pydantic request/response models
-├── dependencies.py     # FastAPI DI: limiter, templates, DB singletons
-├── auth/               # Authentication module
-│   ├── admin.py        # verify_admin, brute force protection, rate limits
-│   ├── csrf.py         # CSRF token generation and validation
-│   └── sessions.py     # Cookie-based session management
-├── search/             # Search pipeline module
-│   ├── pipeline.py     # Main search orchestration
-│   ├── synthesis.py    # Claude LLM synthesis with streaming
-│   └── utils.py        # Helpers: score thresholds, source formatting
-└── routers/            # API routes by domain
-    ├── cameras.py      # Public camera API (/api/cameras)
-    ├── pages.py        # Page routes (/, /cameras, /help, /admin/*)
-    ├── search.py       # Search API (/api/search, /api/search/stream)
-    └── admin/          # 13 admin routers under /api/admin
-        ├── analytics.py, auth.py, cameras.py, chunks.py
-        ├── debug.py, documents.py, drafts.py, graph.py
-        ├── ingestion.py, prompts.py, settings.py
-        ├── support.py, terminology.py
-```
-
-### New Core Module: Generic Cache
-
-Added `core/cache.py` - thread-safe LRU cache with optional TTL:
-
-- `LRUCache[T]`: Generic cache with hit/miss stats
-- `make_cache_key(*args)`: Hash-based key generation
-- Used across embeddings, reranking, and database queries
-
-### Security Enhancements
-
-- **Nonce-based CSP**: All templates use `{{ csp_nonce }}` for inline scripts
-- **CORS/CSRF fixes**: Proper origin validation, double-submit cookie pattern
-- **OAuth encryption**: PBKDF2 iterations increased to 480K
-- **Timing-safe comparison**: Prevents timing attacks on auth
-
-### Answer Export Feature (v0.6.2)
-
-Users can export AI responses in multiple formats: Markdown, Plain Text, HTML, PDF
+For release notes, refactors, and feature history, use `git log` and commit messages
+— the project follows Conventional Commits (`feat:`, `fix:`, `refactor:`, etc.).
+Don't add release-note sections here; they rot. If a change introduces a non-obvious
+constraint or invariant that future Claude sessions need (e.g., "RRF scores are
+uncalibrated, never threshold them pre-rerank"), add it under the relevant **Key
+Patterns** subsection above.
