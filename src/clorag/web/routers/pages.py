@@ -60,6 +60,13 @@ async def help_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("help.html", {"request": request})
 
 
+@router.get("/ai-lexicon", response_class=HTMLResponse)
+async def ai_lexicon(request: Request) -> HTMLResponse:
+    """Public Cyanview AI Lexicon page."""
+    templates = get_templates()
+    return templates.TemplateResponse("ai_lexicon.html", {"request": request})
+
+
 @router.get("/video", response_class=HTMLResponse)
 async def video_page(request: Request) -> HTMLResponse:
     """Public video showcase page."""
