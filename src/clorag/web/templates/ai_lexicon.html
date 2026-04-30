@@ -92,35 +92,36 @@
     font-size: 12px;
     margin-bottom: 16px;
   }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 12px;
-  }
-  .card {
+  .list {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px 18px;
-    transition: all 0.15s;
+    border-radius: 12px;
+    overflow: hidden;
   }
-  .card:hover {
-    background: var(--panel-hover);
-    border-color: #2d3645;
-    transform: translateY(-1px);
-  }
-  .card-header {
-    display: flex;
-    justify-content: space-between;
+  .row {
+    display: grid;
+    grid-template-columns: minmax(180px, 220px) 110px 1fr;
+    gap: 20px;
     align-items: baseline;
-    gap: 8px;
-    margin-bottom: 8px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.12s;
   }
+  .row:last-child { border-bottom: none; }
+  .row:hover { background: var(--panel-hover); }
   .term {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text);
     letter-spacing: -0.01em;
+    word-break: break-word;
+  }
+  @media (max-width: 720px) {
+    .row {
+      grid-template-columns: 1fr auto;
+      gap: 6px 12px;
+    }
+    .row .definition { grid-column: 1 / -1; }
   }
   .tag {
     font-size: 9px;
@@ -184,7 +185,7 @@
   </div>
 
   <div class="stats" id="stats"></div>
-  <div class="grid" id="grid"></div>
+  <div class="list" id="grid"></div>
   <div class="empty" id="empty" style="display:none;">No term matches your search.</div>
 
   <footer>Cyanview internal reference · maintained by the AI team</footer>
@@ -311,11 +312,9 @@ function render() {
     // Definition contains trusted HTML (<strong>, <code>) authored above — highlight on plain text portions only
     const def = q ? t.def.replace(/(>)([^<]+)(<)/g, (m, a, txt, c) => a + highlight(txt, q) + c) : t.def;
     return `
-      <div class="card">
-        <div class="card-header">
-          <div class="term">${term}</div>
-          <span class="tag" data-cat="${t.cat}">${CAT_LABEL[t.cat]}</span>
-        </div>
+      <div class="row">
+        <div class="term">${term}</div>
+        <span class="tag" data-cat="${t.cat}">${CAT_LABEL[t.cat]}</span>
         <div class="definition">${def}</div>
       </div>
     `;
