@@ -12,7 +12,7 @@ import structlog
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 
-from clorag.core.cost_calculator import calculate_cost
+from clorag.core.cost_calculator import CostBreakdown, calculate_cost
 from clorag.services.settings_manager import get_settings_manager
 from clorag.utils.text_transforms import apply_product_name_transforms
 from clorag.web.auth import get_session_store
@@ -35,6 +35,39 @@ from clorag.web.search.synthesis import SynthesisResult
 
 router = APIRouter()
 logger = structlog.get_logger()
+
+
+def _build_usage_payload(sr: SynthesisResult) -> tuple[dict[str, Any], CostBreakdown]:
+    """Build the usage SSE/JSON payload and return the underlying CostBreakdown.
+
+    Returned as a tuple so callers can also persist the breakdown's cost_usd
+    to the analytics DB without recomputing.
+    """
+    cost = calculate_cost(
+        input_tokens=sr.input_tokens,
+        output_tokens=sr.output_tokens,
+        cache_read_tokens=sr.cache_read_tokens,
+        cache_creation_tokens=sr.cache_creation_tokens,
+        settings=get_settings_manager(),
+    )
+    total_tokens = (
+        sr.input_tokens + sr.output_tokens
+        + sr.cache_read_tokens + sr.cache_creation_tokens
+    )
+    payload = {
+        "type": "usage",
+        "total_tokens": total_tokens,
+        "cost_usd": round(cost.total_cost_usd, 6),
+        "cache_hit_pct": round(cost.cache_hit_pct, 1),
+        "model": sr.model,
+        "breakdown": {
+            "input_tokens": sr.input_tokens,
+            "output_tokens": sr.output_tokens,
+            "cache_read_tokens": sr.cache_read_tokens,
+            "cache_creation_tokens": sr.cache_creation_tokens,
+        },
+    }
+    return payload, cost
 
 
 async def _resolve_query_variants(
@@ -207,34 +240,11 @@ async def legacy_search_stream(request: Request, req: SearchRequest) -> Streamin
             yield f"data: {json.dumps({'type': 'sources', 'sources': source_links})}\n\n"
 
             # Emit usage event if synthesis captured token data
-            legacy_sr = legacy_synth_results[0] if legacy_synth_results else None
-            legacy_cost = None
-            if legacy_sr is not None:
-                legacy_cost = calculate_cost(
-                    input_tokens=legacy_sr.input_tokens,
-                    output_tokens=legacy_sr.output_tokens,
-                    cache_read_tokens=legacy_sr.cache_read_tokens,
-                    cache_creation_tokens=legacy_sr.cache_creation_tokens,
-                    settings=get_settings_manager(),
-                )
-                legacy_total_tokens = (
-                    legacy_sr.input_tokens + legacy_sr.output_tokens
-                    + legacy_sr.cache_read_tokens + legacy_sr.cache_creation_tokens
-                )
-                legacy_usage_event = {
-                    "type": "usage",
-                    "total_tokens": legacy_total_tokens,
-                    "cost_usd": round(legacy_cost.total_cost_usd, 6),
-                    "cache_hit_pct": round(legacy_cost.cache_hit_pct, 1),
-                    "model": legacy_sr.model,
-                    "breakdown": {
-                        "input_tokens": legacy_sr.input_tokens,
-                        "output_tokens": legacy_sr.output_tokens,
-                        "cache_read_tokens": legacy_sr.cache_read_tokens,
-                        "cache_creation_tokens": legacy_sr.cache_creation_tokens,
-                    },
-                }
-                yield f"data: {json.dumps(legacy_usage_event)}\n\n"
+            sr = legacy_synth_results[0] if legacy_synth_results else None
+            cost_breakdown = None
+            if sr is not None:
+                usage_event, cost_breakdown = _build_usage_payload(sr)
+                yield f"data: {json.dumps(usage_event)}\n\n"
 
             full_response = "".join(collected_response)
             search_id = 0
@@ -251,12 +261,12 @@ async def legacy_search_stream(request: Request, req: SearchRequest) -> Streamin
                     reranked=was_reranked,
                     scores=[c.get("score", 0) for c in chunks_for_synthesis],
                     source_types=[c.get("source_type", "unknown") for c in chunks_for_synthesis],
-                    input_tokens=legacy_sr.input_tokens if legacy_sr else None,
-                    output_tokens=legacy_sr.output_tokens if legacy_sr else None,
-                    cache_read_tokens=legacy_sr.cache_read_tokens if legacy_sr else None,
-                    cache_creation_tokens=legacy_sr.cache_creation_tokens if legacy_sr else None,
-                    cost_usd=legacy_cost.total_cost_usd if legacy_cost else None,
-                    model=legacy_sr.model if legacy_sr else None,
+                    input_tokens=sr.input_tokens if sr else None,
+                    output_tokens=sr.output_tokens if sr else None,
+                    cache_read_tokens=sr.cache_read_tokens if sr else None,
+                    cache_creation_tokens=sr.cache_creation_tokens if sr else None,
+                    cost_usd=cost_breakdown.total_cost_usd if cost_breakdown else None,
+                    model=sr.model if sr else None,
                 )
             except Exception as e:
                 logger.warning("Failed to log legacy search analytics", error=str(e))
@@ -344,30 +354,7 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
             sr = synth_results[0] if synth_results else None
             cost_breakdown = None
             if sr is not None:
-                cost_breakdown = calculate_cost(
-                    input_tokens=sr.input_tokens,
-                    output_tokens=sr.output_tokens,
-                    cache_read_tokens=sr.cache_read_tokens,
-                    cache_creation_tokens=sr.cache_creation_tokens,
-                    settings=get_settings_manager(),
-                )
-                total_tokens = (
-                    sr.input_tokens + sr.output_tokens
-                    + sr.cache_read_tokens + sr.cache_creation_tokens
-                )
-                usage_event = {
-                    "type": "usage",
-                    "total_tokens": total_tokens,
-                    "cost_usd": round(cost_breakdown.total_cost_usd, 6),
-                    "cache_hit_pct": round(cost_breakdown.cache_hit_pct, 1),
-                    "model": sr.model,
-                    "breakdown": {
-                        "input_tokens": sr.input_tokens,
-                        "output_tokens": sr.output_tokens,
-                        "cache_read_tokens": sr.cache_read_tokens,
-                        "cache_creation_tokens": sr.cache_creation_tokens,
-                    },
-                }
+                usage_event, cost_breakdown = _build_usage_payload(sr)
                 yield f"data: {json.dumps(usage_event)}\n\n"
 
             # Assemble full response and log to analytics BEFORE done event
