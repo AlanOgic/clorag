@@ -400,6 +400,65 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         max_value=500,
         requires_restart=False,
     ),
+    # -------------------------------------------------------------------------
+    # Pricing
+    # -------------------------------------------------------------------------
+    SettingDefinition(
+        key="pricing.input_price_per_mtok",
+        name="Input Price (USD per MTok)",
+        description=(
+            "Price per million input tokens for the synthesis model."
+            " Sonnet 4.6 = 3.00, Opus 4.7 = 15.00, Haiku 4.5 = 0.80."
+        ),
+        category="pricing",
+        value_type="float",
+        default_value="3.00",
+        min_value=0.0,
+        max_value=1000.0,
+        requires_restart=False,
+    ),
+    SettingDefinition(
+        key="pricing.output_price_per_mtok",
+        name="Output Price (USD per MTok)",
+        description=(
+            "Price per million output tokens."
+            " Sonnet 4.6 = 15.00, Opus 4.7 = 75.00, Haiku 4.5 = 4.00."
+        ),
+        category="pricing",
+        value_type="float",
+        default_value="15.00",
+        min_value=0.0,
+        max_value=1000.0,
+        requires_restart=False,
+    ),
+    SettingDefinition(
+        key="pricing.cache_read_price_per_mtok",
+        name="Cache Read Price (USD per MTok)",
+        description=(
+            "Price per million cache-read tokens"
+            " (10% of input price for Anthropic)."
+        ),
+        category="pricing",
+        value_type="float",
+        default_value="0.30",
+        min_value=0.0,
+        max_value=1000.0,
+        requires_restart=False,
+    ),
+    SettingDefinition(
+        key="pricing.cache_write_price_per_mtok",
+        name="Cache Write Price (USD per MTok, 5-min TTL)",
+        description=(
+            "Price per million cache-creation tokens at 5-minute TTL"
+            " (125% of input price)."
+        ),
+        category="pricing",
+        value_type="float",
+        default_value="3.75",
+        min_value=0.0,
+        max_value=1000.0,
+        requires_restart=False,
+    ),
 ]
 
 
