@@ -84,7 +84,13 @@ class AnalyticsDatabase:
                     results_count INTEGER,
                     response TEXT,
                     chunks TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    input_tokens INTEGER,
+                    output_tokens INTEGER,
+                    cache_read_tokens INTEGER,
+                    cache_creation_tokens INTEGER,
+                    cost_usd REAL,
+                    model TEXT
                 )
             """)
             conn.execute("""
@@ -94,6 +100,14 @@ class AnalyticsDatabase:
             # Migration: add columns if they don't exist
             cursor = conn.execute("PRAGMA table_info(search_queries)")
             columns = {row[1] for row in cursor.fetchall()}
+            if "response_time_ms" not in columns:
+                conn.execute(
+                    "ALTER TABLE search_queries ADD COLUMN response_time_ms INTEGER"
+                )
+            if "results_count" not in columns:
+                conn.execute(
+                    "ALTER TABLE search_queries ADD COLUMN results_count INTEGER"
+                )
             if "response" not in columns:
                 conn.execute("ALTER TABLE search_queries ADD COLUMN response TEXT")
             if "chunks" not in columns:
@@ -132,6 +146,20 @@ class AnalyticsDatabase:
                 conn.execute(
                     "ALTER TABLE search_queries ADD COLUMN tool_calls TEXT"
                 )
+            # Cost tracking columns (added 2026-05)
+            cost_columns = {
+                "input_tokens": "INTEGER",
+                "output_tokens": "INTEGER",
+                "cache_read_tokens": "INTEGER",
+                "cache_creation_tokens": "INTEGER",
+                "cost_usd": "REAL",
+                "model": "TEXT",
+            }
+            for col, col_type in cost_columns.items():
+                if col not in columns:
+                    conn.execute(
+                        f"ALTER TABLE search_queries ADD COLUMN {col} {col_type}"
+                    )
 
             # Brute-force login protection (persisted across restarts)
             conn.execute("""
@@ -186,6 +214,12 @@ class AnalyticsDatabase:
         rewritten_query: str | None = None,
         pipeline: str = "web",
         tool_calls: list[dict[str, Any]] | None = None,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        cache_read_tokens: int | None = None,
+        cache_creation_tokens: int | None = None,
+        cost_usd: float | None = None,
+        model: str | None = None,
     ) -> int:
         """Log a search query with full response data and quality metrics.
 
@@ -207,6 +241,12 @@ class AnalyticsDatabase:
             pipeline: Origin of the query — 'web', 'chat', 'cli_agent', 'mcp'.
             tool_calls: For agent pipelines, list of tool invocations with
                 their per-tool queries and result counts.
+            input_tokens: Total input tokens billed by the LLM.
+            output_tokens: Total output tokens billed by the LLM.
+            cache_read_tokens: Tokens served from the prompt cache.
+            cache_creation_tokens: Tokens written to the prompt cache.
+            cost_usd: Estimated USD cost for the synthesis step.
+            model: Claude model ID used for synthesis.
 
         Returns:
             The ID of the inserted record.
@@ -221,12 +261,16 @@ class AnalyticsDatabase:
                 INSERT INTO search_queries
                 (query, source, response_time_ms, results_count, response, chunks, session_id,
                  reranked, scores, source_types, normalized_query, rewritten_query,
-                 pipeline, tool_calls)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 pipeline, tool_calls,
+                 input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+                 cost_usd, model)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (query, source, response_time_ms, results_count, response, chunks_json,
                  session_id, 1 if reranked else 0, scores_json, source_types_json,
-                 normalized_query, rewritten_query, pipeline, tool_calls_json),
+                 normalized_query, rewritten_query, pipeline, tool_calls_json,
+                 input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+                 cost_usd, model),
             )
             conn.commit()
             return cursor.lastrowid or 0
@@ -322,6 +366,77 @@ class AnalyticsDatabase:
 
             return stats
 
+    def get_cost_summary(self, days: int = 30) -> dict[str, Any]:
+        """Total / average cost over the last N days.
+
+        Only rows where cost_usd is not NULL are included, so legacy rows
+        logged before cost tracking was added do not skew the aggregates.
+
+        Args:
+            days: Number of days to look back.
+
+        Returns:
+            Dict with query_count, total_cost_usd, avg_cost_per_query,
+            total_input_tokens, total_output_tokens,
+            total_cache_read_tokens, total_cache_creation_tokens, days.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS query_count,
+                    COALESCE(SUM(cost_usd), 0.0) AS total_cost_usd,
+                    COALESCE(AVG(cost_usd), 0.0) AS avg_cost_per_query,
+                    COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
+                    COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
+                    COALESCE(SUM(cache_read_tokens), 0) AS total_cache_read_tokens,
+                    COALESCE(SUM(cache_creation_tokens), 0) AS total_cache_creation_tokens
+                FROM search_queries
+                WHERE cost_usd IS NOT NULL
+                  AND created_at >= datetime('now', ?)
+                """,
+                (f"-{days} days",),
+            )
+            row = cursor.fetchone()
+            return {
+                "query_count": row["query_count"],
+                "total_cost_usd": row["total_cost_usd"],
+                "avg_cost_per_query": row["avg_cost_per_query"],
+                "total_input_tokens": row["total_input_tokens"],
+                "total_output_tokens": row["total_output_tokens"],
+                "total_cache_read_tokens": row["total_cache_read_tokens"],
+                "total_cache_creation_tokens": row["total_cache_creation_tokens"],
+                "days": days,
+            }
+
+    def get_cost_trend(self, days: int = 30) -> list[dict[str, Any]]:
+        """Daily cost totals over the last N days, oldest-first.
+
+        Args:
+            days: Number of days to look back.
+
+        Returns:
+            List of dicts with day (YYYY-MM-DD), query_count, cost_usd.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT
+                    DATE(created_at) AS day,
+                    COUNT(*) AS query_count,
+                    COALESCE(SUM(cost_usd), 0.0) AS cost_usd
+                FROM search_queries
+                WHERE cost_usd IS NOT NULL
+                  AND created_at >= datetime('now', ?)
+                GROUP BY DATE(created_at)
+                ORDER BY day ASC
+                """,
+                (f"-{days} days",),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
     def get_recent_searches(self, limit: int = 20) -> list[dict[str, Any]]:
         """Get most recent searches.
 
@@ -365,7 +480,10 @@ class AnalyticsDatabase:
                 SELECT id, query, source, response_time_ms, results_count,
                        response, chunks, session_id, reranked, scores,
                        source_types, normalized_query, rewritten_query,
-                       pipeline, tool_calls, created_at
+                       pipeline, tool_calls,
+                       input_tokens, output_tokens, cache_read_tokens,
+                       cache_creation_tokens, cost_usd, model,
+                       created_at
                 FROM search_queries
                 WHERE id = ?
                 """,

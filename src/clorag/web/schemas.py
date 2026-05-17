@@ -79,6 +79,15 @@ class SearchResult(BaseModel):
     metadata: dict[str, Any]
 
 
+class UsageSummary(BaseModel):
+    """Token usage and cost summary for a synthesis call."""
+
+    total_tokens: int
+    cost_usd: float
+    cache_hit_pct: float
+    model: str
+
+
 class SearchResponse(BaseModel):
     """Search response model with AI-generated answer."""
 
@@ -90,6 +99,7 @@ class SearchResponse(BaseModel):
     total: int
     session_id: str | None = None  # Session ID for follow-up conversations
     search_id: int = 0  # Analytics record ID for feedback linking
+    usage: UsageSummary | None = None  # Token usage and cost (when available)
 
 
 # =============================================================================

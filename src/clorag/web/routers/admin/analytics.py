@@ -232,6 +232,24 @@ async def api_recent_feedback(
     return analytics.get_recent_feedback(limit=limit)
 
 
+@router.get("/cost-summary", tags=["Analytics"])
+async def api_cost_summary(
+    days: int = 30,
+    _: bool = Depends(verify_admin),
+) -> dict[str, Any]:
+    """Total / average synthesis cost over the last N days."""
+    return get_analytics_db().get_cost_summary(days=days)
+
+
+@router.get("/cost-trend", tags=["Analytics"])
+async def api_cost_trend(
+    days: int = 30,
+    _: bool = Depends(verify_admin),
+) -> dict[str, Any]:
+    """Daily cost totals for trending over the last N days."""
+    return {"days": days, "trend": get_analytics_db().get_cost_trend(days=days)}
+
+
 def _generate_cache_recommendations(
     dense_stats: dict[str, int | float],
     sparse_stats: dict[str, int | float],

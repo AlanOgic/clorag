@@ -12,6 +12,8 @@ import structlog
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 
+from clorag.core.cost_calculator import CostBreakdown, calculate_cost
+from clorag.services.settings_manager import get_settings_manager
 from clorag.utils.text_transforms import apply_product_name_transforms
 from clorag.web.auth import get_session_store
 from clorag.web.dependencies import get_analytics_db, get_templates, limiter
@@ -20,6 +22,7 @@ from clorag.web.schemas import (
     FeedbackResponse,
     SearchRequest,
     SearchResponse,
+    UsageSummary,
 )
 from clorag.web.search import (
     extract_source_links,
@@ -28,9 +31,43 @@ from clorag.web.search import (
     synthesize_answer,
     synthesize_answer_stream,
 )
+from clorag.web.search.synthesis import SynthesisResult
 
 router = APIRouter()
 logger = structlog.get_logger()
+
+
+def _build_usage_payload(sr: SynthesisResult) -> tuple[dict[str, Any], CostBreakdown]:
+    """Build the usage SSE/JSON payload and return the underlying CostBreakdown.
+
+    Returned as a tuple so callers can also persist the breakdown's cost_usd
+    to the analytics DB without recomputing.
+    """
+    cost = calculate_cost(
+        input_tokens=sr.input_tokens,
+        output_tokens=sr.output_tokens,
+        cache_read_tokens=sr.cache_read_tokens,
+        cache_creation_tokens=sr.cache_creation_tokens,
+        settings=get_settings_manager(),
+    )
+    total_tokens = (
+        sr.input_tokens + sr.output_tokens
+        + sr.cache_read_tokens + sr.cache_creation_tokens
+    )
+    payload = {
+        "type": "usage",
+        "total_tokens": total_tokens,
+        "cost_usd": round(cost.total_cost_usd, 6),
+        "cache_hit_pct": round(cost.cache_hit_pct, 1),
+        "model": sr.model,
+        "breakdown": {
+            "input_tokens": sr.input_tokens,
+            "output_tokens": sr.output_tokens,
+            "cache_read_tokens": sr.cache_read_tokens,
+            "cache_creation_tokens": sr.cache_creation_tokens,
+        },
+    }
+    return payload, cost
 
 
 async def _resolve_query_variants(
@@ -191,14 +228,23 @@ async def legacy_search_stream(request: Request, req: SearchRequest) -> Streamin
         try:
             yield f"data: {json.dumps({'type': 'session', 'session_id': session.session_id})}\n\n"
 
+            legacy_synth_results: list[SynthesisResult] = []
             async for chunk in synthesize_answer_stream(
                 req.query, chunks_for_synthesis, conversation_history, None,
                 prompt_keys=("base.identity", "synthesis.web_layer"),
+                result_sink=legacy_synth_results.append,
             ):
                 collected_response.append(chunk)
                 yield f"data: {json.dumps({'type': 'text', 'text': chunk})}\n\n"
 
             yield f"data: {json.dumps({'type': 'sources', 'sources': source_links})}\n\n"
+
+            # Emit usage event if synthesis captured token data
+            sr = legacy_synth_results[0] if legacy_synth_results else None
+            cost_breakdown = None
+            if sr is not None:
+                usage_event, cost_breakdown = _build_usage_payload(sr)
+                yield f"data: {json.dumps(usage_event)}\n\n"
 
             full_response = "".join(collected_response)
             search_id = 0
@@ -215,6 +261,12 @@ async def legacy_search_stream(request: Request, req: SearchRequest) -> Streamin
                     reranked=was_reranked,
                     scores=[c.get("score", 0) for c in chunks_for_synthesis],
                     source_types=[c.get("source_type", "unknown") for c in chunks_for_synthesis],
+                    input_tokens=sr.input_tokens if sr else None,
+                    output_tokens=sr.output_tokens if sr else None,
+                    cache_read_tokens=sr.cache_read_tokens if sr else None,
+                    cache_creation_tokens=sr.cache_creation_tokens if sr else None,
+                    cost_usd=cost_breakdown.total_cost_usd if cost_breakdown else None,
+                    model=sr.model if sr else None,
                 )
             except Exception as e:
                 logger.warning("Failed to log legacy search analytics", error=str(e))
@@ -286,15 +338,24 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
 
             # Synthesis sees the raw user question (history already gives intent),
             # so the LLM voice stays natural even after a standalone rewrite.
+            synth_results: list[SynthesisResult] = []
             async for chunk in synthesize_answer_stream(
                 raw_query, chunks_for_synthesis, conversation_history, graph_context,
                 prompt_keys=prompt_keys,
+                result_sink=synth_results.append,
             ):
                 collected_response.append(chunk)
                 yield f"data: {json.dumps({'type': 'text', 'text': chunk})}\n\n"
 
             # Then send sources at the end
             yield f"data: {json.dumps({'type': 'sources', 'sources': source_links})}\n\n"
+
+            # Emit usage event if synthesis captured token data
+            sr = synth_results[0] if synth_results else None
+            cost_breakdown = None
+            if sr is not None:
+                usage_event, cost_breakdown = _build_usage_payload(sr)
+                yield f"data: {json.dumps(usage_event)}\n\n"
 
             # Assemble full response and log to analytics BEFORE done event
             # so we can include search_id for feedback linking
@@ -316,6 +377,12 @@ async def search_stream(request: Request, req: SearchRequest) -> StreamingRespon
                     normalized_query=normalized_query,
                     rewritten_query=rewritten_query,
                     pipeline=pipeline_tag,
+                    input_tokens=sr.input_tokens if sr else None,
+                    output_tokens=sr.output_tokens if sr else None,
+                    cache_read_tokens=sr.cache_read_tokens if sr else None,
+                    cache_creation_tokens=sr.cache_creation_tokens if sr else None,
+                    cost_usd=cost_breakdown.total_cost_usd if cost_breakdown else None,
+                    model=sr.model if sr else None,
                 )
             except Exception as e:
                 logger.warning("Failed to log search analytics", error=str(e))
@@ -375,9 +442,19 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
     )
 
     # Generate synthesized answer using Claude with conversation history and graph context
-    answer = await synthesize_answer(
+    synthesis_result = await synthesize_answer(
         raw_query, chunks_for_synthesis, conversation_history, graph_context,
         prompt_keys=prompt_keys,
+    )
+    answer = synthesis_result.text
+
+    # Compute cost from synthesis token usage
+    cost = calculate_cost(
+        input_tokens=synthesis_result.input_tokens,
+        output_tokens=synthesis_result.output_tokens,
+        cache_read_tokens=synthesis_result.cache_read_tokens,
+        cache_creation_tokens=synthesis_result.cache_creation_tokens,
+        settings=get_settings_manager(),
     )
 
     # Store this exchange in the session for future follow-ups
@@ -404,9 +481,20 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
             normalized_query=normalized_query,
             rewritten_query=rewritten_query,
             pipeline="chat" if req.mode == "chat" else "web",
+            input_tokens=synthesis_result.input_tokens,
+            output_tokens=synthesis_result.output_tokens,
+            cache_read_tokens=synthesis_result.cache_read_tokens,
+            cache_creation_tokens=synthesis_result.cache_creation_tokens,
+            cost_usd=cost.total_cost_usd,
+            model=synthesis_result.model,
         )
     except Exception as e:
         logger.warning("Failed to log search analytics", error=str(e))
+
+    total_tokens = (
+        synthesis_result.input_tokens + synthesis_result.output_tokens
+        + synthesis_result.cache_read_tokens + synthesis_result.cache_creation_tokens
+    )
 
     return SearchResponse(
         query=raw_query,
@@ -417,6 +505,12 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
         total=len(results),
         session_id=session.session_id,
         search_id=search_id,
+        usage=UsageSummary(
+            total_tokens=total_tokens,
+            cost_usd=round(cost.total_cost_usd, 6),
+            cache_hit_pct=round(cost.cache_hit_pct, 1),
+            model=synthesis_result.model,
+        ),
     )
 
 

@@ -593,6 +593,7 @@
             margin-top: 1rem;
             padding-top: 0.75rem;
             border-top: 1px solid #f0f0f0;
+            flex-wrap: wrap;
         }
 
         .feedback-label {
@@ -642,6 +643,43 @@
             background: #fce4ec;
             border-color: #e53935;
             color: #c62828;
+        }
+
+        /* Per-answer usage badge (tokens · cost · cache) */
+        .answer-usage {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-left: auto;
+            padding: 0.2rem 0.5rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.75rem;
+            color: #8a9bae;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 6px;
+            cursor: help;
+            user-select: none;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .answer-usage:hover {
+            background: rgba(0, 0, 0, 0.07);
+            color: #555;
+        }
+
+        .answer-usage .sep {
+            opacity: 0.4;
+        }
+
+        .answer-usage .cache-pill {
+            opacity: 0.85;
+        }
+
+        @media (max-width: 640px) {
+            .answer-usage {
+                font-size: 0.7rem;
+                gap: 0.3rem;
+            }
         }
 
         .feedback-comment-container {
@@ -2159,6 +2197,7 @@ ${bodyContent}
                                 </svg>
                             </button>
                         </div>
+                        <span class="answer-usage" id="usage-${exchangeId}" style="display:none;"></span>
                     </div>
                     <div class="feedback-comment-container" id="feedback-comment-${exchangeId}" style="display:none;">
                         <textarea class="feedback-comment" id="feedback-textarea-${exchangeId}" placeholder="What could be improved?" maxlength="1000" rows="2"></textarea>
@@ -2284,6 +2323,12 @@ ${bodyContent}
                                     if (answerStore[exchangeId]) {
                                         answerStore[exchangeId].sources = data.sources || [];
                                     }
+                                } else if (data.type === 'usage') {
+                                    // Store usage data and render the token/cost badge
+                                    if (answerStore[exchangeId]) {
+                                        answerStore[exchangeId].usage = data;
+                                    }
+                                    renderUsageBadge(exchangeId, data);
                                 } else if (data.type === 'done') {
                                     // Store search_id for feedback linking
                                     if (answerStore[exchangeId]) {
@@ -2353,6 +2398,33 @@ ${bodyContent}
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Render per-answer token/cost/cache badge in the feedback footer
+        function renderUsageBadge(exchangeId, usage) {
+            const el = document.getElementById(`usage-${exchangeId}`);
+            if (!el) return;
+            const tokFmt = new Intl.NumberFormat('en-US').format(usage.total_tokens);
+            const costNum = Number(usage.cost_usd) || 0;
+            const costFmt = costNum < 0.001
+                ? '&lt;$0.001'
+                : `$${costNum.toFixed(4)}`;
+            const cacheHitPct = Number(usage.cache_hit_pct) || 0;
+            const cachePill = cacheHitPct > 0
+                ? `<span class="sep">·</span><span class="cache-pill">🧠 ${cacheHitPct.toFixed(0)}%</span>`
+                : '';
+            el.innerHTML = `${tokFmt} tok <span class="sep">·</span> ${costFmt}${cachePill}`;
+            const breakdown = usage.breakdown || {};
+            const fmt = (n) => Number(n || 0).toLocaleString();
+            el.title = [
+                `Model: ${usage.model || 'unknown'}`,
+                `Input: ${fmt(breakdown.input_tokens)} tok`,
+                `Cache read: ${fmt(breakdown.cache_read_tokens)} tok`,
+                `Cache write: ${fmt(breakdown.cache_creation_tokens)} tok`,
+                `Output: ${fmt(breakdown.output_tokens)} tok`,
+                `Total cost: $${costNum.toFixed(6)}`,
+            ].join('\n');
+            el.style.display = 'inline-flex';
         }
 
         // Safe markdown rendering with DOMPurify sanitization
