@@ -98,6 +98,8 @@ select = ["E", "F", "I", "N", "W", "UP"]
 [tool.ruff.lint.per-file-ignores]
 # Prompt content strings are intentionally long
 "src/clorag/services/default_prompts.py" = ["E501"]
+# Settings description strings are intentionally long
+"src/clorag/services/default_settings.py" = ["E501"]
 # Imports must come after logging.basicConfig for stdio transport
 "src/clorag/mcp/server.py" = ["E402"]
 

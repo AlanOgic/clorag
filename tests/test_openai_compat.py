@@ -135,7 +135,10 @@ class TestChatCompletions:
         with self._mock_search_and_synth():
             resp = client.post(
                 "/v1/chat/completions",
-                json={"model": "clorag", "messages": [{"role": "user", "content": "How to configure RIO?"}]},
+                json={
+                    "model": "clorag",
+                    "messages": [{"role": "user", "content": "How to configure RIO?"}],
+                },
                 headers=VALID_HEADERS,
             )
 
@@ -181,7 +184,10 @@ class TestChatCompletions:
         with patch(SETTINGS_PATCH, return_value=_mock_settings()):
             resp = client.post(
                 "/v1/chat/completions",
-                json={"model": "clorag", "messages": [{"role": "system", "content": "You are helpful"}]},
+                json={
+                    "model": "clorag",
+                    "messages": [{"role": "system", "content": "You are helpful"}],
+                },
                 headers=VALID_HEADERS,
             )
         assert resp.status_code == 400
@@ -216,7 +222,11 @@ class TestChatCompletions:
         synth_mock.assert_called_once()
         call_args = synth_mock.call_args
         # synthesize_answer(query, chunks, conversation_history, graph_context)
-        conv_history = call_args[0][2] if len(call_args[0]) > 2 else call_args[1].get("conversation_history")
+        conv_history = (
+            call_args[0][2]
+            if len(call_args[0]) > 2
+            else call_args[1].get("conversation_history")
+        )
         assert conv_history is not None
         assert len(conv_history) == 2  # 1 prior user + 1 prior assistant
 
@@ -355,7 +365,10 @@ class TestUsageReporting:
         ):
             resp = client.post(
                 "/v1/chat/completions",
-                json={"model": "clorag", "messages": [{"role": "user", "content": "How to configure RIO?"}]},
+                json={
+                    "model": "clorag",
+                    "messages": [{"role": "user", "content": "How to configure RIO?"}],
+                },
                 headers=VALID_HEADERS,
             )
 
