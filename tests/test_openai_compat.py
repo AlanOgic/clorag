@@ -8,6 +8,19 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from clorag.web.routers.openai_compat import router
+from clorag.web.search.synthesis import SynthesisResult
+
+
+def _make_synth_result(text: str) -> SynthesisResult:
+    """Create a SynthesisResult with placeholder usage for tests."""
+    return SynthesisResult(
+        text=text,
+        input_tokens=0,
+        output_tokens=0,
+        cache_read_tokens=0,
+        cache_creation_tokens=0,
+        model="claude-sonnet-test",
+    )
 
 
 def _mock_settings(api_key: str | None = "test-key-123") -> MagicMock:
@@ -104,7 +117,7 @@ class TestChatCompletions:
         mock_results = [MagicMock(score=0.9, source="documentation", metadata={})]
 
         search_mock = AsyncMock(return_value=(mock_results, mock_chunks, None, True))
-        synth_mock = AsyncMock(return_value="Here is how to configure RIO.")
+        synth_mock = AsyncMock(return_value=_make_synth_result("Here is how to configure RIO."))
 
         stack = ExitStack()
         stack.enter_context(patch(SETTINGS_PATCH, return_value=_mock_settings()))
@@ -172,7 +185,7 @@ class TestChatCompletions:
             {"text": "info", "source_type": "documentation",
              "url": "https://example.com", "title": "Doc", "score": 0.8}
         ]
-        synth_mock = AsyncMock(return_value="Follow-up answer.")
+        synth_mock = AsyncMock(return_value=_make_synth_result("Follow-up answer."))
 
         with (
             patch(SETTINGS_PATCH, return_value=_mock_settings()),
@@ -207,7 +220,7 @@ class TestChatCompletions:
             {"text": "info", "source_type": "documentation",
              "url": "https://example.com", "title": "Doc", "score": 0.8}
         ]
-        synth_mock = AsyncMock(return_value="Answer.")
+        synth_mock = AsyncMock(return_value=_make_synth_result("Answer."))
 
         with (
             patch(SETTINGS_PATCH, return_value=_mock_settings()),

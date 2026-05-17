@@ -230,12 +230,13 @@ async def chat_completions(
         )
 
     # Non-streaming: synthesize full answer
-    answer = await synthesize_answer(
+    synthesis_result = await synthesize_answer(
         query,
         chunks_for_synthesis,
         conversation_history if conversation_history else None,
         graph_context,
     )
+    answer = synthesis_result.text  # usage available in synthesis_result (Task 8 will wire it)
 
     # Append sources
     answer_with_sources = _append_sources(answer, source_links)

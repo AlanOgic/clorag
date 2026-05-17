@@ -375,10 +375,11 @@ async def search(request: Request, req: SearchRequest) -> SearchResponse:
     )
 
     # Generate synthesized answer using Claude with conversation history and graph context
-    answer = await synthesize_answer(
+    synthesis_result = await synthesize_answer(
         raw_query, chunks_for_synthesis, conversation_history, graph_context,
         prompt_keys=prompt_keys,
     )
+    answer = synthesis_result.text
 
     # Store this exchange in the session for future follow-ups
     session.add_exchange(raw_query, answer)

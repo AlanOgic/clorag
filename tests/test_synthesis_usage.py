@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from clorag.web.search.synthesis import SynthesisResult, synthesize_answer_stream
+from clorag.web.search.synthesis import SynthesisResult, synthesize_answer, synthesize_answer_stream
 
 
 async def test_streaming_returns_usage_via_result_sink() -> None:
@@ -86,3 +86,33 @@ async def test_streaming_works_without_result_sink() -> None:
 
     assert chunks == ["hi"]
     fake_stream.get_final_message.assert_not_called()
+
+
+async def test_non_streaming_returns_synthesis_result() -> None:
+    """synthesize_answer should return SynthesisResult with text + usage."""
+    fake_usage = MagicMock(
+        input_tokens=800,
+        output_tokens=250,
+        cache_read_input_tokens=0,
+        cache_creation_input_tokens=600,
+    )
+    fake_response = MagicMock(
+        content=[MagicMock(text="Synthesized answer.")],
+        usage=fake_usage,
+    )
+    fake_client = MagicMock()
+    fake_client.messages.create = AsyncMock(return_value=fake_response)
+
+    with patch("clorag.web.search.synthesis.get_anthropic", return_value=fake_client):
+        result = await synthesize_answer(
+            query="q",
+            chunks=[{"content": "some context", "source": "doc"}],
+        )
+
+        assert isinstance(result, SynthesisResult)
+        assert result.text == "Synthesized answer."
+        assert result.input_tokens == 800
+        assert result.output_tokens == 250
+        assert result.cache_creation_tokens == 600
+        assert result.cache_read_tokens == 0
+        assert result.model  # whatever the model setting resolves to

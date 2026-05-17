@@ -127,7 +127,7 @@ async def synthesize_answer(
     conversation_history: list[dict[str, Any]] | None = None,
     graph_context: str | None = None,
     prompt_keys: tuple[str, ...] | None = None,
-) -> str:
+) -> SynthesisResult:
     """Use Claude to synthesize an answer from retrieved chunks.
 
     Args:
@@ -138,10 +138,17 @@ async def synthesize_answer(
         prompt_keys: Prompt keys to compose. Defaults to identity + product + web layer.
 
     Returns:
-        Synthesized answer string.
+        SynthesisResult with synthesized text and token usage metadata.
     """
     if not chunks:
-        return "No relevant information found for your query."
+        return SynthesisResult(
+            text="No relevant information found for your query.",
+            input_tokens=0,
+            output_tokens=0,
+            cache_read_tokens=0,
+            cache_creation_tokens=0,
+            model="",
+        )
 
     settings = get_settings()
     context = build_context(chunks, graph_context=graph_context)
@@ -178,17 +185,37 @@ async def synthesize_answer(
         max_tokens = 1500
 
     keys = prompt_keys or _DEFAULT_PROMPT_KEYS
+    # Enable prompt caching on the stable system prompt.  The Anthropic API
+    # charges a 25% write premium on the first call, then only ~10% of normal
+    # input price on cache hits (5-min TTL).  Net savings: ~30-70% on repeats.
+    system_blocks: list[TextBlockParam] = [
+        TextBlockParam(
+            type="text",
+            text=get_composed_prompt(*keys),
+            cache_control={"type": "ephemeral"},
+        )
+    ]
+
     response = await get_anthropic().messages.create(
         model=settings.sonnet_model,
         max_tokens=max_tokens,
-        system=get_composed_prompt(*keys),
+        system=system_blocks,
         messages=messages,
     )
+
     # Extract text from response
     content_block = response.content[0]
-    if hasattr(content_block, "text"):
-        return str(content_block.text)
-    return str(content_block)
+    text = str(content_block.text) if hasattr(content_block, "text") else str(content_block)
+
+    usage = response.usage
+    return SynthesisResult(
+        text=text,
+        input_tokens=getattr(usage, "input_tokens", 0) or 0,
+        output_tokens=getattr(usage, "output_tokens", 0) or 0,
+        cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+        cache_creation_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
+        model=settings.sonnet_model,
+    )
 
 
 async def synthesize_answer_stream(
