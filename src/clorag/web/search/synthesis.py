@@ -5,12 +5,13 @@ using Claude, with support for both streaming and non-streaming responses.
 """
 
 import re
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
+from dataclasses import dataclass
 from typing import Any
 
 import anthropic
 import structlog
-from anthropic.types import MessageParam
+from anthropic.types import MessageParam, TextBlockParam
 
 from clorag.config import get_settings
 from clorag.services.prompt_manager import get_composed_prompt
@@ -18,6 +19,19 @@ from clorag.services.settings_manager import get_setting
 from clorag.web.search.utils import build_context
 
 logger = structlog.get_logger()
+
+
+@dataclass(frozen=True)
+class SynthesisResult:
+    """Captured outputs from one synthesis call."""
+
+    text: str  # full assembled text (for non-streaming) or "" for streaming
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    model: str
+
 
 # Lazy-loaded Anthropic client
 _anthropic_client: anthropic.AsyncAnthropic | None = None
@@ -183,6 +197,7 @@ async def synthesize_answer_stream(
     conversation_history: list[dict[str, Any]] | None = None,
     graph_context: str | None = None,
     prompt_keys: tuple[str, ...] | None = None,
+    result_sink: Callable[[SynthesisResult], None] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Stream answer synthesis using Claude.
 
@@ -192,6 +207,9 @@ async def synthesize_answer_stream(
         conversation_history: Optional list of previous messages for follow-up context.
         graph_context: Optional graph enrichment context string.
         prompt_keys: Prompt keys to compose. Defaults to identity + product + web layer.
+        result_sink: Optional callback invoked with a SynthesisResult after streaming
+            completes. Receives token usage and model metadata. Callers that do not
+            need usage data may omit this parameter (backward-compatible default).
 
     Yields:
         Text chunks from the streaming response.
@@ -235,11 +253,34 @@ async def synthesize_answer_stream(
         max_tokens = 1500
 
     keys = prompt_keys or _DEFAULT_PROMPT_KEYS
+    # Enable prompt caching on the stable system prompt.  The Anthropic API
+    # charges a 25% write premium on the first call, then only ~10% of normal
+    # input price on cache hits (5-min TTL).  Net savings: ~30-70% on repeats.
+    system_blocks: list[TextBlockParam] = [
+        TextBlockParam(
+            type="text",
+            text=get_composed_prompt(*keys),
+            cache_control={"type": "ephemeral"},
+        )
+    ]
+
     async with get_anthropic().messages.stream(
         model=settings.sonnet_model,
         max_tokens=max_tokens,
-        system=get_composed_prompt(*keys),
+        system=system_blocks,
         messages=messages,
     ) as stream:
         async for text in stream.text_stream:
             yield text
+
+        if result_sink is not None:
+            final = await stream.get_final_message()
+            usage = final.usage
+            result_sink(SynthesisResult(
+                text="",
+                input_tokens=usage.input_tokens or 0,
+                output_tokens=usage.output_tokens or 0,
+                cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+                cache_creation_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
+                model=settings.sonnet_model,
+            ))
