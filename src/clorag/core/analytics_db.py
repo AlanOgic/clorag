@@ -399,17 +399,6 @@ class AnalyticsDatabase:
                 (f"-{days} days",),
             )
             row = cursor.fetchone()
-            if not row:
-                return {
-                    "query_count": 0,
-                    "total_cost_usd": 0.0,
-                    "avg_cost_per_query": 0.0,
-                    "total_input_tokens": 0,
-                    "total_output_tokens": 0,
-                    "total_cache_read_tokens": 0,
-                    "total_cache_creation_tokens": 0,
-                    "days": days,
-                }
             return {
                 "query_count": row["query_count"],
                 "total_cost_usd": row["total_cost_usd"],
