@@ -204,8 +204,11 @@ async def synthesize_answer(
     )
 
     # Extract text from response
-    content_block = response.content[0]
-    text = str(content_block.text) if hasattr(content_block, "text") else str(content_block)
+    if not response.content:
+        text = ""
+    else:
+        content_block = response.content[0]
+        text = str(content_block.text) if hasattr(content_block, "text") else str(content_block)
 
     usage = response.usage
     return SynthesisResult(

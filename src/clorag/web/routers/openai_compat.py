@@ -236,7 +236,7 @@ async def chat_completions(
         conversation_history if conversation_history else None,
         graph_context,
     )
-    answer = synthesis_result.text  # usage available in synthesis_result (Task 8 will wire it)
+    answer = synthesis_result.text
 
     # Append sources
     answer_with_sources = _append_sources(answer, source_links)
