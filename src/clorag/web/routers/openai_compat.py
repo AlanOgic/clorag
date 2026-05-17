@@ -28,6 +28,7 @@ from clorag.web.search import (
     synthesize_answer,
     synthesize_answer_stream,
 )
+from clorag.web.search.synthesis import SynthesisResult
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -47,12 +48,19 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class StreamOptions(BaseModel):
+    """OpenAI stream_options payload."""
+
+    include_usage: bool = False
+
+
 class ChatCompletionRequest(BaseModel):
     """OpenAI-compatible chat completion request."""
 
     model: str = "clorag"
     messages: list[ChatMessage]
     stream: bool = False
+    stream_options: StreamOptions | None = None
     # Accepted but ignored — CLORAG controls its own synthesis parameters
     temperature: float | None = None
     max_tokens: int | None = None
@@ -224,6 +232,7 @@ async def chat_completions(
                 conversation_history if conversation_history else None,
                 graph_context,
                 source_links,
+                body,
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
@@ -241,6 +250,13 @@ async def chat_completions(
     # Append sources
     answer_with_sources = _append_sources(answer, source_links)
 
+    prompt_tokens = (
+        synthesis_result.input_tokens
+        + synthesis_result.cache_read_tokens
+        + synthesis_result.cache_creation_tokens
+    )
+    completion_tokens = synthesis_result.output_tokens
+
     return JSONResponse(content={
         "id": completion_id,
         "object": "chat.completion",
@@ -257,9 +273,9 @@ async def chat_completions(
             }
         ],
         "usage": {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
         },
     })
 
@@ -293,16 +309,27 @@ async def _stream_response(
     conversation_history: list[dict[str, str]] | None,
     graph_context: str | None,
     source_links: list[dict[str, Any]],
+    body: ChatCompletionRequest,
 ) -> AsyncGenerator[str, None]:
     """Stream response in OpenAI SSE format."""
     created = int(time.time())
 
+    # Capture usage if stream_options.include_usage requested
+    synth_results: list[SynthesisResult] = []
+    include_usage = (
+        body.stream_options is not None and body.stream_options.include_usage
+    )
+
     # First chunk: role
     yield _sse_chunk(completion_id, created, {"role": "assistant", "content": ""})
 
-    # Stream content
+    # Stream content — wire result_sink only when usage is requested
     async for text in synthesize_answer_stream(
-        query, chunks, conversation_history, graph_context
+        query,
+        chunks,
+        conversation_history,
+        graph_context,
+        result_sink=synth_results.append if include_usage else None,
     ):
         yield _sse_chunk(completion_id, created, {"content": text})
 
@@ -334,6 +361,28 @@ async def _stream_response(
         ],
     }
     yield f"data: {json.dumps(final_chunk)}\n\n"
+
+    # Emit usage chunk before [DONE] when include_usage=true (OpenAI spec)
+    if include_usage and synth_results:
+        sr = synth_results[0]
+        prompt_tokens = (
+            sr.input_tokens + sr.cache_read_tokens + sr.cache_creation_tokens
+        )
+        completion_tokens = sr.output_tokens
+        usage_chunk = {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": created,
+            "model": "clorag",
+            "choices": [],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+        }
+        yield f"data: {json.dumps(usage_chunk)}\n\n"
+
     yield "data: [DONE]\n\n"
 
 

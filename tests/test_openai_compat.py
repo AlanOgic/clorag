@@ -11,14 +11,20 @@ from clorag.web.routers.openai_compat import router
 from clorag.web.search.synthesis import SynthesisResult
 
 
-def _make_synth_result(text: str) -> SynthesisResult:
-    """Create a SynthesisResult with placeholder usage for tests."""
+def _make_synth_result(
+    text: str,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    cache_read_tokens: int = 0,
+    cache_creation_tokens: int = 0,
+) -> SynthesisResult:
+    """Create a SynthesisResult with configurable usage for tests."""
     return SynthesisResult(
         text=text,
-        input_tokens=0,
-        output_tokens=0,
-        cache_read_tokens=0,
-        cache_creation_tokens=0,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_read_tokens=cache_read_tokens,
+        cache_creation_tokens=cache_creation_tokens,
         model="claude-sonnet-test",
     )
 
@@ -320,3 +326,139 @@ class TestChatCompletionsStreaming:
 
         # Stream ends with [DONE]
         assert resp.text.strip().endswith("data: [DONE]")
+
+
+class TestUsageReporting:
+    """Test real token usage in non-streaming and streaming responses."""
+
+    def test_non_streaming_usage_real_values(self, client: TestClient) -> None:
+        """Non-streaming response should report real token counts."""
+        mock_chunks = [
+            {"text": "RIO config guide", "source_type": "documentation",
+             "url": "https://support.cyanview.com/rio", "title": "RIO Guide", "score": 0.9}
+        ]
+        # input=800, cache_read=0, cache_creation=600 → prompt_tokens=1400
+        # output=250 → completion_tokens=250, total=1650
+        synth_mock = AsyncMock(return_value=_make_synth_result(
+            "Here is how to configure RIO.",
+            input_tokens=800,
+            output_tokens=250,
+            cache_read_tokens=0,
+            cache_creation_tokens=600,
+        ))
+
+        with (
+            patch(SETTINGS_PATCH, return_value=_mock_settings()),
+            patch(SEARCH_PATCH, new_callable=AsyncMock,
+                  return_value=([], mock_chunks, None, True)),
+            patch(SYNTH_PATCH, synth_mock),
+        ):
+            resp = client.post(
+                "/v1/chat/completions",
+                json={"model": "clorag", "messages": [{"role": "user", "content": "How to configure RIO?"}]},
+                headers=VALID_HEADERS,
+            )
+
+        assert resp.status_code == 200
+        usage = resp.json()["usage"]
+        assert usage["prompt_tokens"] == 1400   # 800 + 0 + 600
+        assert usage["completion_tokens"] == 250
+        assert usage["total_tokens"] == 1650
+
+    def test_streaming_include_usage_emits_usage_chunk(self, client: TestClient) -> None:
+        """Streaming with include_usage=true should emit a final usage chunk before [DONE]."""
+        mock_chunks = [
+            {"text": "info", "source_type": "documentation",
+             "url": "https://example.com", "title": "Doc", "score": 0.8}
+        ]
+
+        # Synthesize result with known token counts
+        usage_result = _make_synth_result(
+            "",
+            input_tokens=500,
+            output_tokens=120,
+            cache_read_tokens=200,
+            cache_creation_tokens=0,
+        )
+
+        async def mock_stream(*args, result_sink=None, **kwargs):
+            yield "Hello "
+            yield "world"
+            if result_sink is not None:
+                result_sink(usage_result)
+
+        with (
+            patch(SETTINGS_PATCH, return_value=_mock_settings()),
+            patch(SEARCH_PATCH, new_callable=AsyncMock, return_value=([], mock_chunks, None, True)),
+            patch(STREAM_PATCH, side_effect=mock_stream),
+        ):
+            resp = client.post(
+                "/v1/chat/completions",
+                json={
+                    "model": "clorag",
+                    "messages": [{"role": "user", "content": "test"}],
+                    "stream": True,
+                    "stream_options": {"include_usage": True},
+                },
+                headers=VALID_HEADERS,
+            )
+
+        assert resp.status_code == 200
+
+        import json as _json
+        raw_lines = resp.text.strip().split("\n\n")
+
+        # Last line must be [DONE]
+        assert raw_lines[-1] == "data: [DONE]"
+
+        # Penultimate data line should be the usage chunk (empty choices)
+        usage_line = raw_lines[-2]
+        assert usage_line.startswith("data: ")
+        usage_chunk = _json.loads(usage_line.removeprefix("data: "))
+        assert usage_chunk["choices"] == []
+        assert "usage" in usage_chunk
+        # prompt_tokens = input(500) + cache_read(200) + cache_creation(0) = 700
+        assert usage_chunk["usage"]["prompt_tokens"] == 700
+        assert usage_chunk["usage"]["completion_tokens"] == 120
+        assert usage_chunk["usage"]["total_tokens"] == 820
+
+    def test_streaming_without_include_usage_no_extra_chunk(self, client: TestClient) -> None:
+        """Streaming without include_usage should NOT emit an extra usage chunk."""
+        mock_chunks = [
+            {"text": "info", "source_type": "documentation",
+             "url": "https://example.com", "title": "Doc", "score": 0.8}
+        ]
+
+        async def mock_stream(*args, result_sink=None, **kwargs):
+            yield "Hello"
+            # result_sink should be None here — but call it anyway to confirm no chunk emitted
+            if result_sink is not None:
+                result_sink(_make_synth_result("", input_tokens=100, output_tokens=50))
+
+        with (
+            patch(SETTINGS_PATCH, return_value=_mock_settings()),
+            patch(SEARCH_PATCH, new_callable=AsyncMock, return_value=([], mock_chunks, None, True)),
+            patch(STREAM_PATCH, side_effect=mock_stream),
+        ):
+            resp = client.post(
+                "/v1/chat/completions",
+                json={
+                    "model": "clorag",
+                    "messages": [{"role": "user", "content": "test"}],
+                    "stream": True,
+                },
+                headers=VALID_HEADERS,
+            )
+
+        assert resp.status_code == 200
+
+        import json as _json
+        raw_lines = resp.text.strip().split("\n\n")
+
+        # Last line is [DONE]
+        assert raw_lines[-1] == "data: [DONE]"
+
+        # Penultimate chunk is the finish_reason=stop chunk (has choices), not a usage chunk
+        penultimate = _json.loads(raw_lines[-2].removeprefix("data: "))
+        assert len(penultimate["choices"]) > 0
+        assert "usage" not in penultimate
