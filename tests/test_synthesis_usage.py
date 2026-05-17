@@ -85,3 +85,4 @@ async def test_streaming_works_without_result_sink() -> None:
             chunks.append(item)
 
     assert chunks == ["hi"]
+    fake_stream.get_final_message.assert_not_called()
