@@ -36,6 +36,19 @@ logger = structlog.get_logger()
 API_KEY_HEADER = "Authorization"
 
 
+def _openai_usage_from(sr: SynthesisResult | None) -> dict[str, int]:
+    """Compute OpenAI-format usage dict from a SynthesisResult (or zeros if None)."""
+    if sr is None:
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    prompt_tokens = sr.input_tokens + sr.cache_read_tokens + sr.cache_creation_tokens
+    completion_tokens = sr.output_tokens
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": prompt_tokens + completion_tokens,
+    }
+
+
 # =============================================================================
 # Pydantic models (OpenAI format)
 # =============================================================================
@@ -250,13 +263,6 @@ async def chat_completions(
     # Append sources
     answer_with_sources = _append_sources(answer, source_links)
 
-    prompt_tokens = (
-        synthesis_result.input_tokens
-        + synthesis_result.cache_read_tokens
-        + synthesis_result.cache_creation_tokens
-    )
-    completion_tokens = synthesis_result.output_tokens
-
     return JSONResponse(content={
         "id": completion_id,
         "object": "chat.completion",
@@ -272,11 +278,7 @@ async def chat_completions(
                 "finish_reason": "stop",
             }
         ],
-        "usage": {
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": prompt_tokens + completion_tokens,
-        },
+        "usage": _openai_usage_from(synthesis_result),
     })
 
 
@@ -363,23 +365,16 @@ async def _stream_response(
     yield f"data: {json.dumps(final_chunk)}\n\n"
 
     # Emit usage chunk before [DONE] when include_usage=true (OpenAI spec)
-    if include_usage and synth_results:
-        sr = synth_results[0]
-        prompt_tokens = (
-            sr.input_tokens + sr.cache_read_tokens + sr.cache_creation_tokens
-        )
-        completion_tokens = sr.output_tokens
+    # Per spec: must emit usage chunk even if synthesis failed (synth_results empty)
+    if include_usage:
+        sr = synth_results[0] if synth_results else None
         usage_chunk = {
             "id": completion_id,
             "object": "chat.completion.chunk",
             "created": created,
             "model": "clorag",
             "choices": [],
-            "usage": {
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "total_tokens": prompt_tokens + completion_tokens,
-            },
+            "usage": _openai_usage_from(sr),
         }
         yield f"data: {json.dumps(usage_chunk)}\n\n"
 

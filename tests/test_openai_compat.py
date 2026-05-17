@@ -462,3 +462,53 @@ class TestUsageReporting:
         penultimate = _json.loads(raw_lines[-2].removeprefix("data: "))
         assert len(penultimate["choices"]) > 0
         assert "usage" not in penultimate
+
+    def test_streaming_include_usage_with_synthesis_failure_emits_zero_usage(
+        self, client: TestClient
+    ) -> None:
+        """Per OpenAI spec: include_usage=true MUST emit usage chunk even on synthesis failure."""
+        mock_chunks = [
+            {"text": "info", "source_type": "documentation",
+             "url": "https://example.com", "title": "Doc", "score": 0.8}
+        ]
+
+        async def mock_stream_fails(*args, result_sink=None, **kwargs):
+            """Simulate synthesis that yields content but never calls result_sink (error case)."""
+            yield "Partial "
+            yield "answer"
+            # Never calls result_sink — simulating synthesis error mid-stream
+
+        with (
+            patch(SETTINGS_PATCH, return_value=_mock_settings()),
+            patch(SEARCH_PATCH, new_callable=AsyncMock, return_value=([], mock_chunks, None, True)),
+            patch(STREAM_PATCH, side_effect=mock_stream_fails),
+        ):
+            resp = client.post(
+                "/v1/chat/completions",
+                json={
+                    "model": "clorag",
+                    "messages": [{"role": "user", "content": "test"}],
+                    "stream": True,
+                    "stream_options": {"include_usage": True},
+                },
+                headers=VALID_HEADERS,
+            )
+
+        assert resp.status_code == 200
+
+        import json as _json
+        raw_lines = resp.text.strip().split("\n\n")
+
+        # Last line is [DONE]
+        assert raw_lines[-1] == "data: [DONE]"
+
+        # Penultimate chunk MUST be usage (even though synth failed)
+        usage_line = raw_lines[-2]
+        assert usage_line.startswith("data: ")
+        usage_chunk = _json.loads(usage_line.removeprefix("data: "))
+        # Usage chunk has empty choices and all zeros (no SynthesisResult captured)
+        assert usage_chunk["choices"] == []
+        assert "usage" in usage_chunk
+        assert usage_chunk["usage"]["prompt_tokens"] == 0
+        assert usage_chunk["usage"]["completion_tokens"] == 0
+        assert usage_chunk["usage"]["total_tokens"] == 0
