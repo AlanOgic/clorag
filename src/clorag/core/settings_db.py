@@ -34,7 +34,14 @@ def get_settings_database() -> SettingsDatabase:
 
 
 # Valid categories for settings
-SETTING_CATEGORIES = frozenset({"retrieval", "reranking", "synthesis", "caches", "prefetch", "pricing"})
+SETTING_CATEGORIES = frozenset({
+    "retrieval",
+    "reranking",
+    "synthesis",
+    "caches",
+    "prefetch",
+    "pricing",
+})
 
 # Valid value types
 SETTING_VALUE_TYPES = frozenset({"int", "float", "bool"})
