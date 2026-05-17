@@ -451,6 +451,32 @@
             color: #606770;
             font-size: 0.85rem;
         }
+
+        /* Cost trend table */
+        .cost-trend-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .cost-trend-table th,
+        .cost-trend-table td {
+            text-align: left;
+            padding: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .cost-trend-table th {
+            font-weight: 600;
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .cost-trend-table td:nth-child(2),
+        .cost-trend-table td:nth-child(3) {
+            text-align: right;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
     </style>
     <script src="/static/js/admin.js"></script>
 </head>
@@ -524,6 +550,38 @@
                     </button>
                 </div>
                 <div class="daily-chart" id="dailyChart"></div>
+            </div>
+
+            <!-- Synthesis Cost -->
+            <div class="section">
+                <h3 class="section__title">Synthesis Cost (Last 30 Days)</h3>
+                <div class="stats-grid" id="costSummaryGrid">
+                    <div class="stat-card">
+                        <div class="stat-card__value" id="costTotal">-</div>
+                        <div class="stat-card__label">Total Cost</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__value" id="costQueries">-</div>
+                        <div class="stat-card__label">Queries Tracked</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__value" id="costAvg">-</div>
+                        <div class="stat-card__label">Avg / Query</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__value" id="costCacheTokens">-</div>
+                        <div class="stat-card__label">Cache Read Tokens</div>
+                    </div>
+                </div>
+                <h4 style="margin: 1rem 0 0.25rem; font-size: 0.95rem; color: var(--cyanview-navy);">Daily Trend</h4>
+                <table class="cost-trend-table">
+                    <thead>
+                        <tr><th>Day</th><th>Queries</th><th>Cost (USD)</th></tr>
+                    </thead>
+                    <tbody id="costTrendBody">
+                        <tr><td colspan="3" style="text-align:center; color:#999;">Loading…</td></tr>
+                    </tbody>
+                </table>
             </div>
 
             <!-- Source Insights -->
@@ -746,10 +804,54 @@
             // Recent searches table
             renderRecentTable(data.recent_searches || []);
 
-            // Load source insights, conversations, and feedback separately
+            // Load source insights, conversations, feedback, and cost separately
             loadSourceInsights();
             loadConversations();
             loadFeedback();
+            loadCostSummary();
+            loadCostTrend();
+        }
+
+        async function loadCostSummary() {
+            try {
+                const response = await fetch('/api/admin/cost-summary?days=30');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                document.getElementById('costTotal').textContent =
+                    '$' + Number(data.total_cost_usd).toFixed(4);
+                document.getElementById('costQueries').textContent =
+                    Number(data.query_count).toLocaleString();
+                document.getElementById('costAvg').textContent =
+                    '$' + Number(data.avg_cost_per_query).toFixed(6);
+                document.getElementById('costCacheTokens').textContent =
+                    Number(data.total_cache_read_tokens).toLocaleString();
+            } catch (error) {
+                console.error('Failed to load cost summary:', error);
+            }
+        }
+
+        async function loadCostTrend() {
+            try {
+                const response = await fetch('/api/admin/cost-trend?days=30');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                const tbody = document.getElementById('costTrendBody');
+                if (!data.trend || !data.trend.length) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#999;">No cost data yet</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.trend.map(row =>
+                    `<tr>
+                        <td>${escapeHtml(row.day)}</td>
+                        <td>${Number(row.query_count).toLocaleString()}</td>
+                        <td>$${Number(row.cost_usd).toFixed(4)}</td>
+                    </tr>`
+                ).join('');
+            } catch (error) {
+                console.error('Failed to load cost trend:', error);
+                document.getElementById('costTrendBody').innerHTML =
+                    '<tr><td colspan="3" style="text-align:center; color:#e53935;">Failed to load</td></tr>';
+            }
         }
 
         async function loadSourceInsights() {
