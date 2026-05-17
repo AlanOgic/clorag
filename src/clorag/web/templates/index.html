@@ -593,6 +593,7 @@
             margin-top: 1rem;
             padding-top: 0.75rem;
             border-top: 1px solid #f0f0f0;
+            flex-wrap: wrap;
         }
 
         .feedback-label {
@@ -2404,20 +2405,24 @@ ${bodyContent}
             const el = document.getElementById(`usage-${exchangeId}`);
             if (!el) return;
             const tokFmt = new Intl.NumberFormat('en-US').format(usage.total_tokens);
-            const costFmt = usage.cost_usd < 0.001
+            const costNum = Number(usage.cost_usd) || 0;
+            const costFmt = costNum < 0.001
                 ? '&lt;$0.001'
-                : `$${usage.cost_usd.toFixed(4)}`;
-            const cachePill = usage.cache_hit_pct > 0
-                ? `<span class="sep">·</span><span class="cache-pill">🧠 ${usage.cache_hit_pct}%</span>`
+                : `$${costNum.toFixed(4)}`;
+            const cacheHitPct = Number(usage.cache_hit_pct) || 0;
+            const cachePill = cacheHitPct > 0
+                ? `<span class="sep">·</span><span class="cache-pill">🧠 ${cacheHitPct.toFixed(0)}%</span>`
                 : '';
             el.innerHTML = `${tokFmt} tok <span class="sep">·</span> ${costFmt}${cachePill}`;
+            const breakdown = usage.breakdown || {};
+            const fmt = (n) => Number(n || 0).toLocaleString();
             el.title = [
-                `Model: ${usage.model}`,
-                `Input: ${usage.breakdown.input_tokens.toLocaleString()} tok`,
-                `Cache read: ${usage.breakdown.cache_read_tokens.toLocaleString()} tok`,
-                `Cache write: ${usage.breakdown.cache_creation_tokens.toLocaleString()} tok`,
-                `Output: ${usage.breakdown.output_tokens.toLocaleString()} tok`,
-                `Total cost: $${usage.cost_usd.toFixed(6)}`,
+                `Model: ${usage.model || 'unknown'}`,
+                `Input: ${fmt(breakdown.input_tokens)} tok`,
+                `Cache read: ${fmt(breakdown.cache_read_tokens)} tok`,
+                `Cache write: ${fmt(breakdown.cache_creation_tokens)} tok`,
+                `Output: ${fmt(breakdown.output_tokens)} tok`,
+                `Total cost: $${costNum.toFixed(6)}`,
             ].join('\n');
             el.style.display = 'inline-flex';
         }
