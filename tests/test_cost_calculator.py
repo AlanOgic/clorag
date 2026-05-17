@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import pytest
 
-from clorag.core.cost_calculator import CostBreakdown, calculate_cost
+from clorag.core.cost_calculator import calculate_cost  # type: ignore[import-untyped]
 
 
 class FakeSettings:
     """Stub for get_settings_manager().get_float() — avoids DB."""
 
-    def __init__(self, prices: dict[str, float]):
+    def __init__(self, prices: dict[str, float]) -> None:
         self._prices = prices
 
     def get_float(self, key: str) -> float:
@@ -17,7 +17,7 @@ class FakeSettings:
 
 
 @pytest.fixture
-def prices():
+def prices() -> FakeSettings:
     return FakeSettings({
         "pricing.input_price_per_mtok": 3.00,
         "pricing.output_price_per_mtok": 15.00,
@@ -26,7 +26,7 @@ def prices():
     })
 
 
-def test_basic_input_output_cost(prices):
+def test_basic_input_output_cost(prices: FakeSettings) -> None:
     """1M input + 1M output = $3 + $15 = $18."""
     result = calculate_cost(
         input_tokens=1_000_000,
@@ -43,7 +43,7 @@ def test_basic_input_output_cost(prices):
     assert result.cache_hit_pct == 0.0
 
 
-def test_cache_read_and_write_priced_separately(prices):
+def test_cache_read_and_write_priced_separately(prices: FakeSettings) -> None:
     """500K cache-read + 200K cache-write at sonnet prices."""
     result = calculate_cost(
         input_tokens=100_000,
@@ -59,7 +59,7 @@ def test_cache_read_and_write_priced_separately(prices):
     assert result.total_cost_usd == pytest.approx(1.95)
 
 
-def test_cache_hit_pct_computed_over_input_side(prices):
+def test_cache_hit_pct_computed_over_input_side(prices: FakeSettings) -> None:
     """Cache hit % = cache_read / (input + cache_read + cache_creation)."""
     result = calculate_cost(
         input_tokens=200,
@@ -71,7 +71,7 @@ def test_cache_hit_pct_computed_over_input_side(prices):
     assert result.cache_hit_pct == pytest.approx(80.0)
 
 
-def test_zero_input_side_yields_zero_cache_pct(prices):
+def test_zero_input_side_yields_zero_cache_pct(prices: FakeSettings) -> None:
     """Avoid division by zero when no input-side tokens at all."""
     result = calculate_cost(
         input_tokens=0,
@@ -83,7 +83,7 @@ def test_zero_input_side_yields_zero_cache_pct(prices):
     assert result.cache_hit_pct == 0.0
 
 
-def test_breakdown_is_immutable_dataclass(prices):
+def test_breakdown_is_immutable_dataclass(prices: FakeSettings) -> None:
     """CostBreakdown should be a frozen dataclass."""
     result = calculate_cost(
         input_tokens=100,
@@ -92,5 +92,5 @@ def test_breakdown_is_immutable_dataclass(prices):
         cache_creation_tokens=0,
         settings=prices,
     )
-    with pytest.raises((AttributeError, Exception)):
-        result.total_cost_usd = 999.0  # type: ignore[misc]
+    with pytest.raises(AttributeError):
+        result.total_cost_usd = 999.0
