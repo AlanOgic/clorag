@@ -407,8 +407,7 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="pricing.input_price_per_mtok",
         name="Input Price (USD per MTok)",
         description=(
-            "Price per million input tokens for the synthesis model."
-            " Sonnet 4.6 = 3.00, Opus 4.7 = 15.00, Haiku 4.5 = 0.80."
+            "Price per million input tokens for the synthesis model, in USD. Update when you change the active model — see Anthropic's pricing page for current values."
         ),
         category="pricing",
         value_type="float",
@@ -421,8 +420,7 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="pricing.output_price_per_mtok",
         name="Output Price (USD per MTok)",
         description=(
-            "Price per million output tokens."
-            " Sonnet 4.6 = 15.00, Opus 4.7 = 75.00, Haiku 4.5 = 4.00."
+            "Price per million output tokens for the synthesis model, in USD. Update when you change the active model — see Anthropic's pricing page for current values."
         ),
         category="pricing",
         value_type="float",
@@ -435,8 +433,7 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="pricing.cache_read_price_per_mtok",
         name="Cache Read Price (USD per MTok)",
         description=(
-            "Price per million cache-read tokens"
-            " (10% of input price for Anthropic)."
+            "Price per million cache-read input tokens, in USD. Typically 10% of the input price for Anthropic prompt caching."
         ),
         category="pricing",
         value_type="float",
@@ -449,8 +446,7 @@ DEFAULT_SETTINGS: list[SettingDefinition] = [
         key="pricing.cache_write_price_per_mtok",
         name="Cache Write Price (USD per MTok, 5-min TTL)",
         description=(
-            "Price per million cache-creation tokens at 5-minute TTL"
-            " (125% of input price)."
+            "Price per million cache-creation tokens at 5-minute TTL, in USD. Typically 125% of the input price for Anthropic prompt caching."
         ),
         category="pricing",
         value_type="float",
