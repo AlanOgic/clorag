@@ -5,6 +5,8 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from clorag.core.analytics_db import AnalyticsDatabase, _extract_preview
 
 
@@ -122,3 +124,96 @@ class TestLogSearchNewFields:
         convs = db.get_recent_conversations(limit=5)
         assert convs
         assert convs[0]["queries"][0]["response_preview"] == "First sentence here. Second sentence."
+
+
+class TestCostColumns:
+    """Verify token + cost columns persist correctly."""
+
+    def _db(self, path: Path) -> AnalyticsDatabase:
+        return AnalyticsDatabase(db_path=str(path / "a.db"))
+
+    def test_log_search_persists_cost_fields(self) -> None:
+        tmp = tempfile.mkdtemp()
+        db = self._db(Path(tmp))
+        search_id = db.log_search(
+            query="test query",
+            source="both",
+            response_time_ms=1234,
+            results_count=5,
+            input_tokens=1500,
+            output_tokens=400,
+            cache_read_tokens=1200,
+            cache_creation_tokens=0,
+            cost_usd=0.0123,
+            model="claude-sonnet-4-6",
+        )
+        assert search_id > 0
+
+        row = db.get_search_by_id(search_id)
+        assert row is not None
+        assert row["input_tokens"] == 1500
+        assert row["output_tokens"] == 400
+        assert row["cache_read_tokens"] == 1200
+        assert row["cache_creation_tokens"] == 0
+        assert row["cost_usd"] == pytest.approx(0.0123)
+        assert row["model"] == "claude-sonnet-4-6"
+
+    def test_log_search_works_without_cost_fields(self) -> None:
+        """Backward compat — existing callers may not pass cost."""
+        tmp = tempfile.mkdtemp()
+        db = self._db(Path(tmp))
+        search_id = db.log_search(query="legacy call", source="docs")
+        row = db.get_search_by_id(search_id)
+        assert row is not None
+        assert row["cost_usd"] is None
+        assert row["input_tokens"] is None
+
+    def test_cost_summary_aggregates(self) -> None:
+        tmp = tempfile.mkdtemp()
+        db = self._db(Path(tmp))
+        for cost in (0.01, 0.02, 0.03):
+            db.log_search(
+                query="q",
+                source="both",
+                input_tokens=100,
+                output_tokens=200,
+                cost_usd=cost,
+                model="claude-sonnet-4-6",
+            )
+
+        summary = db.get_cost_summary(days=30)
+        assert summary["total_cost_usd"] == pytest.approx(0.06)
+        assert summary["query_count"] == 3
+        assert summary["avg_cost_per_query"] == pytest.approx(0.02)
+        assert summary["total_input_tokens"] == 300
+        assert summary["total_output_tokens"] == 600
+
+    def test_migration_adds_columns_to_existing_db(self) -> None:
+        """Pre-existing DB without cost columns gets ALTER TABLE'd on init."""
+        import sqlite3
+
+        tmp = tempfile.mkdtemp()
+        db_path = Path(tmp) / "a.db"
+        conn = sqlite3.connect(db_path)
+        conn.execute("""
+            CREATE TABLE search_queries (
+                id INTEGER PRIMARY KEY,
+                query TEXT NOT NULL,
+                source TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+        db = AnalyticsDatabase(db_path=str(db_path))
+
+        search_id = db.log_search(
+            query="post-migration",
+            source="both",
+            cost_usd=0.99,
+            input_tokens=10,
+        )
+        row = db.get_search_by_id(search_id)
+        assert row is not None
+        assert row["cost_usd"] == pytest.approx(0.99)
